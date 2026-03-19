@@ -1,3 +1,5 @@
+import axios, { AxiosError } from "axios";
+
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
@@ -5,6 +7,12 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   error: { code: string; message: string } | null;
+}
+
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    skipAuth?: boolean;
+  }
 }
 
 let authToken: string | null = null;
@@ -20,53 +28,78 @@ export function getAuthToken(): string | null {
   return authToken;
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit & { skipAuth?: boolean } = {},
-): Promise<ApiResponse<T>> {
-  const { skipAuth, ...fetchOptions } = options;
-  const headers: Record<string, string> = {
+const axiosInstance = axios.create({
+  baseURL: BASE_URL,
+  headers: {
     "Content-Type": "application/json",
-    ...(fetchOptions.headers as Record<string, string>),
-  };
+  },
+});
 
-  if (!skipAuth) {
-    const token = getAuthToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+axiosInstance.interceptors.request.use(
+  (config) => {
+    if (!config.skipAuth) {
+      const token = getAuthToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+axiosInstance.interceptors.response.use(
+  (response) => {
+    if (response.status === 204) {
+      return { ...response, data: { success: true, data: null, error: null } };
+    }
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("hermes_token");
+        window.dispatchEvent(new Event("unauthorized"));
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
+async function requestWrapper<T>(
+  requestFn: () => Promise<{ data: ApiResponse<T> }>,
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await requestFn();
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.data) {
+      return error.response.data as ApiResponse<T>;
+    }
+    return {
+      success: false,
+      data: null as unknown as T,
+      error: {
+        code: "UNKNOWN_ERROR",
+        message:
+          error instanceof Error ? error.message : "An unknown error occurred",
+      },
+    };
   }
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...fetchOptions,
-    headers,
-  });
-
-  if (!res.ok && res.status === 204) {
-    return { success: true, data: null as T, error: null };
-  }
-
-  const json = await res.json();
-  return json as ApiResponse<T>;
 }
 
 export const api = {
   get: <T>(path: string, extraHeaders?: Record<string, string>) =>
-    request<T>(path, {
-      method: "GET",
-      headers: extraHeaders,
-    }),
+    requestWrapper<T>(() => axiosInstance.get(path, { headers: extraHeaders })),
 
   post: <T>(path: string, body?: unknown, opts?: { skipAuth?: boolean }) =>
-    request<T>(path, {
-      method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
-      skipAuth: opts?.skipAuth,
-    }),
+    requestWrapper<T>(() =>
+      axiosInstance.post(path, body, { skipAuth: opts?.skipAuth }),
+    ),
 
   put: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: "PUT",
-      body: body ? JSON.stringify(body) : undefined,
-    }),
+    requestWrapper<T>(() => axiosInstance.put(path, body)),
 
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string) =>
+    requestWrapper<T>(() => axiosInstance.delete(path)),
 };

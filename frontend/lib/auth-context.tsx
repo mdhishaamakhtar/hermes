@@ -56,8 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+    window.addEventListener("unauthorized", handleUnauthorized);
+
     const savedToken = localStorage.getItem("hermes_token");
     if (!savedToken) return; // isLoading already false from lazy init
+
     api
       .get<User>("/api/auth/me")
       .then((res) => {
@@ -66,6 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(logout)
       .finally(() => setIsLoading(false));
+
+    return () => window.removeEventListener("unauthorized", handleUnauthorized);
   }, []);
 
   return (

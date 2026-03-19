@@ -170,6 +170,7 @@ export default function QuizEditorPage() {
       `/api/questions/${editingQuestion.id}`,
       {
         text: editText,
+        orderIndex: editingQuestion.orderIndex,
         timeLimitSeconds: editTime,
         options: editOptions,
       },
