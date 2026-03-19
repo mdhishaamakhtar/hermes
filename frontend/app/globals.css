@@ -62,7 +62,9 @@ body {
   padding: 0.75rem 1rem;
   font-size: 1rem;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 
   &::placeholder {
     color: color-mix(in srgb, var(--color-muted) 30%, transparent);
@@ -105,14 +107,27 @@ body {
 }
 
 /* ─── Glow effects ───────────────────────────────────────────────────────── */
-.glow-blue  { box-shadow: 0 0 20px rgba(37,  99,  235, 0.4); }
-.glow-green { box-shadow: 0 0 20px rgba(34,  197, 94,  0.4); }
-.glow-red   { box-shadow: 0 0 20px rgba(239, 68,  68,  0.4); }
+.glow-blue {
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+}
+.glow-green {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+}
+.glow-red {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
 
 /* ─── Live dot animation ─────────────────────────────────────────────────── */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1;   transform: scale(1);   }
-  50%       { opacity: 0.5; transform: scale(1.3); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
 }
 
 .live-dot {

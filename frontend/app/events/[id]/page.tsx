@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, useActionState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -30,7 +30,6 @@ export default function EventPage() {
   const [showForm, setShowForm] = useState(false);
   const [quizTitle, setQuizTitle] = useState("");
   const [orderIndex, setOrderIndex] = useState(1);
-  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace("/auth/login");
@@ -44,12 +43,12 @@ export default function EventPage() {
     });
   }, [id, user, router]);
 
-  const handleCreateQuiz = async (e: FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
+  const handleCreateQuiz = async (_prev: null, formData: FormData) => {
+    const title = formData.get("quizTitle") as string;
+    const order = Number(formData.get("orderIndex"));
     const res = await api.post<Quiz>(`/api/events/${id}/quizzes`, {
-      title: quizTitle,
-      orderIndex,
+      title,
+      orderIndex: order,
     });
     if (res.success) {
       setEvent((prev) =>
@@ -66,8 +65,10 @@ export default function EventPage() {
       setOrderIndex((event?.quizzes?.length ?? 0) + 2);
       setShowForm(false);
     }
-    setCreating(false);
+    return null;
   };
+
+  const [, createQuizAction, creating] = useActionState(handleCreateQuiz, null);
 
   if (isLoading || !user || !event) return null;
 
@@ -110,13 +111,14 @@ export default function EventPage() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              onSubmit={handleCreateQuiz}
+              action={createQuizAction}
               className="mb-6 border border-border bg-surface p-5 space-y-4"
             >
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="label block mb-2">Title</label>
                   <input
+                    name="quizTitle"
                     value={quizTitle}
                     onChange={(e) => setQuizTitle(e.target.value)}
                     required
@@ -128,6 +130,7 @@ export default function EventPage() {
                   <label className="label block mb-2">Order</label>
                   <input
                     type="number"
+                    name="orderIndex"
                     value={orderIndex}
                     onChange={(e) => setOrderIndex(Number(e.target.value))}
                     min={1}
@@ -172,7 +175,10 @@ export default function EventPage() {
                       {quiz.title}
                     </span>
                   </div>
-                  <span aria-hidden className="text-muted/40 group-hover:text-accent transition-colors select-none">
+                  <span
+                    aria-hidden
+                    className="text-muted/40 group-hover:text-accent transition-colors select-none"
+                  >
                     →
                   </span>
                 </div>

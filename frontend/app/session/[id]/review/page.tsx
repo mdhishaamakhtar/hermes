@@ -238,7 +238,7 @@ export default function ReviewPage() {
                         {currentQuestion.text}
                       </h2>
                     </div>
-                    <span className="text-xs text-muted tabular-nums ml-4 flex-shrink-0">
+                    <span className="text-xs text-muted tabular-nums ml-4 shrink-0">
                       {currentQuestion.totalAnswers} answers
                     </span>
                   </div>

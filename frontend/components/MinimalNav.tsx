@@ -7,7 +7,10 @@ import Logo from "./Logo";
  */
 export default function MinimalNav() {
   return (
-    <nav className="px-8 py-6 border-b border-border" aria-label="Site navigation">
+    <nav
+      className="px-8 py-6 border-b border-border"
+      aria-label="Site navigation"
+    >
       <Link href="/" aria-label="Hermes — home">
         <Logo size="sm" />
       </Link>

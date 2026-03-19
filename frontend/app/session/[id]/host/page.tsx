@@ -266,7 +266,9 @@ export default function HostPage() {
                 <button
                   onClick={handleCopyCode}
                   disabled={!joinCode}
-                  aria-label={copied ? "Join code copied to clipboard" : "Copy join code"}
+                  aria-label={
+                    copied ? "Join code copied to clipboard" : "Copy join code"
+                  }
                   className={`text-xs tracking-widest uppercase transition-all px-4 py-2 border disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     copied
                       ? "text-success border-success/25 bg-success/5"
@@ -337,7 +339,9 @@ export default function HostPage() {
                         fontVariantNumeric: "tabular-nums",
                         color: timerColor,
                         textShadow:
-                          timeLeft <= 5 ? `0 0 16px rgba(239,68,68,0.5)` : "none",
+                          timeLeft <= 5
+                            ? `0 0 16px rgba(239,68,68,0.5)`
+                            : "none",
                       }}
                     >
                       {timeLeft}s
@@ -471,14 +475,19 @@ export default function HostPage() {
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
-                    <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" aria-hidden />
+                    <span
+                      className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin"
+                      aria-hidden
+                    />
                     Loading
                   </span>
                 ) : currentQuestion.questionIndex ===
-                    currentQuestion.totalQuestions ? (
+                  currentQuestion.totalQuestions ? (
                   "End Quiz"
                 ) : (
-                  <>Next Question <span aria-hidden>→</span></>
+                  <>
+                    Next Question <span aria-hidden>→</span>
+                  </>
                 )}
               </button>
               <button

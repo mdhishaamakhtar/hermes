@@ -358,7 +358,7 @@ export default function PlayPage() {
                       }}
                     >
                       <span
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center font-mono font-bold text-xs text-white mt-0.5"
+                        className="shrink-0 w-7 h-7 flex items-center justify-center font-mono font-bold text-xs text-white mt-0.5"
                         style={{ background: meta.color }}
                         aria-hidden
                       >
@@ -370,12 +370,12 @@ export default function PlayPage() {
                         </p>
                       </div>
                       {state === "correct" && (
-                        <span className="text-success text-lg flex-shrink-0 mt-0.5">
+                        <span className="text-success text-lg shrink-0 mt-0.5">
                           ✓
                         </span>
                       )}
                       {state === "wrong" && (
-                        <span className="text-danger text-lg flex-shrink-0 mt-0.5">
+                        <span className="text-danger text-lg shrink-0 mt-0.5">
                           ✗
                         </span>
                       )}
@@ -385,7 +385,7 @@ export default function PlayPage() {
             </div>
 
             {/* Status message */}
-            <div aria-live="polite" aria-atomic="true" className="mt-6 min-h-[1.5rem]">
+            <div aria-live="polite" aria-atomic="true" className="mt-6 min-h-6">
               <AnimatePresence>
                 {answerSubmitted && correctOptionId === null && (
                   <motion.p

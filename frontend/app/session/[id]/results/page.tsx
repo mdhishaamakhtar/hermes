@@ -39,7 +39,10 @@ export default function ResultsPage() {
   useEffect(() => {
     void (async () => {
       const rejoinToken = localStorage.getItem(`hermes_rejoin_${sessionId}`);
-      if (!rejoinToken) { setError("Session not found"); return; }
+      if (!rejoinToken) {
+        setError("Session not found");
+        return;
+      }
       try {
         const res = await api.get<MyResults>(
           `/api/sessions/${sessionId}/my-results`,
@@ -47,14 +50,18 @@ export default function ResultsPage() {
         );
         if (res.success) setResults(res.data);
         else setError(res.error?.message || "Failed to load results");
-      } catch { setError("Connection failed"); }
+      } catch {
+        setError("Connection failed");
+      }
     })();
   }, [sessionId]);
 
   if (error) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
-        <p className="label text-danger mb-6" role="alert">{error}</p>
+        <p className="label text-danger mb-6" role="alert">
+          {error}
+        </p>
         <button
           onClick={() => router.push("/")}
           className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -142,16 +149,20 @@ export default function ResultsPage() {
                 className={`border bg-surface p-5 ${
                   q.isCorrect ? "border-success/20" : "border-border"
                 }`}
-                style={q.isCorrect ? { boxShadow: "0 0 12px rgba(34,197,94,0.06)" } : {}}
+                style={
+                  q.isCorrect
+                    ? { boxShadow: "0 0 12px rgba(34,197,94,0.06)" }
+                    : {}
+                }
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-start gap-3">
-                    <span className="font-mono text-xs text-muted tabular-nums mt-0.5 flex-shrink-0">
+                    <span className="font-mono text-xs text-muted tabular-nums mt-0.5 shrink-0">
                       {q.orderIndex}.
                     </span>
                     <p className="text-sm text-foreground">{q.questionText}</p>
                   </div>
-                  <div className="flex-shrink-0 flex items-center gap-2">
+                  <div className="shrink-0 flex items-center gap-2">
                     {q.isCorrect ? (
                       <>
                         <span
@@ -160,7 +171,10 @@ export default function ResultsPage() {
                         >
                           +{q.pointsEarned}
                         </span>
-                        <span className="text-success text-base" style={{ textShadow: "0 0 8px rgba(34,197,94,0.4)" }}>
+                        <span
+                          className="text-success text-base"
+                          style={{ textShadow: "0 0 8px rgba(34,197,94,0.4)" }}
+                        >
                           ✓
                         </span>
                       </>
@@ -173,19 +187,32 @@ export default function ResultsPage() {
                 <div className="ml-6 space-y-1">
                   {q.selectedOptionId !== null && !q.isCorrect && (
                     <div className="flex items-center gap-2">
-                      <span className="label opacity-60 w-14 flex-shrink-0">Yours</span>
-                      <span className="text-xs text-danger line-through">{q.selectedOptionText}</span>
+                      <span className="label opacity-60 w-14 shrink-0">
+                        Yours
+                      </span>
+                      <span className="text-xs text-danger line-through">
+                        {q.selectedOptionText}
+                      </span>
                     </div>
                   )}
                   {q.selectedOptionId === null && (
                     <div className="flex items-center gap-2">
-                      <span className="label opacity-60 w-14 flex-shrink-0">Yours</span>
-                      <span className="text-xs text-muted/40 italic">Not answered</span>
+                      <span className="label opacity-60 w-14 shrink-0">
+                        Yours
+                      </span>
+                      <span className="text-xs text-muted/40 italic">
+                        Not answered
+                      </span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="label opacity-60 w-14 flex-shrink-0">Correct</span>
-                    <span className="text-xs text-success" style={{ textShadow: "0 0 6px rgba(34,197,94,0.3)" }}>
+                    <span className="label opacity-60 w-14 shrink-0">
+                      Correct
+                    </span>
+                    <span
+                      className="text-xs text-success"
+                      style={{ textShadow: "0 0 6px rgba(34,197,94,0.3)" }}
+                    >
                       {q.correctOptionText}
                     </span>
                   </div>
@@ -200,7 +227,10 @@ export default function ResultsPage() {
           transition={{ delay: (results.questions?.length ?? 0) * 0.06 + 0.2 }}
           className="text-center mt-10"
         >
-          <Link href="/" className="label hover:text-foreground transition-colors">
+          <Link
+            href="/"
+            className="label hover:text-foreground transition-colors"
+          >
             Back to Home
           </Link>
         </motion.div>

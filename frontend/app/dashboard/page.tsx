@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -20,9 +20,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [creating, setCreating] = useState(false);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
@@ -37,18 +34,18 @@ export default function DashboardPage() {
     });
   }, [user]);
 
-  const handleCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
+  const handleCreate = async (_prev: null, formData: FormData) => {
+    const title = formData.get("title") as string;
+    const description = formData.get("description") as string;
     const res = await api.post<Event>("/api/events", { title, description });
     if (res.success) {
       setEvents((prev) => [res.data, ...prev]);
-      setTitle("");
-      setDescription("");
       setShowForm(false);
     }
-    setCreating(false);
+    return null;
   };
+
+  const [, createAction, creating] = useActionState(handleCreate, null);
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,7 +62,9 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-10">
           <div>
             <p className="label mb-1">Organiser</p>
-            <h1 className="text-2xl font-bold text-foreground leading-tight">Events</h1>
+            <h1 className="text-2xl font-bold text-foreground leading-tight">
+              Events
+            </h1>
           </div>
           <button
             onClick={() => setShowForm((v) => !v)}
@@ -83,14 +82,13 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.15 }}
-              onSubmit={handleCreate}
+              action={createAction}
               className="mb-8 border border-border bg-surface p-6 space-y-4"
             >
               <div>
                 <label className="label block mb-2">Title</label>
                 <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  name="title"
                   required
                   className="input-field"
                   placeholder="Event title"
@@ -99,8 +97,7 @@ export default function DashboardPage() {
               <div>
                 <label className="label block mb-2">Description</label>
                 <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  name="description"
                   rows={2}
                   className="input-field resize-none"
                   placeholder="Optional description"
@@ -122,13 +119,20 @@ export default function DashboardPage() {
         {fetching ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-surface border border-border animate-pulse" />
+              <div
+                key={i}
+                className="h-20 bg-surface border border-border animate-pulse"
+              />
             ))}
           </div>
         ) : events.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-muted text-sm tracking-wide mb-2">No events yet</p>
-            <p className="text-muted/50 text-xs">Create your first event to get started</p>
+            <p className="text-muted text-sm tracking-wide mb-2">
+              No events yet
+            </p>
+            <p className="text-muted/50 text-xs">
+              Create your first event to get started
+            </p>
           </div>
         ) : (
           <motion.div className="space-y-px">
@@ -161,7 +165,12 @@ export default function DashboardPage() {
                     >
                       Delete
                     </button>
-                    <span aria-hidden className="text-muted/40 group-hover:text-accent transition-colors select-none">→</span>
+                    <span
+                      aria-hidden
+                      className="text-muted/40 group-hover:text-accent transition-colors select-none"
+                    >
+                      →
+                    </span>
                   </div>
                 </motion.div>
               ))}

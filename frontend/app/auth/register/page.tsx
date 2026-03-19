@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -8,43 +8,58 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import MinimalNav from "@/components/MinimalNav";
 
+interface RegisterState {
+  error: string;
+}
+
 export default function RegisterPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const regRes = await api.post<{
-        id: number; email: string; displayName: string; createdAt: string;
-      }>("/api/auth/register", { email, password, displayName }, { skipAuth: true });
-      if (!regRes.success) {
-        setError(regRes.error?.message || "Registration failed");
-        return;
+  const [state, formAction, isPending] = useActionState<
+    RegisterState,
+    FormData
+  >(
+    async (_prev, formData) => {
+      const email = formData.get("email") as string;
+      const password = formData.get("password") as string;
+      const displayName = formData.get("displayName") as string;
+      try {
+        const regRes = await api.post<{
+          id: number;
+          email: string;
+          displayName: string;
+          createdAt: string;
+        }>(
+          "/api/auth/register",
+          { email, password, displayName },
+          { skipAuth: true },
+        );
+        if (!regRes.success) {
+          return { error: regRes.error?.message || "Registration failed" };
+        }
+        const loginRes = await api.post<{
+          token: string;
+          user: {
+            id: number;
+            email: string;
+            displayName: string;
+            createdAt: string;
+          };
+        }>("/api/auth/login", { email, password }, { skipAuth: true });
+        if (loginRes.success) {
+          login(loginRes.data.token, loginRes.data.user);
+          router.push("/dashboard");
+        } else {
+          router.push("/auth/login");
+        }
+        return { error: "" };
+      } catch {
+        return { error: "Connection failed" };
       }
-      const loginRes = await api.post<{
-        token: string;
-        user: { id: number; email: string; displayName: string; createdAt: string };
-      }>("/api/auth/login", { email, password }, { skipAuth: true });
-      if (loginRes.success) {
-        login(loginRes.data.token, loginRes.data.user);
-        router.push("/dashboard");
-      } else {
-        router.push("/auth/login");
-      }
-    } catch {
-      setError("Connection failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    { error: "" },
+  );
 
   return (
     <div className="scanlines min-h-screen bg-background flex flex-col">
@@ -64,13 +79,12 @@ export default function RegisterPage() {
             </h1>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form action={formAction} className="space-y-4">
             <div>
               <label className="label block mb-2">Display Name</label>
               <input
                 type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                name="displayName"
                 required
                 maxLength={100}
                 className="input-field font-mono"
@@ -81,8 +95,7 @@ export default function RegisterPage() {
               <label className="label block mb-2">Email</label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                name="email"
                 required
                 className="input-field font-mono"
                 placeholder="you@example.com"
@@ -92,8 +105,7 @@ export default function RegisterPage() {
               <label className="label block mb-2">Password</label>
               <input
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                name="password"
                 required
                 minLength={8}
                 className="input-field font-mono"
@@ -101,26 +113,31 @@ export default function RegisterPage() {
               />
             </div>
 
-            {error && (
+            {state.error && (
               <p className="text-xs text-danger tracking-wide" role="alert">
-                {error}
+                {state.error}
               </p>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending}
               className="w-full bg-primary text-white py-3 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              style={{ boxShadow: loading ? "none" : "0 0 20px rgba(37,99,235,0.3)" }}
+              style={{
+                boxShadow: isPending ? "none" : "0 0 20px rgba(37,99,235,0.3)",
+              }}
             >
-              {loading ? "Creating..." : "Create Account"}
+              {isPending ? "Creating..." : "Create Account"}
             </button>
           </form>
 
           <div className="mt-6 pt-6 border-t border-border">
             <p className="text-sm text-muted">
               Have an account?{" "}
-              <Link href="/auth/login" className="text-accent hover:text-accent-hover transition-colors">
+              <Link
+                href="/auth/login"
+                className="text-accent hover:text-accent-hover transition-colors"
+              >
                 Sign in
               </Link>
             </p>

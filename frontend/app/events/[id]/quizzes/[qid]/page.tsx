@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, useActionState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -56,7 +56,6 @@ export default function QuizEditorPage() {
     { text: "", isCorrect: false },
   ]);
   const [creating, setCreating] = useState(false);
-  const [launching, setLaunching] = useState(false);
 
   // Edit state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -64,6 +63,7 @@ export default function QuizEditorPage() {
   const [editTime, setEditTime] = useState(30);
   const [editOptions, setEditOptions] = useState<OptionReq[]>([]);
   const [saving, setSaving] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace("/auth/login");
@@ -90,17 +90,22 @@ export default function QuizEditorPage() {
       opts.map((o, i) => ({ ...o, isCorrect: i === idx })),
     );
 
-  const handleAddQuestion = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!options.some((o) => o.isCorrect))
-      return alert("Mark one option as correct");
-    if (options.some((o) => !o.text.trim()))
-      return alert("Fill all option texts");
+  const addQuestionAction = async (_prev: null, formData: FormData) => {
+    const text = formData.get("qText") as string;
+    const time = Number(formData.get("qTime"));
+    if (!options.some((o) => o.isCorrect)) {
+      alert("Mark one option as correct");
+      return null;
+    }
+    if (options.some((o) => !o.text.trim())) {
+      alert("Fill all option texts");
+      return null;
+    }
     setCreating(true);
     const res = await api.post<Question>(`/api/quizzes/${qid}/questions`, {
-      text: qText,
+      text,
       orderIndex: qOrder,
-      timeLimitSeconds: qTime,
+      timeLimitSeconds: time,
       options,
     });
     if (res.success) {
@@ -126,7 +131,10 @@ export default function QuizEditorPage() {
       setShowForm(false);
     }
     setCreating(false);
+    return null;
   };
+
+  const [, addQuestionFormAction] = useActionState(addQuestionAction, null);
 
   const handleDeleteQuestion = async (qId: number) => {
     await api.delete(`/api/questions/${qId}`);
@@ -147,13 +155,16 @@ export default function QuizEditorPage() {
     setShowForm(false);
   };
 
-  const handleSaveEdit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!editingQuestion) return;
-    if (!editOptions.some((o) => o.isCorrect))
-      return alert("Mark one option as correct");
-    if (editOptions.some((o) => !o.text.trim()))
-      return alert("Fill all option texts");
+  const saveEditAction = async (_prev: null) => {
+    if (!editingQuestion) return null;
+    if (!editOptions.some((o) => o.isCorrect)) {
+      alert("Mark one option as correct");
+      return null;
+    }
+    if (editOptions.some((o) => !o.text.trim())) {
+      alert("Fill all option texts");
+      return null;
+    }
     setSaving(true);
     const res = await api.put<Question>(
       `/api/questions/${editingQuestion.id}`,
@@ -177,7 +188,10 @@ export default function QuizEditorPage() {
       setEditingQuestion(null);
     }
     setSaving(false);
+    return null;
   };
+
+  const [, saveEditFormAction] = useActionState(saveEditAction, null);
 
   const handleLaunch = async () => {
     setLaunching(true);
@@ -212,7 +226,9 @@ export default function QuizEditorPage() {
         <div className="flex items-start justify-between mb-10">
           <div>
             <p className="label mb-1">Quiz Editor</p>
-            <h1 className="text-2xl font-bold text-foreground leading-tight">{quiz.title}</h1>
+            <h1 className="text-2xl font-bold text-foreground leading-tight">
+              {quiz.title}
+            </h1>
           </div>
           <button
             onClick={handleLaunch}
@@ -225,9 +241,7 @@ export default function QuizEditorPage() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <h2 className="label">
-            Questions ({quiz.questions?.length ?? 0})
-          </h2>
+          <h2 className="label">Questions ({quiz.questions?.length ?? 0})</h2>
           <button
             onClick={() => {
               setShowForm((v) => !v);
@@ -245,7 +259,7 @@ export default function QuizEditorPage() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              onSubmit={handleAddQuestion}
+              action={addQuestionFormAction}
               className="mb-6 border border-primary/40 bg-surface p-6 space-y-4"
               style={{ boxShadow: "0 0 20px rgba(37,99,235,0.1)" }}
             >
@@ -253,6 +267,7 @@ export default function QuizEditorPage() {
                 <div className="flex-1">
                   <label className="label block mb-2">Question Text</label>
                   <input
+                    name="qText"
                     value={qText}
                     onChange={(e) => setQText(e.target.value)}
                     required
@@ -264,6 +279,7 @@ export default function QuizEditorPage() {
                   <label className="label block mb-2">Time (s)</label>
                   <input
                     type="number"
+                    name="qTime"
                     value={qTime}
                     onChange={(e) => setQTime(Number(e.target.value))}
                     min={5}
@@ -378,7 +394,7 @@ export default function QuizEditorPage() {
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        onSubmit={handleSaveEdit}
+                        action={saveEditFormAction}
                         className="border border-warning/40 bg-surface p-6 space-y-4"
                         style={{ boxShadow: "0 0 20px rgba(217,119,6,0.08)" }}
                       >

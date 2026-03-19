@@ -15,7 +15,10 @@ export default function Navbar() {
   };
 
   return (
-    <nav aria-label="Main navigation" className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+    <nav
+      aria-label="Main navigation"
+      className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50"
+    >
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         <Link href="/dashboard" aria-label="Hermes — dashboard">
           <Logo size="sm" showWordmark />

@@ -51,7 +51,12 @@ export default function LandingPage() {
             style={{ boxShadow: "0 0 20px rgba(37,99,235,0.3)" }}
           >
             Host a Quiz
-            <span aria-hidden className="group-hover:translate-x-1 transition-transform">→</span>
+            <span
+              aria-hidden
+              className="group-hover:translate-x-1 transition-transform"
+            >
+              →
+            </span>
           </Link>
           <Link
             href="/join"
