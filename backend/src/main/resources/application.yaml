@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hermes
+    username: hermes
+    password: hermes
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      initialization-fail-timeout: -1  # don't fail-fast; keep retrying until connection-timeout
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+
+app:
+  cors:
+    allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:3000}
+
+jwt:
+  secret: ${JWT_SECRET:7A4F3D8B2E6C1A9F5B7E3D0C4A8F2B6E9D1C5A7F3B0E8D2C6A4F7B1E5D9C3A0F}
+  expiration-ms: 86400000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

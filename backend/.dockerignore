@@ -1,0 +1,10 @@
+target
+.git
+.gitignore
+*.md
+.env*
+.DS_Store
+*.iml
+.idea
+.vscode
+*.log

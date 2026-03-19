@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/* ─── Design tokens (Tailwind v4 @theme) ─────────────────────────────────── */
+@theme {
+  --color-background: #0a0a0f;
+  --color-surface: #0f1117;
+  --color-border: #1a1f2e;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+
+  --color-accent: #38bdf8;
+  --color-accent-hover: #7dd3fc;
+
+  --color-foreground: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-muted-dark: #4b5563;
+
+  --color-success: #22c55e;
+  --color-warning: #d97706;
+  --color-warning-hover: #b45309;
+  --color-danger: #ef4444;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+/*
+ * Type scale (1.25 ratio, rem-based for zoom-safety):
+ *   xs   0.75rem  12px  → captions, metadata, button labels (label utility)
+ *   sm   0.875rem 14px  → secondary body, list metadata
+ *   base 1rem     16px  → primary body, form inputs
+ *   lg   1.125rem 18px  → review text, stat values
+ *   xl   1.25rem  20px  → active question text
+ *   2xl  1.5rem   24px  → page titles
+ *   3xl  1.875rem 30px  → logo / final leaderboard heading
+ *   display clamp()     → hero numbers, join code (fluid responsive)
+ */
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+/* ─── Shared UI utilities ────────────────────────────────────────────────── */
+
+/* Eyebrow / section label — 12px, medium weight, wide tracking, muted */
+@utility label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Standard form input — 16px prevents iOS Safari auto-zoom on focus */
+@utility input-field {
+  width: 100%;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-foreground);
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: color-mix(in srgb, var(--color-muted) 30%, transparent);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+  }
+}
+
+/* ─── Scanline texture ───────────────────────────────────────────────────── */
+/* Apply .scanlines to any root element — renders a fixed viewport overlay. */
+.scanlines::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.03) 2px,
+    rgba(255, 255, 255, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+/* CSS transitions are handled here; Framer Motion is handled by MotionProvider */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Glow effects ───────────────────────────────────────────────────────── */
+.glow-blue  { box-shadow: 0 0 20px rgba(37,  99,  235, 0.4); }
+.glow-green { box-shadow: 0 0 20px rgba(34,  197, 94,  0.4); }
+.glow-red   { box-shadow: 0 0 20px rgba(239, 68,  68,  0.4); }
+
+/* ─── Live dot animation ─────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%       { opacity: 0.5; transform: scale(1.3); }
+}
+
+.live-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
