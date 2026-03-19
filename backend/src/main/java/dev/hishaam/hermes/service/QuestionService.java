@@ -10,7 +10,6 @@ import dev.hishaam.hermes.entity.Question;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
-import dev.hishaam.hermes.repository.AnswerOptionRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.util.ArrayList;
@@ -25,17 +24,14 @@ public class QuestionService {
       List.of(SessionStatus.LOBBY, SessionStatus.ACTIVE);
 
   private final QuestionRepository questionRepository;
-  private final AnswerOptionRepository optionRepository;
   private final QuizSessionRepository sessionRepository;
   private final OwnershipService ownershipService;
 
   public QuestionService(
       QuestionRepository questionRepository,
-      AnswerOptionRepository optionRepository,
       QuizSessionRepository sessionRepository,
       OwnershipService ownershipService) {
     this.questionRepository = questionRepository;
-    this.optionRepository = optionRepository;
     this.sessionRepository = sessionRepository;
     this.ownershipService = ownershipService;
   }
@@ -51,8 +47,8 @@ public class QuestionService {
             .orderIndex(request.orderIndex())
             .timeLimitSeconds(request.timeLimitSeconds())
             .build();
+    question.getOptions().addAll(buildOptions(question, request.options()));
     question = questionRepository.save(question);
-    question.setOptions(buildOptions(question, request.options()));
     return toResponse(question);
   }
 
@@ -66,12 +62,13 @@ public class QuestionService {
     question.setText(request.text());
     question.setOrderIndex(request.orderIndex());
     question.setTimeLimitSeconds(request.timeLimitSeconds());
-    question = questionRepository.save(question);
 
-    optionRepository.deleteAllByQuestionId(questionId);
-    question.setOptions(buildOptions(question, request.options()));
+    question.getOptions().clear();
+    question.getOptions().addAll(buildOptions(question, request.options()));
+
+    question = questionRepository.save(question);
     return toResponse(question);
-  }
+  } 
 
   @Transactional
   public void deleteQuestion(Long questionId, Long userId) {
@@ -106,7 +103,7 @@ public class QuestionService {
               .isCorrect(req.isCorrect())
               .build());
     }
-    return optionRepository.saveAll(options);
+    return options;
   }
 
   private void validateSingleCorrect(List<Boolean> correctFlags) {
