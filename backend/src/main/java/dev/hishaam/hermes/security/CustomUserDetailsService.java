@@ -2,6 +2,7 @@ package dev.hishaam.hermes.security;
 
 import dev.hishaam.hermes.repository.UserRepository;
 import java.util.Collections;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,6 +20,7 @@ public class CustomUserDetailsService implements UserDetailsService {
   }
 
   @Override
+  @NullMarked
   public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
     var entity =
         userRepository

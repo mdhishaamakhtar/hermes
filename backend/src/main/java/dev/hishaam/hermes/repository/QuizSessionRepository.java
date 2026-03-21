@@ -11,10 +11,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface QuizSessionRepository extends JpaRepository<QuizSession, Long> {
-  boolean existsByJoinCode(String joinCode);
-
-  Optional<QuizSession> findByJoinCode(String joinCode);
-
   List<QuizSession> findByQuizIdOrderByCreatedAtDesc(Long quizId);
 
   boolean existsByQuizIdAndStatusIn(Long quizId, List<SessionStatus> statuses);

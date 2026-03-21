@@ -39,7 +39,7 @@ public class QuestionService {
   @Transactional
   public QuestionResponse createQuestion(Long quizId, CreateQuestionRequest request, Long userId) {
     Quiz quiz = ownershipService.requireQuizOwner(quizId, userId);
-    validateSingleCorrect(request.options().stream().map(o -> o.isCorrect()).toList());
+    validateSingleCorrect(request.options().stream().map(OptionRequest::isCorrect).toList());
     Question question =
         Question.builder()
             .quiz(quiz)
@@ -57,7 +57,7 @@ public class QuestionService {
       Long questionId, UpdateQuestionRequest request, Long userId) {
     Question question = ownershipService.requireQuestionOwner(questionId, userId);
     checkNoActiveSession(question.getQuiz().getId());
-    validateSingleCorrect(request.options().stream().map(o -> o.isCorrect()).toList());
+    validateSingleCorrect(request.options().stream().map(OptionRequest::isCorrect).toList());
 
     question.setText(request.text());
     question.setOrderIndex(request.orderIndex());
@@ -68,7 +68,7 @@ public class QuestionService {
 
     question = questionRepository.save(question);
     return toResponse(question);
-  } 
+  }
 
   @Transactional
   public void deleteQuestion(Long questionId, Long userId) {

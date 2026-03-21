@@ -6,6 +6,7 @@ import dev.hishaam.hermes.dto.QuizSessionListResponse;
 import dev.hishaam.hermes.dto.UpdateQuizRequest;
 import dev.hishaam.hermes.entity.Event;
 import dev.hishaam.hermes.entity.Quiz;
+import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
@@ -72,7 +73,7 @@ public class QuizService {
   public List<QuizSessionListResponse> listSessions(Long quizId, Long userId) {
     ownershipService.requireQuizOwner(quizId, userId);
     var sessions = sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId);
-    var sessionIds = sessions.stream().map(s -> s.getId()).toList();
+    var sessionIds = sessions.stream().map(QuizSession::getId).toList();
     var counts = participantRepository.countMapBySessionIds(sessionIds);
     return sessions.stream()
         .map(

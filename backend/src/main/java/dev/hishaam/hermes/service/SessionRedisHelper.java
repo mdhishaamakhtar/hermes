@@ -10,11 +10,9 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import lombok.Getter;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,7 +31,7 @@ public class SessionRedisHelper {
   private static final String TOKEN_CHARS =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-  private final StringRedisTemplate redis;
+  @Getter private final StringRedisTemplate redis;
   private final ObjectMapper objectMapper;
   private final QuizSessionRepository sessionRepository;
 
@@ -169,7 +167,7 @@ public class SessionRedisHelper {
     return data.stream()
         .map(
             t -> {
-              Long pid = Long.parseLong(t.getValue());
+              Long pid = Long.parseLong(Objects.requireNonNull(t.getValue()));
               long score = t.getScore() != null ? t.getScore().longValue() : 0;
               String name =
                   namesMap.containsKey(pid.toString())
@@ -228,11 +226,5 @@ public class SessionRedisHelper {
       token.append(TOKEN_CHARS.charAt(SECURE_RANDOM.nextInt(TOKEN_CHARS.length())));
     }
     return token.toString();
-  }
-
-  // ─── Direct Redis access (for callers needing raw ops) ────────────────────────
-
-  public StringRedisTemplate getRedis() {
-    return redis;
   }
 }

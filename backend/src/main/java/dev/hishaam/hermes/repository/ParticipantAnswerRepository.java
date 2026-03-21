@@ -15,10 +15,6 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
 
   List<ParticipantAnswer> findByParticipantId(Long participantId);
 
-  List<ParticipantAnswer> findBySessionIdAndQuestionId(Long sessionId, Long questionId);
-
-  List<Long> findQuestionIdByParticipantId(Long participantId);
-
   @Query(
       value = "SELECT question_id FROM participant_answers WHERE participant_id = :participantId",
       nativeQuery = true)

@@ -1,7 +1,9 @@
 package dev.hishaam.hermes.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public class AppException extends RuntimeException {
 
   private final HttpStatus status;
@@ -11,14 +13,6 @@ public class AppException extends RuntimeException {
     super(message);
     this.status = status;
     this.code = code;
-  }
-
-  public HttpStatus getStatus() {
-    return status;
-  }
-
-  public String getCode() {
-    return code;
   }
 
   public static AppException notFound(String message) {
