@@ -1,3 +1,8 @@
+logging:
+  structured:
+    format:
+      console: ecs
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/hermes
@@ -33,6 +38,16 @@ app:
 jwt:
   secret: ${JWT_SECRET:7A4F3D8B2E6C1A9F5B7E3D0C4A8F2B6E9D1C5A7F3B0E8D2C6A4F7B1E5D9C3A0F}
   expiration-ms: 86400000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-components: always
+      show-details: never
 
 springdoc:
   swagger-ui:
