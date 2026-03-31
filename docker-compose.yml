@@ -29,6 +29,26 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: hermes
+      RABBITMQ_DEFAULT_PASS: hermes
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "61613:61613"
+      - "15672:15672"
+    command: >
+      sh -c "rabbitmq-plugins enable --offline rabbitmq_stomp &&
+      rabbitmq-server"
+    networks:
+      - hermes-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -39,12 +59,28 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hermes
       SPRING_DATASOURCE_USERNAME: hermes
       SPRING_DATASOURCE_PASSWORD: hermes
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ""
+      BROKER_RELAY_HOST: rabbitmq
+      BROKER_RELAY_PORT: 61613
+      BROKER_RELAY_VHOST: /
+      BROKER_RELAY_CLIENT_LOGIN: hermes
+      BROKER_RELAY_CLIENT_PASSCODE: hermes
+      BROKER_RELAY_SYSTEM_LOGIN: hermes
+      BROKER_RELAY_SYSTEM_PASSCODE: hermes
+      QUARTZ_AUTO_STARTUP: "true"
+      QUARTZ_SCHEMA_INIT: always
+      QUARTZ_THREAD_COUNT: 10
+      CORS_ALLOWED_ORIGIN: http://localhost:3000
+      JWT_SECRET: 7A4F3D8B2E6C1A9F5B7E3D0C4A8F2B6E9D1C5A7F3B0E8D2C6A4F7B1E5D9C3A0F
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: on-failure
     networks:
