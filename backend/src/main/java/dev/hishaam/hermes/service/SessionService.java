@@ -26,6 +26,7 @@ public class SessionService {
   private final OwnershipService ownershipService;
   private final SessionRedisHelper redisHelper;
   private final SessionEngine engine;
+  private final SessionTimerScheduler timerScheduler;
   private final StringRedisTemplate redis;
 
   public SessionService(
@@ -36,6 +37,7 @@ public class SessionService {
       OwnershipService ownershipService,
       SessionRedisHelper redisHelper,
       SessionEngine engine,
+      SessionTimerScheduler timerScheduler,
       StringRedisTemplate redis) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
@@ -44,6 +46,7 @@ public class SessionService {
     this.ownershipService = ownershipService;
     this.redisHelper = redisHelper;
     this.engine = engine;
+    this.timerScheduler = timerScheduler;
     this.redis = redis;
   }
 
@@ -127,6 +130,7 @@ public class SessionService {
   public void advanceSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     String sid = sessionId.toString();
+    timerScheduler.cancelQuestionTimer(sessionId);
     redis.delete(redisHelper.key(sid, "timer"));
     redis.opsForValue().increment(redisHelper.key(sid, "question_seq"));
     engine.advanceSessionInternal(sessionId);
@@ -135,6 +139,7 @@ public class SessionService {
   public void endSessionByOrganiser(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     String sid = sessionId.toString();
+    timerScheduler.cancelQuestionTimer(sessionId);
     redis.delete(redisHelper.key(sid, "timer"));
     redis.opsForValue().increment(redisHelper.key(sid, "question_seq"));
     engine.doEndSession(sessionId);

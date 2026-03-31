@@ -3,18 +3,21 @@ logging:
     format:
       console: ecs
 
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/hermes
-    username: hermes
-    password: hermes
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/hermes}
+    username: ${SPRING_DATASOURCE_USERNAME:hermes}
+    password: ${SPRING_DATASOURCE_PASSWORD:hermes}
     driver-class-name: org.postgresql.Driver
     hikari:
-      initialization-fail-timeout: -1  # don't fail-fast; keep retrying until connection-timeout
+      initialization-fail-timeout: -1
       connection-timeout: 30000
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: false
     properties:
       hibernate:
@@ -22,22 +25,48 @@ spring:
         format_sql: true
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+  quartz:
+    auto-startup: ${QUARTZ_AUTO_STARTUP:true}
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: ${QUARTZ_SCHEMA_INIT:never}
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: HermesScheduler
+            instanceId: AUTO
+          threadPool:
+            threadCount: ${QUARTZ_THREAD_COUNT:10}
+          jobStore:
+            isClustered: true
+            misfireThreshold: 60000
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+            tablePrefix: QRTZ_
+            useProperties: false
   threads:
     virtual:
       enabled: true
 
-server:
-  port: 8080
-
 app:
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:3000}
+  stomp:
+    broker-relay:
+      host: ${BROKER_RELAY_HOST:localhost}
+      port: ${BROKER_RELAY_PORT:61613}
+      virtual-host: ${BROKER_RELAY_VHOST:/}
+      client-login: ${BROKER_RELAY_CLIENT_LOGIN:hermes}
+      client-passcode: ${BROKER_RELAY_CLIENT_PASSCODE:hermes}
+      system-login: ${BROKER_RELAY_SYSTEM_LOGIN:hermes}
+      system-passcode: ${BROKER_RELAY_SYSTEM_PASSCODE:hermes}
 
 jwt:
   secret: ${JWT_SECRET:7A4F3D8B2E6C1A9F5B7E3D0C4A8F2B6E9D1C5A7F3B0E8D2C6A4F7B1E5D9C3A0F}
-  expiration-ms: 86400000
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 management:
   endpoints:

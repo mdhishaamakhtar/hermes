@@ -16,6 +16,27 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Value("${app.cors.allowed-origin}")
   private String allowedOrigin;
 
+  @Value("${app.stomp.broker-relay.host}")
+  private String brokerRelayHost;
+
+  @Value("${app.stomp.broker-relay.port}")
+  private int brokerRelayPort;
+
+  @Value("${app.stomp.broker-relay.virtual-host}")
+  private String brokerRelayVirtualHost;
+
+  @Value("${app.stomp.broker-relay.client-login}")
+  private String brokerRelayClientLogin;
+
+  @Value("${app.stomp.broker-relay.client-passcode}")
+  private String brokerRelayClientPasscode;
+
+  @Value("${app.stomp.broker-relay.system-login}")
+  private String brokerRelaySystemLogin;
+
+  @Value("${app.stomp.broker-relay.system-passcode}")
+  private String brokerRelaySystemPasscode;
+
   public WebSocketConfig(StompChannelInterceptor stompChannelInterceptor) {
     this.stompChannelInterceptor = stompChannelInterceptor;
   }
@@ -28,7 +49,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void configureMessageBroker(MessageBrokerRegistry config) {
     config.setApplicationDestinationPrefixes("/app");
-    config.enableSimpleBroker("/topic");
+    config
+        .enableStompBrokerRelay("/topic")
+        .setRelayHost(brokerRelayHost)
+        .setRelayPort(brokerRelayPort)
+        .setVirtualHost(brokerRelayVirtualHost)
+        .setClientLogin(brokerRelayClientLogin)
+        .setClientPasscode(brokerRelayClientPasscode)
+        .setSystemLogin(brokerRelaySystemLogin)
+        .setSystemPasscode(brokerRelaySystemPasscode);
   }
 
   @Override

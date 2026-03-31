@@ -9,7 +9,6 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +33,7 @@ public class SessionEngine {
   private final SessionRedisHelper redisHelper;
   private final StringRedisTemplate redis;
   private final SimpMessagingTemplate messaging;
-  private final ThreadPoolTaskScheduler taskScheduler;
+  private final SessionTimerScheduler timerScheduler;
 
   public SessionEngine(
       QuizSessionRepository sessionRepository,
@@ -43,13 +41,13 @@ public class SessionEngine {
       SessionRedisHelper redisHelper,
       StringRedisTemplate redis,
       SimpMessagingTemplate messaging,
-      ThreadPoolTaskScheduler taskScheduler) {
+      SessionTimerScheduler timerScheduler) {
     this.sessionRepository = sessionRepository;
     this.questionRepository = questionRepository;
     this.redisHelper = redisHelper;
     this.redis = redis;
     this.messaging = messaging;
-    this.taskScheduler = taskScheduler;
+    this.timerScheduler = timerScheduler;
   }
 
   // ─── Advance to next question (called by timer or organiser) ──────────────────
@@ -113,6 +111,7 @@ public class SessionEngine {
   @Transactional
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
     String sid = sessionId.toString();
+    timerScheduler.cancelQuestionTimer(sessionId);
 
     QuizSession session =
         sessionRepository
@@ -179,20 +178,7 @@ public class SessionEngine {
 
     String seqStr = redis.opsForValue().get(redisHelper.key(sid, "question_seq"));
     long seqAtStart = seqStr != null ? Long.parseLong(seqStr) : 0;
-
-    taskScheduler.schedule(
-        () -> {
-          try {
-            String currentSeqStr = redis.opsForValue().get(redisHelper.key(sid, "question_seq"));
-            if (currentSeqStr == null) return;
-            long currentSeq = Long.parseLong(currentSeqStr);
-            if (currentSeq != seqAtStart) return; // stale timer
-            advanceSessionInternal(sessionId);
-          } catch (Exception e) {
-            log.error("Timer error for session {}", sessionId, e);
-          }
-        },
-        Instant.now().plusSeconds(timeLimitSeconds));
+    timerScheduler.scheduleQuestionTimer(sessionId, questionId, timeLimitSeconds, seqAtStart);
   }
 
   // ─── Leaderboard broadcast (shared with AnswerService) ────────────────────────
