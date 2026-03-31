@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useStompClient } from "@/hooks/useStompClient";
 import Logo from "@/components/Logo";
 import { OPTION_META } from "@/lib/session-constants";
+import { colorRgb } from "@/lib/design-tokens";
 
 interface Option {
   id: number;
@@ -209,7 +210,7 @@ export default function HostPage() {
                       : "var(--color-warning)",
                 animation:
                   sessionStatus === "ACTIVE"
-                    ? "pulse-dot 1.5s ease-in-out infinite"
+                    ? "pulse-dot var(--duration-slow) ease-in-out infinite"
                     : "none",
               }}
             />
@@ -233,32 +234,23 @@ export default function HostPage() {
         {sessionStatus === "LOBBY" && (
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
             {/* Join code hero */}
-            <div className="text-center mb-10">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="text-center mb-10"
+            >
               <p className="label tracking-[0.25em] mb-6">Share this code</p>
 
-              <div className="relative inline-block">
-                {/* Ambient glow */}
-                <div
-                  className="absolute inset-0 rounded-sm"
-                  style={{
-                    background:
-                      "radial-gradient(ellipse at center, rgba(37,99,235,0.18) 0%, transparent 70%)",
-                    filter: "blur(24px)",
-                    transform: "scale(1.4)",
-                  }}
-                />
-                <div
-                  className="relative font-mono font-black tracking-[0.35em] text-foreground select-all px-8 py-5 border border-primary/30 bg-surface"
-                  style={{
-                    fontSize: "clamp(2.5rem, 8vw, 4rem)",
-                    fontVariantNumeric: "tabular-nums",
-                    boxShadow:
-                      "0 0 40px rgba(37,99,235,0.2), inset 0 0 20px rgba(37,99,235,0.03)",
-                    letterSpacing: "0.35em",
-                  }}
-                >
-                  {joinCode || "——————"}
-                </div>
+              <div
+                className="font-black text-center text-foreground select-all px-8 py-5 border border-primary/30 bg-surface"
+                style={{
+                  fontSize: "clamp(2rem, 5vw, 3rem)",
+                  letterSpacing: "0.35em",
+                  paddingLeft: "calc(2rem + 0.35em)",
+                }}
+              >
+                {joinCode || "——————"}
               </div>
 
               {/* Copy button */}
@@ -278,16 +270,15 @@ export default function HostPage() {
                   {copied ? "✓ Copied!" : "Copy Code"}
                 </button>
               </div>
-
-              {/* URL hint */}
-              <p className="text-xs text-muted/40 mt-3 tracking-wide">
-                Participants join at{" "}
-                <span className="text-muted/60 font-mono">hermes.app/join</span>
-              </p>
-            </div>
+            </motion.div>
 
             {/* Participant count */}
-            <div className="text-center mb-10">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: 0.08 }}
+              className="text-center mb-10"
+            >
               <AnimatePresence mode="wait">
                 <motion.div
                   key={participantCount}
@@ -295,8 +286,11 @@ export default function HostPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 6 }}
                   transition={{ duration: 0.2 }}
-                  className="font-mono font-black tabular-nums text-foreground"
-                  style={{ fontSize: "clamp(3rem, 10vw, 5rem)", lineHeight: 1 }}
+                  className="font-black tabular-nums text-foreground"
+                  style={{
+                    fontSize: "clamp(2.5rem, 7vw, 4rem)",
+                    lineHeight: 1,
+                  }}
                 >
                   {participantCount}
                 </motion.div>
@@ -304,17 +298,20 @@ export default function HostPage() {
               <p className="text-sm text-muted mt-1 tracking-wide">
                 {participantCount === 1 ? "participant" : "participants"} joined
               </p>
-            </div>
+            </motion.div>
 
             {/* Start CTA */}
-            <button
+            <motion.button
               onClick={handleStart}
               disabled={loading}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: 0.14 }}
+              whileTap={!loading ? { scale: 0.97 } : {}}
               className="bg-primary text-white px-14 py-4 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              style={{ boxShadow: "0 0 32px rgba(37,99,235,0.4)" }}
             >
               {loading ? "Starting..." : "Start Session"}
-            </button>
+            </motion.button>
           </div>
         )}
 
@@ -332,7 +329,7 @@ export default function HostPage() {
                   {/* Timer inline top-right */}
                   <div className="ml-auto flex items-center gap-3">
                     <span
-                      className="font-mono font-black tabular-nums transition-all duration-300"
+                      className="font-black tabular-nums transition-all duration-300"
                       style={{
                         fontSize: timeLeft <= 10 ? "2rem" : "1.5rem",
                         lineHeight: 1,
@@ -340,7 +337,7 @@ export default function HostPage() {
                         color: timerColor,
                         textShadow:
                           timeLeft <= 5
-                            ? `0 0 16px rgba(239,68,68,0.5)`
+                            ? `0 0 16px rgba(${colorRgb.danger},0.5)`
                             : "none",
                       }}
                     >
@@ -360,7 +357,7 @@ export default function HostPage() {
                     }}
                   />
                 </div>
-                <h2 className="text-xl font-bold text-foreground leading-snug">
+                <h2 className="text-2xl font-bold text-foreground leading-snug">
                   {currentQuestion.text}
                 </h2>
               </div>
@@ -372,7 +369,7 @@ export default function HostPage() {
               <div className="p-8 flex flex-col overflow-y-auto">
                 <div className="flex items-center justify-between mb-5">
                   <span className="label">Responses</span>
-                  <span className="text-xs font-mono tabular-nums text-muted">
+                  <span className="text-xs tabular-nums text-muted">
                     {totalAnswered} / {participantCount}
                   </span>
                 </div>
@@ -389,7 +386,7 @@ export default function HostPage() {
                             {opt.text}
                           </span>
                           <span
-                            className="text-sm font-mono tabular-nums font-bold shrink-0"
+                            className="text-sm tabular-nums font-bold shrink-0"
                             style={{ color: meta.color }}
                           >
                             {count}
@@ -406,7 +403,6 @@ export default function HostPage() {
                             }}
                             style={{
                               backgroundColor: meta.color,
-                              boxShadow: `0 0 12px rgba(${meta.rgb},0.5)`,
                               willChange: "transform",
                             }}
                           />
@@ -433,7 +429,7 @@ export default function HostPage() {
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span
-                            className="font-mono text-xs tabular-nums w-5 shrink-0 font-bold"
+                            className="text-xs tabular-nums w-5 shrink-0 font-bold"
                             style={{
                               color:
                                 entry.rank <= 3
@@ -447,7 +443,7 @@ export default function HostPage() {
                             {entry.displayName}
                           </span>
                         </div>
-                        <span className="font-mono text-sm tabular-nums text-success font-bold shrink-0 ml-2">
+                        <span className="text-sm tabular-nums text-success font-bold shrink-0 ml-2">
                           {entry.score}
                         </span>
                       </motion.div>
@@ -471,7 +467,6 @@ export default function HostPage() {
                 onClick={handleNext}
                 disabled={loading}
                 className="bg-primary text-white px-8 py-2.5 text-xs tracking-widest uppercase hover:bg-primary-hover disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                style={{ boxShadow: "0 0 16px rgba(37,99,235,0.3)" }}
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
@@ -521,7 +516,7 @@ export default function HostPage() {
                 >
                   <div className="flex items-center gap-4">
                     <span
-                      className="font-mono text-sm tabular-nums w-6 font-bold"
+                      className="text-sm tabular-nums w-6 font-bold"
                       style={{
                         color:
                           entry.rank === 1
@@ -535,7 +530,7 @@ export default function HostPage() {
                     </span>
                     <span className="text-foreground">{entry.displayName}</span>
                   </div>
-                  <span className="font-mono tabular-nums text-success font-bold">
+                  <span className="tabular-nums text-success font-bold">
                     {entry.score}
                   </span>
                 </motion.div>

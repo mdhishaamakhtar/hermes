@@ -1,0 +1,17 @@
+# Java / Maven build output
+backend/target/
+
+# Node / Next.js build output
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# Test reports
+backend/target/surefire-reports/
+backend/target/site/
+
+# Compiled classes
+**/*.class
+
+# Package lock (large, rarely useful)
+frontend/package-lock.json

@@ -186,10 +186,6 @@ export default function JoinPage() {
               type="submit"
               disabled={isPending || code.length !== 6}
               className="w-full bg-primary text-white py-4 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              style={{
-                boxShadow:
-                  code.length === 6 ? "0 0 20px rgba(37,99,235,0.3)" : "none",
-              }}
             >
               {isPending ? "Joining..." : "Join Session"}
             </button>

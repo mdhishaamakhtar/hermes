@@ -63,7 +63,7 @@ export default function LoginPage() {
 
           <form action={formAction} className="space-y-4">
             <div>
-              <label className="label block mb-2">Email</label>
+              <label className="field-label block mb-2">Email</label>
               <input
                 type="email"
                 name="email"
@@ -73,7 +73,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label block mb-2">Password</label>
+              <label className="field-label block mb-2">Password</label>
               <input
                 type="password"
                 name="password"
@@ -92,16 +92,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isPending}
-              className="w-full bg-primary text-white py-3 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              style={{
-                boxShadow: isPending ? "none" : "0 0 20px rgba(37,99,235,0.3)",
-              }}
+              className="w-full bg-primary text-white py-4 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {isPending ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border">
+          <div className="mt-8 border-t border-border pt-6">
             <p className="text-sm text-muted">
               No account?{" "}
               <Link

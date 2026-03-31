@@ -92,18 +92,17 @@ export default function ResultsPage() {
       <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-12 relative z-10">
         {/* Hero score */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.2 }}
           className="text-center mb-12"
         >
           <p className="label mb-2">{results.displayName}</p>
           <div
-            className="font-mono font-black tabular-nums text-foreground mb-1"
+            className="font-black tabular-nums text-foreground mb-1"
             style={{
-              fontSize: "clamp(4rem, 15vw, 7rem)",
+              fontSize: "clamp(3rem, 8vw, 5rem)",
               lineHeight: 1,
-              textShadow: "0 0 40px rgba(37,99,235,0.3)",
             }}
           >
             {results.score.toLocaleString()}
@@ -112,21 +111,21 @@ export default function ResultsPage() {
 
           <div className="flex items-center justify-center gap-8 mt-8">
             <div className="text-center">
-              <p className="font-mono font-bold text-2xl text-foreground tabular-nums leading-none">
+              <p className="font-bold text-2xl text-foreground tabular-nums leading-none">
                 #{results.rank}
               </p>
               <p className="label mt-0.5">of {results.totalParticipants}</p>
             </div>
             <div className="w-px h-10 bg-border" />
             <div className="text-center">
-              <p className="font-mono font-bold text-2xl text-foreground tabular-nums leading-none">
+              <p className="font-bold text-2xl text-foreground tabular-nums leading-none">
                 {accuracy}%
               </p>
               <p className="label mt-0.5">accuracy</p>
             </div>
             <div className="w-px h-10 bg-border" />
             <div className="text-center">
-              <p className="font-mono font-bold text-2xl text-foreground tabular-nums leading-none">
+              <p className="font-bold text-2xl text-foreground tabular-nums leading-none">
                 {results.correctCount}/{results.totalQuestions}
               </p>
               <p className="label mt-0.5">correct</p>
@@ -145,15 +144,10 @@ export default function ResultsPage() {
                 key={q.questionId}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.06 }}
-                className={`border bg-surface p-5 ${
+                transition={{ duration: 0.15, delay: i * 0.04 }}
+                className={`border bg-surface p-6 ${
                   q.isCorrect ? "border-success/20" : "border-border"
                 }`}
-                style={
-                  q.isCorrect
-                    ? { boxShadow: "0 0 12px rgba(34,197,94,0.06)" }
-                    : {}
-                }
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-start gap-3">
@@ -165,18 +159,10 @@ export default function ResultsPage() {
                   <div className="shrink-0 flex items-center gap-2">
                     {q.isCorrect ? (
                       <>
-                        <span
-                          className="text-xs tabular-nums font-mono text-success"
-                          style={{ textShadow: "0 0 8px rgba(34,197,94,0.4)" }}
-                        >
+                        <span className="text-xs tabular-nums font-mono text-success">
                           +{q.pointsEarned}
                         </span>
-                        <span
-                          className="text-success text-base"
-                          style={{ textShadow: "0 0 8px rgba(34,197,94,0.4)" }}
-                        >
-                          ✓
-                        </span>
+                        <span className="text-success text-base">✓</span>
                       </>
                     ) : (
                       <span className="text-danger text-base">✗</span>
@@ -184,10 +170,10 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
-                <div className="ml-6 space-y-1">
+                <div className="ml-6 space-y-2">
                   {q.selectedOptionId !== null && !q.isCorrect && (
                     <div className="flex items-center gap-2">
-                      <span className="label opacity-60 w-14 shrink-0">
+                      <span className="label opacity-60 w-20 shrink-0">
                         Yours
                       </span>
                       <span className="text-xs text-danger line-through">
@@ -197,7 +183,7 @@ export default function ResultsPage() {
                   )}
                   {q.selectedOptionId === null && (
                     <div className="flex items-center gap-2">
-                      <span className="label opacity-60 w-14 shrink-0">
+                      <span className="label opacity-60 w-20 shrink-0">
                         Yours
                       </span>
                       <span className="text-xs text-muted/40 italic">
@@ -206,13 +192,10 @@ export default function ResultsPage() {
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="label opacity-60 w-14 shrink-0">
+                    <span className="label opacity-60 w-20 shrink-0">
                       Correct
                     </span>
-                    <span
-                      className="text-xs text-success"
-                      style={{ textShadow: "0 0 6px rgba(34,197,94,0.3)" }}
-                    >
+                    <span className="text-xs text-success">
                       {q.correctOptionText}
                     </span>
                   </div>
@@ -224,7 +207,7 @@ export default function ResultsPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: (results.questions?.length ?? 0) * 0.06 + 0.2 }}
+          transition={{ delay: (results.questions?.length ?? 0) * 0.04 + 0.1 }}
           className="text-center mt-10"
         >
           <Link

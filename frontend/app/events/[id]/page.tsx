@@ -85,7 +85,12 @@ export default function EventPage() {
           </Link>
         </div>
 
-        <div className="mb-10">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-10"
+        >
           <p className="label mb-1">Event</p>
           <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">
             {event.title}
@@ -93,7 +98,7 @@ export default function EventPage() {
           {event.description && (
             <p className="text-sm text-muted">{event.description}</p>
           )}
-        </div>
+        </motion.div>
 
         <div className="flex items-center justify-between mb-6">
           <h2 className="label">Quizzes</h2>
@@ -116,7 +121,7 @@ export default function EventPage() {
             >
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="label block mb-2">Title</label>
+                  <label className="field-label block mb-2">Title</label>
                   <input
                     name="quizTitle"
                     value={quizTitle}
@@ -127,7 +132,7 @@ export default function EventPage() {
                   />
                 </div>
                 <div className="w-24">
-                  <label className="label block mb-2">Order</label>
+                  <label className="field-label block mb-2">Order</label>
                   <input
                     type="number"
                     name="orderIndex"
@@ -159,19 +164,22 @@ export default function EventPage() {
           <div className="space-y-px">
             {event.quizzes
               ?.sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((quiz) => (
-                <div
+              .map((quiz, i) => (
+                <motion.div
                   key={quiz.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15, delay: i * 0.04 }}
                   onClick={() =>
                     router.push(`/events/${id}/quizzes/${quiz.id}`)
                   }
-                  className="group flex items-center justify-between px-5 py-4 bg-surface border border-border hover:border-primary/40 cursor-pointer transition-all"
+                  className="group flex items-center justify-between px-6 py-4 bg-surface border border-border hover:border-primary/40 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <span className="font-mono text-xs text-muted tabular-nums w-5">
                       {quiz.orderIndex}
                     </span>
-                    <span className="text-foreground font-medium group-hover:text-accent transition-colors text-sm">
+                    <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">
                       {quiz.title}
                     </span>
                   </div>
@@ -181,7 +189,7 @@ export default function EventPage() {
                   >
                     →
                   </span>
-                </div>
+                </motion.div>
               ))}
           </div>
         )}

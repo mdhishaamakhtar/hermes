@@ -72,7 +72,7 @@ public class QuizService {
 
   public List<QuizSessionListResponse> listSessions(Long quizId, Long userId) {
     ownershipService.requireQuizOwner(quizId, userId);
-    var sessions = sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId);
+    var sessions = sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId).stream().toList();
     var sessionIds = sessions.stream().map(QuizSession::getId).toList();
     var counts = participantRepository.countMapBySessionIds(sessionIds);
     return sessions.stream()

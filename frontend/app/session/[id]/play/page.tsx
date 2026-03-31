@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { useStompClient } from "@/hooks/useStompClient";
 import { OPTION_META } from "@/lib/session-constants";
+import { colorRgb } from "@/lib/design-tokens";
 import Spinner from "@/components/Spinner";
 
 interface OptionData {
@@ -231,8 +232,8 @@ export default function PlayPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.2 }}
-                className="font-mono font-bold text-foreground tabular-nums"
-                style={{ fontSize: "clamp(4rem, 15vw, 8rem)", lineHeight: 1 }}
+                className="font-bold text-foreground tabular-nums"
+                style={{ fontSize: "clamp(3rem, 10vw, 5rem)", lineHeight: 1 }}
               >
                 {participantCount}
               </motion.div>
@@ -246,7 +247,6 @@ export default function PlayPage() {
             <span
               aria-hidden
               className="live-dot inline-block w-2 h-2 rounded-full bg-success"
-              style={{ boxShadow: "0 0 8px rgba(34,197,94,0.8)" }}
             />
             <p className="text-sm tracking-wide">Waiting for host to start…</p>
           </div>
@@ -265,7 +265,7 @@ export default function PlayPage() {
               Question {question.orderIndex} of {question.totalQuestions}
             </p>
             <div
-              className="font-mono font-bold tabular-nums transition-all duration-300"
+              className="font-bold tabular-nums transition-all duration-300"
               style={{
                 fontSize:
                   timeLeft !== null && timeLeft <= 5 ? "1.5rem" : "1rem",
@@ -296,89 +296,95 @@ export default function PlayPage() {
             transition={{ duration: 0.2 }}
             className="flex-1 flex flex-col px-6 py-8 max-w-2xl mx-auto w-full"
           >
-            <h1 className="text-xl font-bold text-foreground text-center mb-8 leading-snug">
+            <h1 className="text-2xl font-bold text-foreground text-center mb-8 leading-snug">
               {question.text}
             </h1>
 
             {/* Options 2×2 grid */}
-            <div className="grid grid-cols-2 gap-3 flex-1">
+            <div className="grid grid-cols-2 gap-2 flex-1">
               {question.options
                 .sort((a, b) => a.orderIndex - b.orderIndex)
                 .map((opt, i) => {
                   const meta = OPTION_META[i % OPTION_META.length];
                   const state = getOptionState(opt.id);
 
-                  let bgStyle = `rgba(${meta.rgb}, 0.08)`;
-                  let borderStyle = `rgba(${meta.rgb}, 0.2)`;
-                  let boxShadow = "none";
+                  // Dormant: pure neutral. Color only appears on selection.
+                  let bgStyle = "var(--color-surface)";
+                  let borderStyle = "var(--color-border)";
+                  let letterColor = "var(--color-muted-dark)";
                   let opacity = 1;
 
                   if (state === "selected") {
-                    bgStyle = `rgba(${meta.rgb}, 0.18)`;
+                    bgStyle = `rgba(${meta.rgb}, 0.16)`;
                     borderStyle = meta.color;
-                    boxShadow = `0 0 20px rgba(${meta.rgb}, 0.3)`;
+                    letterColor = meta.color;
                   } else if (state === "faded") {
-                    opacity = 0.35;
+                    opacity = 0.3;
                   } else if (state === "correct") {
-                    bgStyle = "rgba(34,197,94,0.12)";
-                    borderStyle = "rgba(34,197,94,0.5)";
-                    boxShadow = "0 0 20px rgba(34,197,94,0.25)";
+                    bgStyle = `rgba(${colorRgb.success},0.16)`;
+                    borderStyle = `rgba(${colorRgb.success},0.7)`;
+                    letterColor = "var(--color-success)";
                   } else if (state === "wrong") {
-                    bgStyle = "rgba(239,68,68,0.08)";
-                    borderStyle = "rgba(239,68,68,0.3)";
-                    opacity = 0.6;
+                    bgStyle = `rgba(${colorRgb.danger},0.08)`;
+                    borderStyle = `rgba(${colorRgb.danger},0.25)`;
+                    letterColor = "var(--color-danger)";
+                    opacity = 0.5;
                   } else if (state === "neutral" && correctOptionId !== null) {
-                    opacity = 0.2;
+                    opacity = 0.18;
                   }
+
+                  const isInteractive =
+                    !answerSubmitted && correctOptionId === null;
 
                   return (
                     <motion.button
                       key={opt.id}
                       onClick={() => handleAnswer(opt.id)}
-                      disabled={answerSubmitted || correctOptionId !== null}
-                      whileHover={
-                        !answerSubmitted && correctOptionId === null
-                          ? { scale: 1.01 }
-                          : {}
-                      }
-                      whileTap={
-                        !answerSubmitted && correctOptionId === null
-                          ? { scale: 0.98 }
-                          : {}
-                      }
-                      animate={{ opacity, boxShadow }}
-                      transition={{ duration: 0.25 }}
-                      className="relative flex items-start gap-3 p-5 text-left border cursor-pointer disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      style={{
+                      disabled={!isInteractive}
+                      whileHover={isInteractive ? { scale: 1.015 } : {}}
+                      whileTap={isInteractive ? { scale: 0.97 } : {}}
+                      animate={{
+                        opacity,
                         background: bgStyle,
                         borderColor: borderStyle,
-                        borderLeftWidth: "4px",
-                        borderLeftColor: meta.color,
-                        minHeight: 88,
                       }}
+                      transition={{ duration: 0.2 }}
+                      className="relative flex flex-col justify-between p-5 text-left border cursor-pointer disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      style={{ minHeight: 108 }}
                     >
-                      <span
-                        className="shrink-0 w-7 h-7 flex items-center justify-center font-mono font-bold text-xs text-white mt-0.5"
-                        style={{ background: meta.color }}
-                        aria-hidden
-                      >
-                        {meta.letter}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-base font-medium text-foreground leading-snug">
-                          {opt.text}
-                        </p>
+                      {/* Top row: letter + result indicator */}
+                      <div className="flex items-center justify-between mb-3">
+                        <motion.span
+                          animate={{ color: letterColor }}
+                          transition={{ duration: 0.2 }}
+                          className="font-mono font-black text-xs tracking-widest"
+                          aria-hidden
+                        >
+                          {meta.letter}
+                        </motion.span>
+                        {state === "correct" && (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="text-success text-sm font-bold"
+                          >
+                            ✓
+                          </motion.span>
+                        )}
+                        {state === "wrong" && (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="text-danger text-sm"
+                          >
+                            ✗
+                          </motion.span>
+                        )}
                       </div>
-                      {state === "correct" && (
-                        <span className="text-success text-lg shrink-0 mt-0.5">
-                          ✓
-                        </span>
-                      )}
-                      {state === "wrong" && (
-                        <span className="text-danger text-lg shrink-0 mt-0.5">
-                          ✗
-                        </span>
-                      )}
+                      {/* Option text */}
+                      <p className="text-sm font-medium text-foreground leading-snug">
+                        {opt.text}
+                      </p>
                     </motion.button>
                   );
                 })}
@@ -394,7 +400,6 @@ export default function PlayPage() {
                     exit={{ opacity: 0 }}
                     role="status"
                     className="text-center label text-success"
-                    style={{ textShadow: "0 0 8px rgba(34,197,94,0.4)" }}
                   >
                     Answer recorded
                   </motion.p>
@@ -423,10 +428,6 @@ export default function PlayPage() {
                         selectedOptionId === correctOptionId
                           ? "var(--color-success)"
                           : "var(--color-danger)",
-                      textShadow:
-                        selectedOptionId === correctOptionId
-                          ? "0 0 8px rgba(34,197,94,0.4)"
-                          : "0 0 8px rgba(239,68,68,0.4)",
                     }}
                   >
                     {selectedOptionId === correctOptionId

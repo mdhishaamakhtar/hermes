@@ -33,6 +33,7 @@ interface LeaderboardEntry {
 
 interface SessionResults {
   sessionId: number;
+  quizId: number;
   eventId: number;
   quizTitle: string;
   startedAt: string;
@@ -81,14 +82,19 @@ export default function ReviewPage() {
       <div className="max-w-4xl mx-auto px-6 py-12">
         <div className="mb-2">
           <Link
-            href={`/events/${results.eventId}`}
+            href={`/events/${results.eventId}/quizzes/${results.quizId}`}
             className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            ← Back to Event
+            ← Back to Quiz
           </Link>
         </div>
 
-        <div className="mb-10">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-10"
+        >
           <p className="label mb-1">Session Review</p>
           <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">
             {results.quizTitle}
@@ -101,7 +107,7 @@ export default function ReviewPage() {
               <span>{new Date(results.startedAt).toLocaleDateString()}</span>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Tab switcher */}
         <div className="flex gap-0 mb-8 border-b border-border">
@@ -109,7 +115,7 @@ export default function ReviewPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-xs tracking-widest uppercase transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
+              className={`px-6 py-4 text-xs tracking-widest uppercase transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
                 activeTab === tab
                   ? "text-foreground"
                   : "text-muted hover:text-foreground"
@@ -120,7 +126,6 @@ export default function ReviewPage() {
                 <motion.div
                   layoutId="tab-indicator"
                   className="absolute bottom-0 left-0 right-0 h-px bg-primary"
-                  style={{ boxShadow: "0 0 8px rgba(37,99,235,0.6)" }}
                 />
               )}
             </button>
@@ -142,21 +147,19 @@ export default function ReviewPage() {
                 </p>
               ) : (
                 <div className="space-y-px">
-                  {results.leaderboard?.map((entry) => (
-                    <div
+                  {results.leaderboard?.map((entry, i) => (
+                    <motion.div
                       key={entry.rank}
-                      className={`flex items-center justify-between px-5 py-4 bg-surface border ${
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.15, delay: i * 0.04 }}
+                      className={`flex items-center justify-between px-6 py-4 bg-surface border ${
                         entry.rank === 1 ? "border-primary/40" : "border-border"
                       }`}
-                      style={
-                        entry.rank === 1
-                          ? { boxShadow: "0 0 16px rgba(37,99,235,0.1)" }
-                          : {}
-                      }
                     >
                       <div className="flex items-center gap-5">
                         <span
-                          className={`font-mono font-bold tabular-nums text-lg w-8 ${
+                          className={`font-bold tabular-nums text-lg w-8 ${
                             entry.rank === 1
                               ? "text-accent"
                               : entry.rank <= 3
@@ -174,10 +177,10 @@ export default function ReviewPage() {
                           {entry.displayName}
                         </span>
                       </div>
-                      <span className="font-mono font-bold tabular-nums text-foreground">
+                      <span className="font-bold tabular-nums text-foreground">
                         {entry.score.toLocaleString()}
                       </span>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
@@ -272,7 +275,7 @@ export default function ReviewPage() {
                                 )}
                                 {opt.text}
                               </span>
-                              <span className="font-mono text-xs tabular-nums text-muted">
+                              <span className="text-xs tabular-nums text-muted">
                                 {opt.count} ({pct}%)
                               </span>
                             </div>
@@ -282,9 +285,8 @@ export default function ReviewPage() {
                                 animate={{ scaleX: barWidth / 100 }}
                                 transition={{
                                   type: "spring",
-                                  stiffness: 120,
-                                  damping: 20,
-                                  delay: 0.05,
+                                  stiffness: 300,
+                                  damping: 32,
                                 }}
                                 className="h-full absolute inset-0 origin-left"
                                 style={{

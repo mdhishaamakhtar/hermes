@@ -59,7 +59,12 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-10">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex items-center justify-between mb-10"
+        >
           <div>
             <p className="label mb-1">Organiser</p>
             <h1 className="text-2xl font-bold text-foreground leading-tight">
@@ -69,11 +74,10 @@ export default function DashboardPage() {
           <button
             onClick={() => setShowForm((v) => !v)}
             className="bg-primary text-white px-6 py-2.5 text-xs tracking-widest uppercase hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            style={{ boxShadow: "0 0 16px rgba(37,99,235,0.3)" }}
           >
             {showForm ? "Cancel" : "+ New Event"}
           </button>
-        </div>
+        </motion.div>
 
         <AnimatePresence>
           {showForm && (
@@ -86,7 +90,7 @@ export default function DashboardPage() {
               className="mb-8 border border-border bg-surface p-6 space-y-4"
             >
               <div>
-                <label className="label block mb-2">Title</label>
+                <label className="field-label block mb-2">Title</label>
                 <input
                   name="title"
                   required
@@ -95,7 +99,7 @@ export default function DashboardPage() {
                 />
               </div>
               <div>
-                <label className="label block mb-2">Description</label>
+                <label className="field-label block mb-2">Description</label>
                 <textarea
                   name="description"
                   rows={2}
@@ -137,15 +141,16 @@ export default function DashboardPage() {
         ) : (
           <motion.div className="space-y-px">
             <AnimatePresence>
-              {events.map((event) => (
+              {events.map((event, i) => (
                 <motion.div
                   key={event.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15, delay: i * 0.04 }}
                   layout
                   onClick={() => router.push(`/events/${event.id}`)}
-                  className="group flex items-center justify-between px-6 py-5 bg-surface border border-border hover:border-primary/40 hover:bg-surface/80 cursor-pointer transition-all"
+                  className="group flex items-center justify-between px-6 py-4 bg-surface border border-border hover:border-primary/40 hover:bg-surface/80 cursor-pointer transition-all"
                 >
                   <div>
                     <h2 className="text-foreground font-medium group-hover:text-accent transition-colors">

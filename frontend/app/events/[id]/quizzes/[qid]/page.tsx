@@ -64,6 +64,7 @@ export default function QuizEditorPage() {
   const [editOptions, setEditOptions] = useState<OptionReq[]>([]);
   const [saving, setSaving] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [abandoning, setAbandoning] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace("/auth/login");
@@ -194,6 +195,44 @@ export default function QuizEditorPage() {
 
   const [, saveEditFormAction] = useActionState(saveEditAction, null);
 
+  const handleAbandon = async (sessionId: number) => {
+    if (!confirm("Abandon this session? The quiz will become editable again."))
+      return;
+    setAbandoning(true);
+    const res = await api.post(`/api/sessions/${sessionId}/end`);
+    if (res.success) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, status: "ENDED" } : s)),
+      );
+    } else {
+      alert(res.error?.message || "Failed to abandon session");
+    }
+    setAbandoning(false);
+  };
+
+  const handleAbandonAll = async () => {
+    const lobbyIds = sessions
+      .filter((s) => s.status === "LOBBY")
+      .map((s) => s.id);
+    if (!lobbyIds.length) return;
+    if (
+      !confirm(
+        `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
+      )
+    )
+      return;
+    setAbandoning(true);
+    await Promise.all(
+      lobbyIds.map((id) => api.post(`/api/sessions/${id}/end`)),
+    );
+    setSessions((prev) =>
+      prev.map((s) =>
+        lobbyIds.includes(s.id) ? { ...s, status: "ENDED" } : s,
+      ),
+    );
+    setAbandoning(false);
+  };
+
   const handleLaunch = async () => {
     setLaunching(true);
     const res = await api.post<{ id: number; joinCode: string }>(
@@ -224,7 +263,12 @@ export default function QuizEditorPage() {
           </Link>
         </div>
 
-        <div className="flex items-start justify-between mb-10">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex items-start justify-between mb-10"
+        >
           <div>
             <p className="label mb-1">Quiz Editor</p>
             <h1 className="text-2xl font-bold text-foreground leading-tight">
@@ -235,11 +279,10 @@ export default function QuizEditorPage() {
             onClick={handleLaunch}
             disabled={launching || (quiz.questions?.length ?? 0) === 0}
             className="bg-primary text-white px-6 py-3 text-xs tracking-widest uppercase hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            style={{ boxShadow: "0 0 20px rgba(37,99,235,0.3)" }}
           >
             {launching ? "Launching..." : "↑ Launch Session"}
           </button>
-        </div>
+        </motion.div>
 
         <div className="flex items-center justify-between mb-4">
           <h2 className="label">Questions ({quiz.questions?.length ?? 0})</h2>
@@ -262,11 +305,12 @@ export default function QuizEditorPage() {
               exit={{ opacity: 0, y: -8 }}
               action={addQuestionFormAction}
               className="mb-6 border border-primary/40 bg-surface p-6 space-y-4"
-              style={{ boxShadow: "0 0 20px rgba(37,99,235,0.1)" }}
             >
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="label block mb-2">Question Text</label>
+                  <label className="field-label block mb-2">
+                    Question Text
+                  </label>
                   <input
                     name="qText"
                     value={qText}
@@ -277,7 +321,7 @@ export default function QuizEditorPage() {
                   />
                 </div>
                 <div className="w-28">
-                  <label className="label block mb-2">Time (s)</label>
+                  <label className="field-label block mb-2">Time (s)</label>
                   <input
                     type="number"
                     name="qTime"
@@ -289,11 +333,9 @@ export default function QuizEditorPage() {
                 </div>
               </div>
               <div>
-                <label className="label block mb-3">
+                <label className="field-label block mb-3">
                   Options{" "}
-                  <span className="normal-case text-muted/50">
-                    (click to mark correct)
-                  </span>
+                  <span className="text-muted/50">(click to mark correct)</span>
                 </label>
                 <div className="space-y-2">
                   {options.map((opt, i) => (
@@ -341,63 +383,72 @@ export default function QuizEditorPage() {
           <div className="space-y-2 mb-12">
             {quiz.questions
               ?.sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((q) => (
+              .map((q, i) => (
                 <div key={q.id}>
-                  {/* View row */}
-                  {editingQuestion?.id !== q.id && (
-                    <div className="border border-border bg-surface p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-start gap-3">
-                          <span className="font-mono text-xs text-muted mt-0.5 tabular-nums">
-                            {q.orderIndex}.
-                          </span>
-                          <div>
-                            <p className="text-foreground text-sm font-medium">
-                              {q.text}
-                            </p>
-                            <p className="text-xs text-muted mt-0.5">
-                              {q.timeLimitSeconds}s
-                            </p>
+                  <AnimatePresence mode="wait" initial={true}>
+                    {editingQuestion?.id !== q.id ? (
+                      /* View row */
+                      <motion.div
+                        key="view"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                        transition={{ duration: 0.15, delay: i * 0.04 }}
+                        className="border border-border bg-surface p-6"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3">
+                            <span className="font-mono text-xs text-muted mt-0.5 tabular-nums">
+                              {q.orderIndex}.
+                            </span>
+                            <div>
+                              <p className="text-foreground text-base font-medium">
+                                {q.text}
+                              </p>
+                              <p className="text-xs text-muted mt-0.5">
+                                {q.timeLimitSeconds}s
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => openEdit(q)}
+                              className="label text-muted/40 hover:text-accent transition-colors focus-visible:outline-none focus-visible:opacity-100"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteQuestion(q.id)}
+                              className="label text-muted/40 hover:text-danger transition-colors focus-visible:outline-none focus-visible:opacity-100"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <button
-                            onClick={() => openEdit(q)}
-                            className="label text-muted/40 hover:text-accent transition-colors focus-visible:outline-none focus-visible:opacity-100"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteQuestion(q.id)}
-                            className="label text-muted/40 hover:text-danger transition-colors focus-visible:outline-none focus-visible:opacity-100"
-                          >
-                            Delete
-                          </button>
+                        <div className="grid grid-cols-2 gap-2 ml-6">
+                          {q.options?.map((opt) => (
+                            <div
+                              key={opt.id}
+                              className={`px-3 py-1.5 text-xs border ${opt.isCorrect ? "border-success/40 text-success bg-success/5" : "border-border text-muted"}`}
+                            >
+                              {opt.text}
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 ml-6">
-                        {q.options?.map((opt) => (
-                          <div
-                            key={opt.id}
-                            className={`px-3 py-1.5 text-xs border ${opt.isCorrect ? "border-success/40 text-success bg-success/5" : "border-border text-muted"}`}
-                          >
-                            {opt.text}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Inline edit form */}
-                  <AnimatePresence>
-                    {editingQuestion?.id === q.id && (
+                      </motion.div>
+                    ) : (
+                      /* Inline edit form */
                       <motion.form
+                        key="edit"
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
+                        exit={{
+                          opacity: 0,
+                          y: -4,
+                          transition: { duration: 0.1 },
+                        }}
                         action={saveEditFormAction}
                         className="border border-warning/40 bg-surface p-6 space-y-4"
-                        style={{ boxShadow: "0 0 20px rgba(217,119,6,0.08)" }}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs tracking-widest uppercase text-warning">
@@ -413,7 +464,7 @@ export default function QuizEditorPage() {
                         </div>
                         <div className="flex gap-4">
                           <div className="flex-1">
-                            <label className="label block mb-2">
+                            <label className="field-label block mb-2">
                               Question Text
                             </label>
                             <input
@@ -424,7 +475,9 @@ export default function QuizEditorPage() {
                             />
                           </div>
                           <div className="w-28">
-                            <label className="label block mb-2">Time (s)</label>
+                            <label className="field-label block mb-2">
+                              Time (s)
+                            </label>
                             <input
                               type="number"
                               value={editTime}
@@ -437,9 +490,9 @@ export default function QuizEditorPage() {
                           </div>
                         </div>
                         <div>
-                          <label className="label block mb-3">
+                          <label className="field-label block mb-3">
                             Options{" "}
-                            <span className="normal-case text-muted/50">
+                            <span className="text-muted/50">
                               (click to mark correct)
                             </span>
                           </label>
@@ -488,16 +541,36 @@ export default function QuizEditorPage() {
         {sessions.length > 0 && (
           <>
             <div className="h-px bg-border mb-6" />
-            <h2 className="label mb-4">Past Sessions</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="label">Past Sessions</h2>
+              {sessions.some((s) => s.status === "LOBBY") && (
+                <button
+                  onClick={handleAbandonAll}
+                  disabled={abandoning}
+                  className="text-xs tracking-widest uppercase text-warning hover:text-warning/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+                >
+                  {abandoning ? "Abandoning..." : "Abandon All →"}
+                </button>
+              )}
+            </div>
             <div className="space-y-px">
-              {sessions.map((s) => (
-                <div
+              {sessions.map((s, i) => (
+                <motion.div
                   key={s.id}
-                  className="flex items-center justify-between px-5 py-3 bg-surface border border-border"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15, delay: i * 0.04 }}
+                  className="flex items-center justify-between px-6 py-4 bg-surface border border-border"
                 >
                   <div className="flex items-center gap-4">
                     <span
-                      className={`text-xs tracking-widest uppercase px-2 py-0.5 ${s.status === "ENDED" ? "text-muted bg-border" : "text-success bg-success/10"}`}
+                      className={`text-xs tracking-widest uppercase px-2 py-0.5 ${
+                        s.status === "ENDED"
+                          ? "text-muted bg-border"
+                          : s.status === "LOBBY"
+                            ? "text-warning bg-warning/10"
+                            : "text-success bg-success/10"
+                      }`}
                     >
                       {s.status}
                     </span>
@@ -518,7 +591,16 @@ export default function QuizEditorPage() {
                       Review →
                     </button>
                   )}
-                </div>
+                  {s.status === "LOBBY" && (
+                    <button
+                      onClick={() => handleAbandon(s.id)}
+                      disabled={abandoning}
+                      className="label text-warning hover:text-warning/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+                    >
+                      {abandoning ? "Abandoning..." : "Abandon →"}
+                    </button>
+                  )}
+                </motion.div>
               ))}
             </div>
           </>

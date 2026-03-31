@@ -114,25 +114,29 @@ public class SessionEngine {
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
     String sid = sessionId.toString();
 
-    // Build leaderboard from Redis (display names cached there)
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard = redisHelper.buildLeaderboard(sid);
-
-    // Broadcast SESSION_END to participants
-    messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question", new WsPayloads.SessionEnd());
-
-    // Broadcast SESSION_END with leaderboard to organiser
-    long participantCount = redisHelper.getParticipantCount(sid);
-    messaging.convertAndSend(
-        "/topic/session." + sessionId + ".analytics",
-        new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
-
-    // Update DB
     QuizSession session =
         sessionRepository
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
     String joinCode = session.getJoinCode();
+
+    // Skip broadcasting and leaderboard for LOBBY sessions — no participants joined yet
+    if (session.getStatus() != SessionStatus.LOBBY) {
+      // Build leaderboard from Redis (display names cached there)
+      List<SessionResultsResponse.LeaderboardEntry> leaderboard = redisHelper.buildLeaderboard(sid);
+
+      // Broadcast SESSION_END to participants
+      messaging.convertAndSend(
+          "/topic/session." + sessionId + ".question", new WsPayloads.SessionEnd());
+
+      // Broadcast SESSION_END with leaderboard to organiser
+      long participantCount = redisHelper.getParticipantCount(sid);
+      messaging.convertAndSend(
+          "/topic/session." + sessionId + ".analytics",
+          new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
+    }
+
+    // Update DB
     session.setStatus(SessionStatus.ENDED);
     session.setEndedAt(OffsetDateTime.now());
     session.setCurrentQuestion(null);

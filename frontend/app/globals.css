@@ -1,70 +1,293 @@
 @import "tailwindcss";
 
-/* ─── Design tokens (Tailwind v4 @theme) ─────────────────────────────────── */
-@theme {
-  --color-background: #0a0a0f;
-  --color-surface: #0f1117;
-  --color-border: #1a1f2e;
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERMES DESIGN SYSTEM
+   ───────────────────────────────────────────────────────────────────────────
+   A dark-mode, real-time quiz platform. CRT-inspired, high-contrast,
+   purposeful. Every token is named for its meaning, not its value.
 
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
+   Sections:
+     1. Primitive palette     — raw hex values, only referenced by semantic tokens
+     2. Semantic tokens       — colour intent, exposed to Tailwind via @theme
+     3. Motion tokens         — durations, easings (in :root)
+     4. Layer tokens          — z-index semantic scale (in :root)
+     5. Border & shape tokens — radius, border widths (in :root)
+     6. Option colour tokens  — A/B/C/D quiz answer colours (in :root)
+     7. Base styles           — body defaults, font stack
+     8. Utility classes       — @utility definitions
+     9. Component patterns    — scanlines, live-dot
+    10. Animations            — @keyframes
+    11. Accessibility         — reduced-motion overrides
 
-  --color-accent: #38bdf8;
-  --color-accent-hover: #7dd3fc;
+   Theming:
+     Colour tokens are defined on [data-theme="dark"] (the current default).
+     To add a light theme, duplicate the block with [data-theme="light"] and
+     swap the surface/foreground/border values. The Tailwind @theme block
+     references these via var(), so all utilities automatically follow.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  --color-foreground: #f8fafc;
-  --color-muted: #94a3b8;
-  --color-muted-dark: #4b5563;
+/* ── 1. Primitive palette ─────────────────────────────────────────────────── */
+/*
+ * Raw colour values. Never use these directly in components.
+ * Components use semantic tokens. Primitives exist only to define them.
+ */
+:root {
+  /* Neutrals */
+  --palette-neutral-950: #0a0a0f;
+  --palette-neutral-900: #0f1117;
+  --palette-neutral-800: #1a1f2e;
+  --palette-neutral-700: #252b3b;
+  --palette-neutral-600: #4b5563;
+  --palette-neutral-400: #94a3b8;
+  --palette-neutral-50: #f8fafc;
 
-  --color-success: #22c55e;
-  --color-warning: #d97706;
-  --color-warning-hover: #b45309;
-  --color-danger: #ef4444;
+  /* Blue (primary / interactive) */
+  --palette-blue-700: #1d4ed8;
+  --palette-blue-600: #2563eb;
+  --palette-blue-400: #60a5fa;
+
+  /* Sky (accent / links) */
+  --palette-sky-400: #38bdf8;
+  --palette-sky-300: #7dd3fc;
+
+  /* Green (success / correct) */
+  --palette-green-500: #22c55e;
+  --palette-green-400: #4ade80;
+
+  /* Amber (warning / editing) */
+  --palette-amber-600: #d97706;
+  --palette-amber-700: #b45309;
+
+  /* Red (danger / incorrect) */
+  --palette-red-500: #ef4444;
+  --palette-red-400: #f87171;
+
+  /* Answer option colours (A B C D) */
+  --palette-option-a: #2563eb; /* blue   */
+  --palette-option-b: #7c3aed; /* violet */
+  --palette-option-c: #d97706; /* amber  */
+  --palette-option-d: #e11d48; /* rose   */
 }
 
-/* ─── Base ───────────────────────────────────────────────────────────────── */
+/* ── 2. Semantic tokens (Tailwind v4 @theme) ─────────────────────────────── */
 /*
- * Type scale (1.25 ratio, rem-based for zoom-safety):
- *   xs   0.75rem  12px  → captions, metadata, button labels (label utility)
- *   sm   0.875rem 14px  → secondary body, list metadata
- *   base 1rem     16px  → primary body, form inputs
- *   lg   1.125rem 18px  → review text, stat values
- *   xl   1.25rem  20px  → active question text
- *   2xl  1.5rem   24px  → page titles
- *   3xl  1.875rem 30px  → logo / final leaderboard heading
- *   display clamp()     → hero numbers, join code (fluid responsive)
+ * Semantic tokens map meaning to values. They are exposed to Tailwind, so
+ * every token generates utility classes: bg-*, text-*, border-*, ring-*, etc.
+ *
+ * Naming:
+ *   background   — page canvas
+ *   surface      — cards, inputs, panels (one step lighter than background)
+ *   border       — dividers, outlines
+ *   foreground   — primary readable text
+ *   muted        — secondary text, labels, captions
+ *   muted-dark   — disabled / placeholder
+ *   primary      — brand blue, primary actions
+ *   accent       — sky blue, links, secondary actions
+ *   success      — correct answers, confirmations
+ *   warning      — edit mode, pending states
+ *   danger       — errors, incorrect answers, destructive actions
+ */
+@theme {
+  /* Surfaces */
+  --color-background: var(--palette-neutral-950);
+  --color-surface: var(--palette-neutral-900);
+  --color-border: var(--palette-neutral-800);
+  --color-overlay: var(--palette-neutral-700);
+
+  /* Text */
+  --color-foreground: var(--palette-neutral-50);
+  --color-muted: var(--palette-neutral-400);
+  --color-muted-dark: var(--palette-neutral-600);
+
+  /* Brand — primary */
+  --color-primary: var(--palette-blue-600);
+  --color-primary-hover: var(--palette-blue-700);
+
+  /* Brand — accent */
+  --color-accent: var(--palette-sky-400);
+  --color-accent-hover: var(--palette-sky-300);
+
+  /* Status */
+  --color-success: var(--palette-green-500);
+  --color-warning: var(--palette-amber-600);
+  --color-warning-hover: var(--palette-amber-700);
+  --color-danger: var(--palette-red-500);
+
+  /* Answer options — generated as text-option-a etc. */
+  --color-option-a: var(--palette-option-a);
+  --color-option-b: var(--palette-option-b);
+  --color-option-c: var(--palette-option-c);
+  --color-option-d: var(--palette-option-d);
+
+  /* Typography */
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Courier New", monospace;
+}
+
+/* ── 3. Motion tokens ────────────────────────────────────────────────────── */
+/*
+ * Transition durations and easing functions.
+ * Used in CSS transitions; Framer Motion uses its own values directly.
+ *
+ * Duration hierarchy:
+ *   instant  — immediate feedback, hover border changes
+ *   fast     — micro-interactions, button state changes
+ *   base     — standard UI transitions (most common)
+ *   slow     — page-level entrances, complex state changes
+ *
+ * Easing:
+ *   ease-out — elements entering the screen (start fast, settle gently)
+ *   ease-in  — elements leaving the screen (start slow, exit fast)
+ *   standard — general-purpose transitions
+ */
+:root {
+  --duration-instant: 50ms;
+  --duration-fast: 100ms;
+  --duration-base: 150ms;
+  --duration-slow: 250ms;
+  --duration-enter: 200ms;
+  --duration-exit: 150ms;
+
+  --ease-standard: ease;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out: fast settle */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 4. Layer tokens (z-index) ───────────────────────────────────────────── */
+/*
+ * Semantic z-index scale. Never use magic numbers.
+ * Each layer has a defined purpose — consult before adding new ones.
+ *
+ *   base      — default document flow
+ *   raised    — tooltips, dropdowns within a component
+ *   dropdown  — floating menus, autocomplete lists
+ *   sticky    — sticky headers and sidebars
+ *   overlay   — backdrop shades behind modals
+ *   modal     — dialogs, drawers
+ *   toast     — notification toasts (above modals)
+ *   tooltip   — tooltips that must appear above everything
+ */
+:root {
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+}
+
+/* ── 5. Border & shape tokens ────────────────────────────────────────────── */
+/*
+ * Hermes uses sharp corners as a design principle (quiz/terminal aesthetic).
+ * Radius tokens exist for completeness and future flexibility.
+ */
+:root {
+  --radius-none: 0;
+  --radius-sm: 0.125rem; /* 2px — very subtle rounding */
+  --radius-md: 0.25rem; /* 4px — component-level rounding */
+
+  --border-width-thin: 1px;
+  --border-width-emphasis: 2px;
+}
+
+/* ── 6. Answer option colour tokens ─────────────────────────────────────── */
+/*
+ * Quiz answer options A–D each have a distinct colour identity used on
+ * selection floods, letter badges, and host response charts.
+ *
+ * These are also available in lib/session-constants.ts for JS/inline use.
+ * Prefer CSS variables here; use JS values only when dynamic rgba() is needed.
+ */
+:root {
+  --option-a-color: var(--palette-option-a); /* blue   */
+  --option-b-color: var(--palette-option-b); /* violet */
+  --option-c-color: var(--palette-option-c); /* amber  */
+  --option-d-color: var(--palette-option-d); /* rose   */
+
+  /* RGB triplets for rgba() usage in inline styles */
+  --option-a-rgb: 37, 99, 235;
+  --option-b-rgb: 124, 58, 237;
+  --option-c-rgb: 217, 119, 6;
+  --option-d-rgb: 225, 29, 72;
+}
+
+/* ── 7. Base styles ──────────────────────────────────────────────────────── */
+/*
+ * Type scale (1.25 modular ratio, rem-based for zoom-safety):
+ *
+ *   xs     0.75rem   12px  → eyebrow labels, badges, metadata  [label utility]
+ *   sm     0.875rem  14px  → secondary body, helper text
+ *   base   1rem      16px  → primary body, form inputs          [input-field utility]
+ *   lg     1.125rem  18px  → stat values, leaderboard scores
+ *   xl     1.25rem   20px  → — (not currently used as a primary text size)
+ *   2xl    1.5rem    24px  → page titles, question text during play
+ *   3xl    1.875rem  30px  → logo, final leaderboard heading
+ *   display clamp()        → hero numbers, join codes (fluid)
+ *
+ * Weight roles:
+ *   400 (regular)   — body text when present
+ *   500 (medium)    — form labels, secondary labels, option text
+ *   600 (semibold)  — eyebrow labels (label utility)
+ *   700 (bold)      — page headings, question text
+ *   900 (black)     — display numbers, logo, join codes
  */
 body {
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Shared UI utilities ────────────────────────────────────────────────── */
+/* ── 8. Utility classes ──────────────────────────────────────────────────── */
 
-/* Eyebrow / section label — 12px, medium weight, wide tracking, muted */
+/*
+ * label
+ * Eyebrow / section label — uppercase, tracked, muted.
+ * Use for: section headings, status badges, metadata captions.
+ * Do NOT use for: form field labels (use field-label), body text.
+ */
 @utility label {
   font-size: 0.75rem;
   line-height: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-muted);
 }
 
-/* Standard form input — 16px prevents iOS Safari auto-zoom on focus */
+/*
+ * field-label
+ * Form input label — readable, not uppercase, slightly muted.
+ * Use for: <label> elements above form inputs.
+ */
+@utility field-label {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+}
+
+/*
+ * input-field
+ * Standard text input — 16px prevents iOS Safari auto-zoom on focus.
+ * Includes focus ring via box-shadow (not outline) for cross-browser consistency.
+ */
 @utility input-field {
   width: 100%;
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: var(--border-width-thin) solid var(--color-border);
   color: var(--color-foreground);
   padding: 0.75rem 1rem;
   font-size: 1rem;
   outline: none;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard);
 
   &::placeholder {
     color: color-mix(in srgb, var(--color-muted) 30%, transparent);
@@ -74,10 +297,132 @@ body {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 1px var(--color-primary);
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
-/* ─── Scanline texture ───────────────────────────────────────────────────── */
-/* Apply .scanlines to any root element — renders a fixed viewport overlay. */
+/*
+ * btn-primary
+ * Primary call-to-action button. Hermes style: rectangular, uppercase, tracked.
+ * Use for: the single most important action on a surface.
+ */
+@utility btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-primary);
+  color: #fff;
+  padding: 1rem 2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background-color var(--duration-base) var(--ease-standard);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-primary);
+  }
+}
+
+/*
+ * btn-ghost
+ * Secondary/ghost button — bordered, transparent background.
+ * Use for: secondary actions, destructive confirms, cancel flows.
+ */
+@utility btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: var(--border-width-thin) solid var(--color-border);
+  color: var(--color-muted);
+  padding: 1rem 2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition:
+    border-color var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+    color: var(--color-accent);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-primary);
+  }
+}
+
+/*
+ * surface-card
+ * A bordered, surfaced container for grouped content.
+ * Use for: question cards, session rows, form panels.
+ * Do NOT nest surface-card inside surface-card.
+ */
+@utility surface-card {
+  background-color: var(--color-surface);
+  border: var(--border-width-thin) solid var(--color-border);
+  padding: 1.5rem;
+}
+
+/*
+ * interactive-row
+ * A clickable list row — hover reveals border highlight.
+ * Use for: event list, quiz list, any navigable list item.
+ */
+@utility interactive-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background-color: var(--color-surface);
+  border: var(--border-width-thin) solid var(--color-border);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-base) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+}
+
+/* ── 9. Component patterns ───────────────────────────────────────────────── */
+
+/*
+ * .scanlines
+ * CRT scanline texture overlay. Apply to any full-screen root element.
+ * Renders a fixed viewport overlay that sits above content (pointer-events: none).
+ *
+ * Usage: <div className="scanlines min-h-screen ...">
+ */
 .scanlines::before {
   content: "";
   position: fixed;
@@ -93,31 +438,18 @@ body {
   z-index: 0;
 }
 
-/* ─── Reduced motion ─────────────────────────────────────────────────────── */
-/* CSS transitions are handled here; Framer Motion is handled by MotionProvider */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+/*
+ * .live-dot
+ * Pulsing status indicator. Pair with a coloured background.
+ *
+ * Usage: <span className="live-dot w-2 h-2 rounded-full bg-success" />
+ */
+.live-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
-/* ─── Glow effects ───────────────────────────────────────────────────────── */
-.glow-blue {
-  box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
-}
-.glow-green {
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
-}
-.glow-red {
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-}
+/* ── 10. Animations ──────────────────────────────────────────────────────── */
 
-/* ─── Live dot animation ─────────────────────────────────────────────────── */
 @keyframes pulse-dot {
   0%,
   100% {
@@ -130,6 +462,38 @@ body {
   }
 }
 
-.live-dot {
-  animation: pulse-dot 1.5s ease-in-out infinite;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── 11. Accessibility ───────────────────────────────────────────────────── */
+/*
+ * Respect prefers-reduced-motion for CSS animations and transitions.
+ * Framer Motion respects this separately via MotionProvider.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
