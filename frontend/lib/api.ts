@@ -1,4 +1,4 @@
-import axios, { AxiosError } from "axios";
+import ky, { HTTPError, type Options } from "ky";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -9,72 +9,66 @@ export interface ApiResponse<T> {
   error: { code: string; message: string } | null;
 }
 
-declare module "axios" {
-  export interface AxiosRequestConfig {
-    skipAuth?: boolean;
-  }
-}
-
-let authToken: string | null = null;
-
-export function setAuthToken(token: string | null) {
-  authToken = token;
-}
-
 export function getAuthToken(): string | null {
   if (typeof window !== "undefined") {
     return localStorage.getItem("hermes_token");
   }
-  return authToken;
+  return null;
 }
 
-const axiosInstance = axios.create({
-  baseURL: BASE_URL,
+interface RequestOptions extends Options {
+  skipAuth?: boolean;
+}
+
+const kyInstance = ky.create({
+  prefixUrl: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  hooks: {
+    beforeRequest: [
+      (request, options: RequestOptions) => {
+        if (!options.skipAuth) {
+          const token = getAuthToken();
+          if (token) {
+            request.headers.set("Authorization", `Bearer ${token}`);
+          }
+        }
+      },
+    ],
+    afterResponse: [
+      (_request, _options, response) => {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("hermes_token");
+            window.dispatchEvent(new Event("unauthorized"));
+          }
+        }
+        return response;
+      },
+    ],
+  },
 });
 
-axiosInstance.interceptors.request.use(
-  (config) => {
-    if (!config.skipAuth) {
-      const token = getAuthToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
-
-axiosInstance.interceptors.response.use(
-  (response) => {
-    if (response.status === 204) {
-      return { ...response, data: { success: true, data: null, error: null } };
-    }
-    return response;
-  },
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("hermes_token");
-        window.dispatchEvent(new Event("unauthorized"));
-      }
-    }
-    return Promise.reject(error);
-  },
-);
-
 async function requestWrapper<T>(
-  requestFn: () => Promise<{ data: ApiResponse<T> }>,
+  requestFn: () => Promise<Response>,
+  is204 = false,
 ): Promise<ApiResponse<T>> {
   try {
     const response = await requestFn();
-    return response.data;
+    if (is204 || response.status === 204) {
+      return { success: true, data: null as unknown as T, error: null };
+    }
+    const data = (await response.json()) as ApiResponse<T>;
+    return data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      return error.response.data as ApiResponse<T>;
+    if (error instanceof HTTPError) {
+      try {
+        const data = (await error.response.json()) as ApiResponse<T>;
+        return data;
+      } catch {
+        // fall through
+      }
     }
     return {
       success: false,
@@ -88,18 +82,36 @@ async function requestWrapper<T>(
   }
 }
 
+// ky's prefixUrl requires no leading slash
+function normalizePath(path: string): string {
+  return path.startsWith("/") ? path.slice(1) : path;
+}
+
 export const api = {
   get: <T>(path: string, extraHeaders?: Record<string, string>) =>
-    requestWrapper<T>(() => axiosInstance.get(path, { headers: extraHeaders })),
+    requestWrapper<T>(() =>
+      kyInstance.get(normalizePath(path), {
+        headers: extraHeaders,
+      }),
+    ),
 
   post: <T>(path: string, body?: unknown, opts?: { skipAuth?: boolean }) =>
-    requestWrapper<T>(() =>
-      axiosInstance.post(path, body, { skipAuth: opts?.skipAuth }),
+    requestWrapper<T>(
+      () =>
+        kyInstance.post(normalizePath(path), {
+          json: body,
+          skipAuth: opts?.skipAuth,
+        } as RequestOptions),
+      !body,
     ),
 
   put: <T>(path: string, body?: unknown) =>
-    requestWrapper<T>(() => axiosInstance.put(path, body)),
+    requestWrapper<T>(() =>
+      kyInstance.put(normalizePath(path), {
+        json: body,
+      }),
+    ),
 
   delete: <T>(path: string) =>
-    requestWrapper<T>(() => axiosInstance.delete(path)),
+    requestWrapper<T>(() => kyInstance.delete(normalizePath(path)), true),
 };
