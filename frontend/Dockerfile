@@ -1,6 +1,6 @@
 FROM oven/bun:1 AS builder
 WORKDIR /app
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 COPY . .
 # NEXT_PUBLIC_* vars are inlined by webpack at build time — must be ARGs, not
