@@ -26,12 +26,12 @@ cd backend
 ### Frontend
 ```bash
 cd frontend
-npm run dev                # Dev server at http://localhost:3000
-npm run build              # Production build
-npm run lint:check         # ESLint check
-npm run lint:fix           # ESLint auto-fix
-npm run format:check       # Prettier check
-npm run format:fix         # Prettier auto-fix
+bun run dev                # Dev server at http://localhost:3000
+bun run build              # Production build
+bun run lint:check         # ESLint check
+bun run lint:fix           # ESLint auto-fix
+bun run format:check       # Prettier check
+bun run format:fix         # Prettier auto-fix
 ```
 
 ## Architecture

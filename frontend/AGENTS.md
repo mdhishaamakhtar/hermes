@@ -11,8 +11,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Always run linting and formatting before considering work complete:
 
 ```bash
-npm run lint:fix
-npm run format:fix
+bun run lint:fix
+bun run format:fix
 ```
 
 Both must exit cleanly (no errors) before committing.
