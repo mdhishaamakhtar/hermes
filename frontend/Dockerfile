@@ -1,7 +1,7 @@
-FROM node:22-alpine AS builder
+FROM oven/bun:1 AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile
 COPY . .
 # NEXT_PUBLIC_* vars are inlined by webpack at build time — must be ARGs, not
 # runtime ENV. Defaults work for docker compose on localhost.
@@ -9,7 +9,7 @@ ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 ARG NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws-hermes
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
-RUN npm run build
+RUN bun run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
