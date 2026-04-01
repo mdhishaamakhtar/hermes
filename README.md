@@ -35,10 +35,8 @@ bun run dev                # http://localhost:3000
 ```bash
 bun run dev            # Dev server
 bun run build          # Production build
-bun run lint:check     # ESLint check
-bun run lint:fix       # ESLint auto-fix
-bun run format:check   # Prettier check
-bun run format:fix     # Prettier auto-fix
+bun run lint           # ESLint auto-fix
+bun run format         # Prettier auto-fix
 ```
 
 ## Backend Commands

@@ -28,10 +28,8 @@ cd backend
 cd frontend
 bun run dev                # Dev server at http://localhost:3000
 bun run build              # Production build
-bun run lint:check         # ESLint check
-bun run lint:fix           # ESLint auto-fix
-bun run format:check       # Prettier check
-bun run format:fix         # Prettier auto-fix
+bun run lint               # ESLint auto-fix
+bun run format             # Prettier auto-fix
 ```
 
 ## Architecture

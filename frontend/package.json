@@ -6,12 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint:check": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format:check": "prettier --check .",
-    "format:fix": "prettier --write .",
-    "check": "npm run lint:check && npm run format:check",
-    "fix": "npm run lint:fix && npm run format:fix"
+    "lint": "eslint . --fix",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@stomp/stompjs": "^7.3.0",

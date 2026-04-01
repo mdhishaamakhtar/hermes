@@ -11,8 +11,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Always run linting and formatting before considering work complete:
 
 ```bash
-bun run lint:fix
-bun run format:fix
+bun run lint
+bun run format
 ```
 
 Both must exit cleanly (no errors) before committing.
