@@ -151,7 +151,7 @@ export default function ResultsPage() {
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-start gap-3">
-                    <span className="font-mono text-xs text-muted tabular-nums mt-0.5 shrink-0">
+                    <span className="text-xs text-muted tabular-nums mt-0.5 shrink-0">
                       {q.orderIndex}.
                     </span>
                     <p className="text-sm text-foreground">{q.questionText}</p>
@@ -159,7 +159,7 @@ export default function ResultsPage() {
                   <div className="shrink-0 flex items-center gap-2">
                     {q.isCorrect ? (
                       <>
-                        <span className="text-xs tabular-nums font-mono text-success">
+                        <span className="text-xs tabular-nums text-success">
                           +{q.pointsEarned}
                         </span>
                         <span className="text-success text-base">✓</span>

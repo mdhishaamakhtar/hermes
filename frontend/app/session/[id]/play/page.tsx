@@ -277,7 +277,7 @@ export default function PlayPage() {
                       : "var(--color-foreground)",
                 textShadow:
                   timeLeft !== null && timeLeft <= 5
-                    ? "0 0 12px rgba(239,68,68,0.6)"
+                    ? `0 0 12px rgba(${colorRgb.danger},0.6)`
                     : "none",
               }}
             >
