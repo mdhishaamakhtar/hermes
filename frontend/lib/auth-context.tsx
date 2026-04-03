@@ -5,6 +5,8 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
+  useMemo,
   ReactNode,
 } from "react";
 import { api } from "./api";
@@ -43,17 +45,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       typeof window !== "undefined" && !!localStorage.getItem("hermes_token"),
   );
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem("hermes_token");
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = useCallback((newToken: string, newUser: User) => {
     localStorage.setItem("hermes_token", newToken);
     setToken(newToken);
     setUser(newUser);
-  };
+  }, []);
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -74,13 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
 
     return () => window.removeEventListener("unauthorized", handleUnauthorized);
-  }, []);
+  }, [logout]);
 
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, token, login, logout, isLoading }),
+    [user, token, login, logout, isLoading],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

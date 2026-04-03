@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import Navbar from "@/components/Navbar";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface Event {
   id: number;
@@ -53,7 +54,14 @@ export default function DashboardPage() {
     setEvents((prev) => prev.filter((ev) => ev.id !== id));
   };
 
-  if (isLoading || !user) return null;
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <ContentSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

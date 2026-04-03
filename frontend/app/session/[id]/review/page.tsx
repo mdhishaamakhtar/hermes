@@ -7,6 +7,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import Navbar from "@/components/Navbar";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface OptionResult {
   id: number;
@@ -66,7 +67,14 @@ export default function ReviewPage() {
       });
   }, [sessionId, user]);
 
-  if (isLoading || !user || !results) return null;
+  if (isLoading || !user || !results) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <ContentSkeleton />
+      </div>
+    );
+  }
 
   const currentQuestion = results.questions?.sort(
     (a, b) => a.orderIndex - b.orderIndex,
