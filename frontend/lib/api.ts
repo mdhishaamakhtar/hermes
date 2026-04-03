@@ -1,4 +1,5 @@
 import ky, { HTTPError, type Options } from "ky";
+import { clearStoredAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -10,10 +11,7 @@ export interface ApiResponse<T> {
 }
 
 export function getAuthToken(): string | null {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("hermes_token");
-  }
-  return null;
+  return getStoredAuthToken();
 }
 
 interface RequestOptions extends Options {
@@ -40,8 +38,7 @@ const kyInstance = ky.create({
       (_request, _options, response) => {
         if (response.status === 401) {
           if (typeof window !== "undefined") {
-            localStorage.removeItem("hermes_token");
-            window.dispatchEvent(new Event("unauthorized"));
+            clearStoredAuthToken();
           }
         }
         return response;

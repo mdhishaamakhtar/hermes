@@ -15,9 +15,11 @@ const WS_URL =
 export function useStompClient(options: UseStompOptions = {}) {
   const clientRef = useRef<Client | null>(null);
   const subscriptionsRef = useRef<Map<string, StompSubscription>>(new Map());
-  // Sync options into a ref so the stable effect dep array can still read the
-  // latest callbacks without reconnecting on every render.
+  const desiredSubscriptionsRef = useRef<Map<string, (body: unknown) => void>>(
+    new Map(),
+  );
   const optionsRef = useRef(options);
+
   useEffect(() => {
     optionsRef.current = options;
   });
@@ -25,12 +27,27 @@ export function useStompClient(options: UseStompOptions = {}) {
   useEffect(() => {
     const client = new Client({
       brokerURL: WS_URL,
-      connectHeaders: optionsRef.current.headers || {},
+      beforeConnect: async () => {
+        client.connectHeaders = optionsRef.current.headers || {};
+      },
       reconnectDelay: 3000,
       onConnect: () => {
+        desiredSubscriptionsRef.current.forEach((callback, destination) => {
+          if (!subscriptionsRef.current.has(destination)) {
+            const subscription = client.subscribe(destination, (msg) => {
+              try {
+                callback(JSON.parse(msg.body));
+              } catch {
+                callback(msg.body);
+              }
+            });
+            subscriptionsRef.current.set(destination, subscription);
+          }
+        });
         optionsRef.current.onConnect?.();
       },
       onDisconnect: () => {
+        subscriptionsRef.current.clear();
         optionsRef.current.onDisconnect?.();
       },
       onStompError: (frame) => {
@@ -51,31 +68,19 @@ export function useStompClient(options: UseStompOptions = {}) {
 
   const subscribe = useCallback(
     (destination: string, callback: (body: unknown) => void) => {
+      desiredSubscriptionsRef.current.set(destination, callback);
       const client = clientRef.current;
-      if (!client || !client.connected) {
-        const checkInterval = setInterval(() => {
-          if (clientRef.current?.connected) {
-            clearInterval(checkInterval);
-            const sub = clientRef.current.subscribe(destination, (msg) => {
-              try {
-                callback(JSON.parse(msg.body));
-              } catch {
-                callback(msg.body);
-              }
-            });
-            subscriptionsRef.current.set(destination, sub);
-          }
-        }, 100);
+      if (!client?.connected || subscriptionsRef.current.has(destination)) {
         return;
       }
-      const sub = client.subscribe(destination, (msg) => {
+      const subscription = client.subscribe(destination, (msg) => {
         try {
           callback(JSON.parse(msg.body));
         } catch {
           callback(msg.body);
         }
       });
-      subscriptionsRef.current.set(destination, sub);
+      subscriptionsRef.current.set(destination, subscription);
     },
     [],
   );
@@ -91,9 +96,10 @@ export function useStompClient(options: UseStompOptions = {}) {
   }, []);
 
   const unsubscribe = useCallback((destination: string) => {
-    const sub = subscriptionsRef.current.get(destination);
-    if (sub) {
-      sub.unsubscribe();
+    desiredSubscriptionsRef.current.delete(destination);
+    const subscription = subscriptionsRef.current.get(destination);
+    if (subscription) {
+      subscription.unsubscribe();
       subscriptionsRef.current.delete(destination);
     }
   }, []);

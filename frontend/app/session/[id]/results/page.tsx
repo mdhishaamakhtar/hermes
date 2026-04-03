@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import Link from "next/link";
 import MinimalNav from "@/components/MinimalNav";
@@ -32,7 +31,6 @@ interface MyResults {
 
 export default function ResultsPage() {
   const { id: sessionId } = useParams<{ id: string }>();
-  const router = useRouter();
   const [results, setResults] = useState<MyResults | null>(null);
   const [error, setError] = useState("");
 
@@ -62,12 +60,13 @@ export default function ResultsPage() {
         <p className="label text-danger mb-6" role="alert">
           {error}
         </p>
-        <button
-          onClick={() => router.push("/")}
+        <Link
+          href="/"
+          prefetch
           className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Go Home
-        </button>
+        </Link>
       </div>
     );
   }
@@ -91,12 +90,7 @@ export default function ResultsPage() {
 
       <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-12 relative z-10">
         {/* Hero score */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="text-center mb-12"
-        >
+        <div className="page-enter text-center mb-12">
           <p className="label mb-2">{results.displayName}</p>
           <div
             className="font-black tabular-nums text-foreground mb-1"
@@ -131,30 +125,30 @@ export default function ResultsPage() {
               <p className="label mt-0.5">correct</p>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         <div className="h-px bg-border mb-8" />
 
         {/* Per-question breakdown */}
         <div className="space-y-2">
           {results.questions
-            ?.sort((a, b) => a.orderIndex - b.orderIndex)
+            ?.toSorted((a, b) => a.orderIndex - b.orderIndex)
             .map((q, i) => (
-              <motion.div
+              <div
                 key={q.questionId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.15, delay: i * 0.04 }}
-                className={`border bg-surface p-6 ${
+                className={`page-enter border bg-surface p-6 ${
                   q.isCorrect ? "border-success/20" : "border-border"
                 }`}
+                style={{ animationDelay: `${Math.min(i, 5) * 60}ms` }}
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-start gap-3">
                     <span className="text-xs text-muted tabular-nums mt-0.5 shrink-0">
                       {q.orderIndex}.
                     </span>
-                    <p className="text-sm text-foreground">{q.questionText}</p>
+                    <p className="text-sm md:text-base text-foreground">
+                      {q.questionText}
+                    </p>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
                     {q.isCorrect ? (
@@ -200,23 +194,19 @@ export default function ResultsPage() {
                     </span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
         </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: (results.questions?.length ?? 0) * 0.04 + 0.1 }}
-          className="text-center mt-10"
-        >
+        <div className="page-enter page-enter-delay-5 text-center mt-10">
           <Link
             href="/"
+            prefetch
             className="label hover:text-foreground transition-colors"
           >
             Back to Home
           </Link>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

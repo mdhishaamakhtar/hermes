@@ -296,14 +296,14 @@ export default function PlayPage() {
             transition={{ duration: 0.2 }}
             className="flex-1 flex flex-col px-6 py-8 max-w-2xl mx-auto w-full"
           >
-            <h1 className="text-2xl font-bold text-foreground text-center mb-8 leading-snug">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground text-center mb-8 leading-snug">
               {question.text}
             </h1>
 
             {/* Options 2×2 grid */}
             <div className="grid grid-cols-2 gap-2 flex-1">
               {question.options
-                .sort((a, b) => a.orderIndex - b.orderIndex)
+                .toSorted((a, b) => a.orderIndex - b.orderIndex)
                 .map((opt, i) => {
                   const meta = OPTION_META[i % OPTION_META.length];
                   const state = getOptionState(opt.id);
@@ -382,7 +382,7 @@ export default function PlayPage() {
                         )}
                       </div>
                       {/* Option text */}
-                      <p className="text-sm font-medium text-foreground leading-snug">
+                      <p className="text-sm md:text-base font-medium text-foreground leading-snug">
                         {opt.text}
                       </p>
                     </motion.button>

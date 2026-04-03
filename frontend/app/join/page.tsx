@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useActionState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import MinimalNav from "@/components/MinimalNav";
 
@@ -94,40 +94,25 @@ export default function JoinPage() {
       <MinimalNav />
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="w-full max-w-sm"
-        >
+        <div className="page-enter w-full max-w-sm">
           {/* Rejoin banner */}
-          <AnimatePresence>
-            {activeSession && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="mb-6 border border-success/30 bg-success/5 px-4 py-3 flex items-center justify-between"
+          {activeSession && (
+            <div className="page-enter page-enter-delay-1 mb-6 border border-success/30 bg-success/5 px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="label text-success mb-0.5">Session in progress</p>
+                <p className="text-xs text-muted">
+                  You are already in a session
+                </p>
+              </div>
+              <Link
+                href={`/session/${activeSession.sessionId}/play`}
+                prefetch
+                className="label text-success hover:text-success/80 transition-colors ml-4 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                <div>
-                  <p className="label text-success mb-0.5">
-                    Session in progress
-                  </p>
-                  <p className="text-xs text-muted">
-                    You are already in a session
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    router.push(`/session/${activeSession.sessionId}/play`)
-                  }
-                  className="label text-success hover:text-success/80 transition-colors ml-4 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  Rejoin →
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                Rejoin →
+              </Link>
+            </div>
+          )}
 
           <p className="label text-center mb-8">Enter Session Code</p>
 
@@ -190,7 +175,7 @@ export default function JoinPage() {
               {isPending ? "Joining..." : "Join Session"}
             </button>
           </form>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

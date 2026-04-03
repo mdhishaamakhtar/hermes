@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { clearStoredAuthToken } from "@/lib/auth-storage";
 import Logo from "./Logo";
 
-export default function Navbar() {
-  const { user, logout } = useAuth();
+export default function Navbar({ displayName }: { displayName: string }) {
   const router = useRouter();
 
   const handleLogout = () => {
-    logout();
+    clearStoredAuthToken();
     router.replace("/");
   };
 
@@ -24,10 +23,10 @@ export default function Navbar() {
           <Logo size="sm" showWordmark />
         </Link>
         <div className="flex items-center gap-6">
-          {user && (
+          {displayName && (
             <>
               <span className="text-sm text-muted tracking-wide select-none">
-                {user.displayName}
+                {displayName}
               </span>
               <button
                 onClick={handleLogout}

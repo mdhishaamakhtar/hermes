@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
+import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import Logo from "@/components/Logo";
 import { OPTION_META } from "@/lib/session-constants";
@@ -52,7 +53,6 @@ interface ParticipantJoined {
 
 export default function HostPage() {
   const { id } = useParams<{ id: string }>();
-  const { user, token, isLoading } = useAuth();
   const router = useRouter();
 
   const [sessionStatus, setSessionStatus] = useState<
@@ -76,54 +76,61 @@ export default function HostPage() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const authToken =
-    token ||
-    (typeof window !== "undefined" ? localStorage.getItem("hermes_token") : "");
-
-  const { subscribe } = useStompClient({
+  const authToken = getStoredAuthToken();
+  const { subscribe, unsubscribe } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-    onConnect: () => {
-      subscribe(`/topic/session.${id}.question`, (msg) => {
-        const data = msg as QuestionMsg | { event: string };
-        if (data.event === "QUESTION_START") {
-          const q = data as QuestionMsg;
-          setCurrentQuestion(q);
-          setTimeLeft(q.timeLimitSeconds);
-          setCounts({});
-          setTotalAnswered(0);
-        } else if (data.event === "SESSION_END") {
-          setSessionStatus("ENDED");
-        }
-      });
-      subscribe(`/topic/session.${id}.analytics`, (msg) => {
-        const data = msg as AnswerUpdate | LeaderboardUpdate | SessionEnd;
-        if (data.event === "ANSWER_UPDATE") {
-          const a = data as AnswerUpdate;
-          setCounts(a.counts);
-          setTotalAnswered(a.totalAnswered);
-        } else if (data.event === "LEADERBOARD_UPDATE") {
-          setLeaderboard((data as LeaderboardUpdate).leaderboard);
-        } else if (data.event === "SESSION_END") {
-          const se = data as SessionEnd;
-          setFinalLeaderboard(se.leaderboard || []);
-          setSessionStatus("ENDED");
-        }
-      });
-      subscribe(`/topic/session.${id}.control`, (msg) => {
-        const data = msg as ParticipantJoined;
-        if (data.event === "PARTICIPANT_JOINED")
-          setParticipantCount(data.count);
-      });
-    },
   });
 
   useEffect(() => {
-    if (!isLoading && !user) router.replace("/auth/login");
-  }, [user, isLoading, router]);
+    const questionDestination = `/topic/session.${id}.question`;
+    const analyticsDestination = `/topic/session.${id}.analytics`;
+    const controlDestination = `/topic/session.${id}.control`;
+
+    subscribe(questionDestination, (msg) => {
+      const data = msg as QuestionMsg | { event: string };
+      if (data.event === "QUESTION_START") {
+        const question = data as QuestionMsg;
+        setCurrentQuestion(question);
+        setTimeLeft(question.timeLimitSeconds);
+        setCounts({});
+        setTotalAnswered(0);
+      } else if (data.event === "SESSION_END") {
+        setSessionStatus("ENDED");
+      }
+    });
+
+    subscribe(analyticsDestination, (msg) => {
+      const data = msg as AnswerUpdate | LeaderboardUpdate | SessionEnd;
+      if (data.event === "ANSWER_UPDATE") {
+        const answer = data as AnswerUpdate;
+        setCounts(answer.counts);
+        setTotalAnswered(answer.totalAnswered);
+      } else if (data.event === "LEADERBOARD_UPDATE") {
+        setLeaderboard((data as LeaderboardUpdate).leaderboard);
+      } else if (data.event === "SESSION_END") {
+        const sessionEnd = data as SessionEnd;
+        setFinalLeaderboard(sessionEnd.leaderboard || []);
+        setSessionStatus("ENDED");
+      }
+    });
+
+    subscribe(controlDestination, (msg) => {
+      const data = msg as ParticipantJoined;
+      if (data.event === "PARTICIPANT_JOINED") {
+        setParticipantCount(data.count);
+      }
+    });
+
+    return () => {
+      unsubscribe(questionDestination);
+      unsubscribe(analyticsDestination);
+      unsubscribe(controlDestination);
+    };
+  }, [id, subscribe, unsubscribe]);
 
   // On mount: fetch lobby state (count + joinCode) and check if already ENDED
   useEffect(() => {
-    if (!user || !id) return;
+    if (!id) return;
     api
       .get<{ status: string; participantCount: number; joinCode: string }>(
         `/api/sessions/${id}/lobby`,
@@ -140,7 +147,7 @@ export default function HostPage() {
         }
       })
       .catch(() => {});
-  }, [id, user, router]);
+  }, [id, router]);
 
   // Timer countdown
   useEffect(() => {
@@ -189,14 +196,6 @@ export default function HostPage() {
   const timerPct = currentQuestion
     ? (timeLeft / currentQuestion.timeLimitSeconds) * 100
     : 0;
-
-  if (isLoading || !user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-5 h-5 border border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="scanlines min-h-screen bg-background flex flex-col">
@@ -363,7 +362,7 @@ export default function HostPage() {
                     }}
                   />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground leading-snug">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-snug">
                   {currentQuestion.text}
                 </h2>
               </div>
@@ -542,12 +541,13 @@ export default function HostPage() {
                 </motion.div>
               ))}
             </div>
-            <button
-              onClick={() => router.replace(`/session/${id}/review`)}
+            <Link
+              href={`/session/${id}/review`}
+              prefetch
               className="border border-primary/50 text-accent px-8 py-3 text-xs tracking-widest uppercase hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               Full Review →
-            </button>
+            </Link>
           </div>
         )}
       </div>

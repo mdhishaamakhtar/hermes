@@ -3,9 +3,8 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
+import { setStoredAuthToken } from "@/lib/auth-storage";
 import MinimalNav from "@/components/MinimalNav";
 
 interface LoginState {
@@ -13,7 +12,6 @@ interface LoginState {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
   const router = useRouter();
 
   const [state, formAction, isPending] = useActionState<LoginState, FormData>(
@@ -31,7 +29,7 @@ export default function LoginPage() {
           };
         }>("/api/auth/login", { email, password }, { skipAuth: true });
         if (res.success) {
-          login(res.data.token, res.data.user);
+          setStoredAuthToken(res.data.token);
           router.push("/dashboard");
           return { error: "" };
         }
@@ -48,12 +46,7 @@ export default function LoginPage() {
       <MinimalNav />
 
       <div className="flex-1 flex items-center justify-center px-6 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="w-full max-w-sm"
-        >
+        <div className="page-enter w-full max-w-sm">
           <div className="mb-8">
             <p className="label mb-2">Organiser Access</p>
             <h1 className="text-2xl font-bold text-foreground leading-tight tracking-tight">
@@ -103,13 +96,14 @@ export default function LoginPage() {
               No account?{" "}
               <Link
                 href="/auth/register"
+                prefetch
                 className="text-accent hover:text-accent-hover transition-colors"
               >
                 Create one
               </Link>
             </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
