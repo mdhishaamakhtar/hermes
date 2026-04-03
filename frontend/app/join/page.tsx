@@ -161,7 +161,7 @@ export default function JoinPage() {
 
             {/* Display name */}
             <div>
-              <label className="label block mb-2">Your Name</label>
+              <label className="field-label block mb-2">Your Name</label>
               <input
                 type="text"
                 value={displayName}

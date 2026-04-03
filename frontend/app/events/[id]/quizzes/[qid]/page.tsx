@@ -259,9 +259,9 @@ export default function QuizEditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="scanlines min-h-screen bg-background">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-12 relative z-10">
         <div className="mb-2">
           <Link
             href={`/events/${eventId}`}
@@ -406,7 +406,7 @@ export default function QuizEditorPage() {
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-start gap-3">
-                            <span className="font-mono text-xs text-muted mt-0.5 tabular-nums">
+                            <span className="text-xs text-muted mt-0.5 tabular-nums">
                               {q.orderIndex}.
                             </span>
                             <div>

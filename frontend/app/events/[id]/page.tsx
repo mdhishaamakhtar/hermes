@@ -81,9 +81,9 @@ export default function EventPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="scanlines min-h-screen bg-background">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-12 relative z-10">
         <div className="mb-2">
           <Link
             href="/dashboard"
@@ -184,7 +184,7 @@ export default function EventPage() {
                   className="group flex items-center justify-between px-6 py-4 bg-surface border border-border hover:border-primary/40 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <span className="font-mono text-xs text-muted tabular-nums w-5">
+                    <span className="text-xs text-muted tabular-nums w-5">
                       {quiz.orderIndex}
                     </span>
                     <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">
