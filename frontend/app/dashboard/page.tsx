@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 import { requireServerUser, serverApi } from "@/lib/server-api";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
+  },
+};
 
 interface Event {
   id: number;

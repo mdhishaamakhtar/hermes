@@ -1,9 +1,55 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import Logo from "@/components/Logo";
+import { absoluteUrl, siteConfig } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Real-time Quiz Platform",
+  description: siteConfig.description,
+  alternates: {
+    canonical: "/",
+  },
+};
 
 export default function LandingPage() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        name: siteConfig.title,
+        url: siteConfig.url,
+        description: siteConfig.description,
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: siteConfig.title,
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        url: siteConfig.url,
+        image: absoluteUrl("/opengraph-image"),
+        description: siteConfig.description,
+        creator: {
+          "@type": "Person",
+          name: siteConfig.creator,
+        },
+      },
+      {
+        "@type": "Organization",
+        name: siteConfig.title,
+        url: siteConfig.url,
+        logo: absoluteUrl(siteConfig.iconPath),
+      },
+    ],
+  };
+
   return (
     <main className="scanlines relative min-h-screen bg-background overflow-hidden flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+
       {/* Radial gradient bloom */}
       <div
         aria-hidden
