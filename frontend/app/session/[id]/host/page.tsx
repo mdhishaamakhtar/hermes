@@ -190,7 +190,13 @@ export default function HostPage() {
     ? (timeLeft / currentQuestion.timeLimitSeconds) * 100
     : 0;
 
-  if (isLoading || !user) return null;
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-5 h-5 border border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="scanlines min-h-screen bg-background flex flex-col">

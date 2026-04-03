@@ -7,6 +7,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import Navbar from "@/components/Navbar";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface Quiz {
   id: number;
@@ -70,7 +71,14 @@ export default function EventPage() {
 
   const [, createQuizAction, creating] = useActionState(handleCreateQuiz, null);
 
-  if (isLoading || !user || !event) return null;
+  if (isLoading || !user || !event) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <ContentSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

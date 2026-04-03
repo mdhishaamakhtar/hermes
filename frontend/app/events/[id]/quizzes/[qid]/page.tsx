@@ -7,6 +7,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import Navbar from "@/components/Navbar";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface OptionReq {
   text: string;
@@ -248,7 +249,14 @@ export default function QuizEditorPage() {
     }
   };
 
-  if (isLoading || !user || !quiz) return null;
+  if (isLoading || !user || !quiz) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <ContentSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
