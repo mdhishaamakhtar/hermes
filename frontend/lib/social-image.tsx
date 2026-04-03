@@ -47,20 +47,20 @@ export async function createSocialImage() {
         }}
       />
 
-      <div
-        style={{
-          position: "absolute",
-          top: 42,
-          left: 46,
-          right: 46,
+        <div
+          style={{
+            position: "absolute",
+            top: 42,
+            left: 46,
+            right: 46,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          fontSize: 24,
-          letterSpacing: "0.28em",
-          textTransform: "uppercase",
-          color: "#7dd3fc",
-        }}
+            fontSize: 24,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "#7dd3fc",
+          }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <svg
@@ -101,21 +101,21 @@ export async function createSocialImage() {
             maxWidth: 860,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignSelf: "flex-start",
-              padding: "12px 18px",
-              border: "1px solid rgba(56,189,248,0.28)",
-              background: "rgba(15,17,23,0.74)",
-              color: "#7dd3fc",
-              fontSize: 22,
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-            }}
-          >
-            Host. Join. Score. Repeat.
-          </div>
+            <div
+              style={{
+                display: "flex",
+                alignSelf: "flex-start",
+                padding: "10px 16px",
+                border: "1px solid rgba(56,189,248,0.28)",
+                background: "rgba(15,17,23,0.74)",
+                color: "#7dd3fc",
+                fontSize: 18,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+              }}
+            >
+              Host. Join. Score.
+            </div>
 
           <div
             style={{
@@ -126,8 +126,8 @@ export async function createSocialImage() {
           >
             <div
               style={{
-                fontSize: 112,
-                lineHeight: 0.92,
+                fontSize: 96,
+                lineHeight: 0.94,
                 fontWeight: 700,
                 letterSpacing: "-0.06em",
               }}
@@ -136,10 +136,10 @@ export async function createSocialImage() {
             </div>
             <div
               style={{
-                fontSize: 34,
+                fontSize: 28,
                 lineHeight: 1.25,
                 color: "#cbd5e1",
-                maxWidth: 900,
+                maxWidth: 760,
               }}
             >
               Real-time quiz sessions with live analytics, organiser controls,
@@ -160,10 +160,10 @@ export async function createSocialImage() {
               <div
                 key={label}
                 style={{
-                  padding: "12px 18px",
+                  padding: "10px 16px",
                   border: "1px solid rgba(148,163,184,0.18)",
                   background: "rgba(15,17,23,0.82)",
-                  fontSize: 22,
+                  fontSize: 19,
                   color: "#e2e8f0",
                 }}
               >
@@ -172,15 +172,15 @@ export async function createSocialImage() {
             ))}
           </div>
 
-          <div
-            style={{
-              fontSize: 22,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-              color: "#60a5fa",
-            }}
-          >
-            hermes.hishaam.dev
+            <div
+              style={{
+                fontSize: 18,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "#60a5fa",
+              }}
+            >
+              hermes.hishaam.dev
           </div>
         </div>
       </div>
