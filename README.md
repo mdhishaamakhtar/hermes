@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD033 -->
 
 <p align="center">
-  <img src="./frontend/public/og-image.svg" alt="Hermes Preview">
+  <img src="./frontend/public/readme-preview.svg" alt="Hermes Preview">
 </p>
 
 ## Hermes
