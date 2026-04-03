@@ -31,7 +31,7 @@ export async function createSocialImage() {
         position: "relative",
         overflow: "hidden",
         background:
-          "radial-gradient(circle at 24% 28%, rgba(37,99,235,0.34), transparent 30%), radial-gradient(circle at 82% 16%, rgba(56,189,248,0.22), transparent 24%), linear-gradient(180deg, #0a0a0f 0%, #0f1117 100%)",
+          "radial-gradient(circle at 28% 30%, rgba(37,99,235,0.22), transparent 34%), linear-gradient(180deg, #0a0a0f 0%, #0f1117 100%)",
         color: "#f8fafc",
         fontFamily: "Geist",
       }}
@@ -41,26 +41,20 @@ export async function createSocialImage() {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
           backgroundSize: "72px 72px",
-          opacity: 0.22,
+          opacity: 0.18,
         }}
       />
 
-        <div
-          style={{
-            position: "absolute",
-            top: 42,
-            left: 46,
-            right: 46,
+      <div
+        style={{
           display: "flex",
+          flex: 1,
+          flexDirection: "column",
           justifyContent: "space-between",
-          alignItems: "center",
-            fontSize: 24,
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "#7dd3fc",
-          }}
+          padding: "54px 74px 54px",
+        }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <svg
@@ -78,74 +72,55 @@ export async function createSocialImage() {
             <rect x="10" y="22" width="4" height="8" fill="#1A1F2E" />
             <rect x="18" y="22" width="4" height="8" fill="#1A1F2E" />
           </svg>
-          <span>Hermes</span>
+          <div
+            style={{
+              fontSize: 22,
+              letterSpacing: "0.24em",
+              textTransform: "uppercase",
+              color: "#7dd3fc",
+            }}
+          >
+            Hermes
+          </div>
         </div>
-        <span style={{ color: "#94a3b8" }}>Live Quiz Platform</span>
-      </div>
 
-      <div
-        style={{
-          position: "relative",
-          display: "flex",
-          flex: 1,
-          padding: "128px 74px 68px",
-          flexDirection: "column",
-          justifyContent: "space-between",
-        }}
-      >
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 28,
-            maxWidth: 860,
+            gap: 18,
+            maxWidth: 760,
+            marginTop: "-60px",
           }}
         >
-            <div
-              style={{
-                display: "flex",
-                alignSelf: "flex-start",
-                padding: "10px 16px",
-                border: "1px solid rgba(56,189,248,0.28)",
-                background: "rgba(15,17,23,0.74)",
-                color: "#7dd3fc",
-                fontSize: 18,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-              }}
-            >
-              Host. Join. Score.
-            </div>
-
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
+              fontSize: 128,
+              lineHeight: 0.9,
+              fontWeight: 700,
+              letterSpacing: "-0.07em",
             }}
           >
-            <div
-              style={{
-                fontSize: 96,
-                lineHeight: 0.94,
-                fontWeight: 700,
-                letterSpacing: "-0.06em",
-              }}
-            >
-              {siteConfig.title}
-            </div>
-            <div
-              style={{
-                fontSize: 28,
-                lineHeight: 1.25,
-                color: "#cbd5e1",
-                maxWidth: 760,
-              }}
-            >
-              Real-time quiz sessions with live analytics, organiser controls,
-              and fast participant joins.
-            </div>
+            HERMES
           </div>
+          <div
+            style={{
+              fontSize: 34,
+              lineHeight: 1.22,
+              color: "#cbd5e1",
+              maxWidth: 700,
+            }}
+          >
+            {siteConfig.shortDescription}
+          </div>
+          <div
+            style={{
+              width: 96,
+              height: 2,
+              background: "#2563EB",
+              marginTop: 10,
+            }}
+          />
         </div>
 
         <div
@@ -155,32 +130,25 @@ export async function createSocialImage() {
             alignItems: "flex-end",
           }}
         >
-          <div style={{ display: "flex", gap: 14 }}>
-            {["WebSocket", "Analytics", "Anonymous Players"].map((label) => (
-              <div
-                key={label}
-                style={{
-                  padding: "10px 16px",
-                  border: "1px solid rgba(148,163,184,0.18)",
-                  background: "rgba(15,17,23,0.82)",
-                  fontSize: 19,
-                  color: "#e2e8f0",
-                }}
-              >
-                {label}
-              </div>
-            ))}
+          <div
+            style={{
+              fontSize: 18,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "#94a3b8",
+            }}
+          >
+            Real-time • WebSocket • Anonymous Participants
           </div>
-
-            <div
-              style={{
-                fontSize: 18,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "#60a5fa",
-              }}
-            >
-              hermes.hishaam.dev
+          <div
+            style={{
+              fontSize: 18,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#60a5fa",
+            }}
+          >
+            hermes.hishaam.dev
           </div>
         </div>
       </div>
