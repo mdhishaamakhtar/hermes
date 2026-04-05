@@ -75,10 +75,18 @@ export default function QuizEditorClient({
   const [saving, setSaving] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [abandoning, setAbandoning] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const questions = useMemo(
     () => quiz.questions.toSorted((a, b) => a.orderIndex - b.orderIndex),
     [quiz.questions],
+  );
+
+  const hasBlockingSession = sessions.some(
+    (s) => s.status === "LOBBY" || s.status === "ACTIVE",
   );
 
   const setCorrect = (idx: number) =>
@@ -133,13 +141,15 @@ export default function QuizEditorClient({
   const [, addQuestionFormAction] = useActionState(addQuestionAction, null);
 
   const handleDeleteQuestion = async (questionId: number) => {
-    await api.delete(`/api/questions/${questionId}`);
-    setQuiz((prev) => ({
-      ...prev,
-      questions: prev.questions.filter(
-        (question) => question.id !== questionId,
-      ),
-    }));
+    const res = await api.delete(`/api/questions/${questionId}`);
+    if (res.success) {
+      setQuiz((prev) => ({
+        ...prev,
+        questions: prev.questions.filter(
+          (question) => question.id !== questionId,
+        ),
+      }));
+    }
   };
 
   const openEdit = (question: Question) => {
@@ -193,53 +203,52 @@ export default function QuizEditorClient({
 
   const [, saveEditFormAction] = useActionState(saveEditAction, null);
 
-  const handleAbandon = async (sessionId: number) => {
-    if (
-      !confirm("Abandon this session? The quiz will become editable again.")
-    ) {
-      return;
-    }
-
-    setAbandoning(true);
-    const res = await api.post(`/api/sessions/${sessionId}/end`);
-    if (res.success) {
-      setSessions((prev) =>
-        prev.map((session) =>
-          session.id === sessionId ? { ...session, status: "ENDED" } : session,
-        ),
-      );
-    } else {
-      alert(res.error?.message || "Failed to abandon session");
-    }
-    setAbandoning(false);
+  const handleAbandon = (sessionId: number) => {
+    setConfirmDialog({
+      message: "Abandon this session? The quiz will become editable again.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setAbandoning(true);
+        const res = await api.post(`/api/sessions/${sessionId}/end`);
+        if (res.success) {
+          setSessions((prev) =>
+            prev.map((session) =>
+              session.id === sessionId
+                ? { ...session, status: "ENDED" }
+                : session,
+            ),
+          );
+        }
+        setAbandoning(false);
+      },
+    });
   };
 
-  const handleAbandonAll = async () => {
+  const handleAbandonAll = () => {
     const lobbyIds = sessions
       .filter((session) => session.status === "LOBBY")
       .map((session) => session.id);
 
     if (!lobbyIds.length) return;
-    if (
-      !confirm(
-        `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
-      )
-    ) {
-      return;
-    }
 
-    setAbandoning(true);
-    await Promise.all(
-      lobbyIds.map((id) => api.post(`/api/sessions/${id}/end`)),
-    );
-    setSessions((prev) =>
-      prev.map((session) =>
-        lobbyIds.includes(session.id)
-          ? { ...session, status: "ENDED" }
-          : session,
-      ),
-    );
-    setAbandoning(false);
+    setConfirmDialog({
+      message: `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setAbandoning(true);
+        await Promise.all(
+          lobbyIds.map((id) => api.post(`/api/sessions/${id}/end`)),
+        );
+        setSessions((prev) =>
+          prev.map((session) =>
+            lobbyIds.includes(session.id)
+              ? { ...session, status: "ENDED" }
+              : session,
+          ),
+        );
+        setAbandoning(false);
+      },
+    });
   };
 
   const handleLaunch = async () => {
@@ -253,6 +262,7 @@ export default function QuizEditorClient({
 
     if (res.success) {
       localStorage.setItem(`hermes_session_${res.data.id}`, res.data.joinCode);
+      router.refresh();
       router.push(`/session/${res.data.id}/host`);
       return;
     }
@@ -301,7 +311,8 @@ export default function QuizEditorClient({
             setShowForm((value) => !value);
             setEditingQuestion(null);
           }}
-          className="text-sm tracking-widest uppercase text-accent hover:text-accent-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          disabled={hasBlockingSession}
+          className="text-sm tracking-widest uppercase text-accent hover:text-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {showForm ? "Cancel" : "+ Add Question"}
         </button>
@@ -422,13 +433,15 @@ export default function QuizEditorClient({
                       <div className="flex items-center gap-4">
                         <button
                           onClick={() => openEdit(question)}
-                          className="label text-muted/40 hover:text-accent transition-colors focus-visible:outline-none focus-visible:opacity-100"
+                          disabled={hasBlockingSession}
+                          className="label text-muted/40 hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:opacity-100"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDeleteQuestion(question.id)}
-                          className="label text-muted/40 hover:text-danger transition-colors focus-visible:outline-none focus-visible:opacity-100"
+                          disabled={hasBlockingSession}
+                          className="label text-muted/40 hover:text-danger disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:opacity-100"
                         >
                           Delete
                         </button>
@@ -543,6 +556,44 @@ export default function QuizEditorClient({
           ))}
         </div>
       )}
+
+      <AnimatePresence>
+        {confirmDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.15 }}
+              className="bg-surface border border-warning/40 p-8 max-w-md w-full mx-6 space-y-6"
+            >
+              <p className="text-sm text-foreground leading-relaxed">
+                {confirmDialog.message}
+              </p>
+              <div className="flex items-center justify-end gap-4">
+                <button
+                  onClick={() => setConfirmDialog(null)}
+                  className="label text-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDialog.onConfirm}
+                  className="bg-warning text-white px-5 py-2 text-sm tracking-widest uppercase hover:bg-warning-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  Abandon
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {sessions.length > 0 && (
         <>
