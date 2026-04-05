@@ -18,7 +18,6 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
   const [activeTab, setActiveTab] = useState<"leaderboard" | "questions">(
     "leaderboard",
   );
-  const [questionIndex, setQuestionIndex] = useState(0);
 
   useEffect(() => {
     if (error) router.push("/dashboard");
@@ -33,11 +32,6 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
   );
 
   if (isLoading || !results) return <ReviewSkeleton />;
-
-  const currentQuestion = sortedQuestions[questionIndex];
-  const maxCount = currentQuestion
-    ? Math.max(...currentQuestion.options.map((option) => option.count), 1)
-    : 1;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -148,139 +142,98 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
           </motion.div>
         )}
 
-        {activeTab === "questions" && currentQuestion && (
+        {activeTab === "questions" && (
           <motion.div
             key="questions"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
+            className="space-y-4"
           >
-            <div className="flex items-center justify-between mb-6">
-              <button
-                onClick={() =>
-                  setQuestionIndex((index) => Math.max(0, index - 1))
-                }
-                disabled={questionIndex === 0}
-                className="label hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                ← Prev
-              </button>
-              <p className="label tabular-nums">
-                {questionIndex + 1} / {sortedQuestions.length}
-              </p>
-              <button
-                onClick={() =>
-                  setQuestionIndex((index) =>
-                    Math.min(sortedQuestions.length - 1, index + 1),
-                  )
-                }
-                disabled={questionIndex >= sortedQuestions.length - 1}
-                className="label hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Next →
-              </button>
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentQuestion.id}
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: 0.2 }}
-                className="border border-border bg-surface p-6"
-              >
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <p className="label mb-2 tabular-nums">
-                      Q{currentQuestion.orderIndex} ·{" "}
-                      {currentQuestion.timeLimitSeconds}s
-                    </p>
-                    <h2 className="text-lg font-bold text-foreground leading-snug">
-                      {currentQuestion.text}
-                    </h2>
-                  </div>
-                  <span className="text-xs text-muted tabular-nums ml-4 shrink-0">
-                    {currentQuestion.totalAnswers} answers
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {currentQuestion.options
-                    .toSorted((a, b) => a.orderIndex - b.orderIndex)
-                    .map((option) => {
-                      const pct =
-                        currentQuestion.totalAnswers > 0
-                          ? Math.round(
-                              (option.count / currentQuestion.totalAnswers) *
-                                100,
-                            )
-                          : 0;
-                      const barWidth =
-                        maxCount > 0 ? (option.count / maxCount) * 100 : 0;
-
-                      return (
-                        <div key={option.id}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span
-                              className={`text-sm ${
-                                option.isCorrect
-                                  ? "text-success font-medium"
-                                  : "text-muted"
-                              }`}
-                            >
-                              {option.isCorrect && (
-                                <span className="mr-2 text-xs">✓</span>
-                              )}
-                              {option.text}
-                            </span>
-                            <span className="text-xs tabular-nums text-muted">
-                              {option.count} ({pct}%)
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-border overflow-hidden relative">
-                            <motion.div
-                              initial={{ scaleX: 0 }}
-                              animate={{ scaleX: barWidth / 100 }}
-                              transition={{
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 32,
-                              }}
-                              className="h-full absolute inset-0 origin-left"
-                              style={{
-                                background: option.isCorrect
-                                  ? "var(--color-success)"
-                                  : "var(--color-primary)",
-                                boxShadow: option.isCorrect
-                                  ? "0 0 8px rgba(34,197,94,0.4)"
-                                  : "none",
-                                willChange: "transform",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
-            <div className="flex items-center justify-center gap-2 mt-6">
-              {sortedQuestions.map((question, index) => (
-                <button
+            {sortedQuestions.map((question) => {
+              const maxCount = Math.max(
+                ...question.options.map((o) => o.count),
+                1,
+              );
+              return (
+                <div
                   key={question.id}
-                  onClick={() => setQuestionIndex(index)}
-                  aria-label={`Go to question ${index + 1}`}
-                  className={`w-1.5 h-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                    index === questionIndex
-                      ? "bg-primary scale-125"
-                      : "bg-border"
-                  }`}
-                />
-              ))}
-            </div>
+                  className="border border-border bg-surface p-6"
+                >
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <p className="label mb-2 tabular-nums">
+                        Q{question.orderIndex} · {question.timeLimitSeconds}s
+                      </p>
+                      <h2 className="text-lg font-bold text-foreground leading-snug">
+                        {question.text}
+                      </h2>
+                    </div>
+                    <span className="text-xs text-muted tabular-nums ml-4 shrink-0">
+                      {question.totalAnswers} answers
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {question.options
+                      .toSorted((a, b) => a.orderIndex - b.orderIndex)
+                      .map((option) => {
+                        const pct =
+                          question.totalAnswers > 0
+                            ? Math.round(
+                                (option.count / question.totalAnswers) * 100,
+                              )
+                            : 0;
+                        const barWidth = (option.count / maxCount) * 100;
+
+                        return (
+                          <div key={option.id}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span
+                                className={`text-sm ${
+                                  option.isCorrect
+                                    ? "text-success font-medium"
+                                    : "text-muted"
+                                }`}
+                              >
+                                {option.isCorrect && (
+                                  <span className="mr-2 text-xs">✓</span>
+                                )}
+                                {option.text}
+                              </span>
+                              <span className="text-xs tabular-nums text-muted">
+                                {option.count} ({pct}%)
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-border overflow-hidden relative">
+                              <motion.div
+                                initial={{ scaleX: 0 }}
+                                animate={{ scaleX: barWidth / 100 }}
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 300,
+                                  damping: 32,
+                                }}
+                                className="h-full absolute inset-0 origin-left"
+                                style={{
+                                  background: option.isCorrect
+                                    ? "var(--color-success)"
+                                    : "var(--color-primary)",
+                                  boxShadow: option.isCorrect
+                                    ? "0 0 8px rgba(34,197,94,0.4)"
+                                    : "none",
+                                  willChange: "transform",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
