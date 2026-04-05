@@ -44,7 +44,7 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="scanlines relative min-h-screen bg-background overflow-hidden flex flex-col">
+    <main className="relative min-h-screen bg-background overflow-hidden flex flex-col">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

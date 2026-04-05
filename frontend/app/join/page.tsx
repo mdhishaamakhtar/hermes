@@ -90,7 +90,7 @@ export default function JoinPage() {
   );
 
   return (
-    <div className="scanlines min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">

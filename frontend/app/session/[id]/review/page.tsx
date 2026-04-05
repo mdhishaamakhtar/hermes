@@ -8,7 +8,7 @@ export default async function ReviewPage({
 }) {
   const { id } = await params;
   return (
-    <div className="scanlines min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <ReviewClient sessionId={id} />
     </div>

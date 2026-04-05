@@ -85,7 +85,7 @@ export default function ResultsPage() {
       : 0;
 
   return (
-    <div className="scanlines min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
       <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-12 relative z-10">

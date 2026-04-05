@@ -215,7 +215,7 @@ export default function PlayPage() {
 
   if (sessionState === "LOBBY") {
     return (
-      <div className="scanlines min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -257,7 +257,7 @@ export default function PlayPage() {
 
   if (sessionState === "ACTIVE" && question) {
     return (
-      <div className="scanlines min-h-screen bg-background flex flex-col relative overflow-hidden">
+      <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border">
           <div className="flex items-center justify-between max-w-2xl mx-auto">
