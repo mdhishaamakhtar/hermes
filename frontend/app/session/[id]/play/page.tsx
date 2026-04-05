@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import { OPTION_META } from "@/lib/session-constants";
 import { colorRgb } from "@/lib/design-tokens";
@@ -58,8 +59,7 @@ export default function PlayPage() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const authToken =
-    typeof window !== "undefined" ? localStorage.getItem("hermes_token") : null;
+  const authToken = getStoredAuthToken();
   const { subscribe, publish, unsubscribe } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
   });
@@ -382,7 +382,7 @@ export default function PlayPage() {
                         )}
                       </div>
                       {/* Option text */}
-                      <p className="text-sm md:text-base font-medium text-foreground leading-snug">
+                      <p className="text-base md:text-lg lg:text-xl font-medium text-foreground leading-snug">
                         {opt.text}
                       </p>
                     </motion.button>
