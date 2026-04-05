@@ -163,9 +163,14 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                 >
                   <div className="flex items-start justify-between mb-6">
                     <div>
-                      <p className="label mb-2 tabular-nums">
-                        Q{question.orderIndex} · {question.timeLimitSeconds}s
-                      </p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <p className="label tabular-nums">
+                          Q{question.orderIndex}
+                        </p>
+                        <span className="text-xs text-muted tabular-nums">
+                          {question.timeLimitSeconds}s time limit
+                        </span>
+                      </div>
                       <h2 className="text-lg font-bold text-foreground leading-snug">
                         {question.text}
                       </h2>
