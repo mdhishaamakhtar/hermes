@@ -4,11 +4,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
   message: string | null;
+  confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export default function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
+export default function ConfirmDialog({
+  message,
+  confirmLabel = "Confirm",
+  onConfirm,
+  onCancel,
+}: Props) {
   return (
     <AnimatePresence>
       {message && (
@@ -38,7 +44,7 @@ export default function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
                 onClick={onConfirm}
                 className="bg-warning text-white px-5 py-2 text-sm tracking-widest uppercase hover:bg-warning-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                Abandon
+                {confirmLabel}
               </button>
             </div>
           </motion.div>

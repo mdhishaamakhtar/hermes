@@ -36,6 +36,7 @@ export default function QuizEditorClient({
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [abandoning, setAbandoning] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const [confirmLabel, setConfirmLabel] = useState("Confirm");
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
@@ -79,18 +80,23 @@ export default function QuizEditorClient({
     );
   };
 
-  const handleQuestionDeleted = async (questionId: number) => {
-    const { questionsApi } = await import("@/lib/apiClient");
-    const res = await questionsApi.delete(questionId);
-    if (res.success && quiz) {
-      mutateQuiz(
-        {
-          ...quiz,
-          questions: quiz.questions.filter((q) => q.id !== questionId),
-        },
-        { revalidate: false },
-      );
-    }
+  const handleQuestionDeleted = (questionId: number) => {
+    setConfirmMessage("Delete this question? This cannot be undone.");
+    setConfirmLabel("Delete");
+    setConfirmAction(() => async () => {
+      setConfirmMessage(null);
+      const { questionsApi } = await import("@/lib/apiClient");
+      const res = await questionsApi.delete(questionId);
+      if (res.success && quiz) {
+        mutateQuiz(
+          {
+            ...quiz,
+            questions: quiz.questions.filter((q) => q.id !== questionId),
+          },
+          { revalidate: false },
+        );
+      }
+    });
   };
 
   const handleLaunch = async () => {
@@ -113,6 +119,7 @@ export default function QuizEditorClient({
     setConfirmMessage(
       "Abandon this session? The quiz will become editable again.",
     );
+    setConfirmLabel("Abandon");
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
@@ -138,6 +145,7 @@ export default function QuizEditorClient({
     setConfirmMessage(
       `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
     );
+    setConfirmLabel("Abandon");
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
@@ -243,6 +251,7 @@ export default function QuizEditorClient({
 
       <ConfirmDialog
         message={confirmMessage}
+        confirmLabel={confirmLabel}
         onConfirm={() => confirmAction?.()}
         onCancel={() => setConfirmMessage(null)}
       />
