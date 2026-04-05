@@ -101,7 +101,7 @@ Anyone, anywhere: teachers running classroom assessments, facilitators running t
 
 ### Aesthetic Direction
 - **Dark mode only.** Deep navy/near-black backgrounds. No light mode.
-- **CRT/terminal as a soul, not a costume.** Scanlines and sharp corners are foundational identity — not decoration. Terminal structure: monospace type, uppercase labels, pixel-precise borders.
+- **Terminal as a soul, not a costume.** Sharp corners are foundational identity — not decoration. Terminal structure: monospace type, uppercase labels, pixel-precise borders. No scanlines.
 - **Energetic, not garish.** Dark backgrounds make colour pop. Use the established palette with confidence.
 - **Not like Kahoot.** No bright primaries on white, no confetti-for-confetti's-sake. Energy comes from motion, density, and contrast — not noise.
 - **Unique.** No direct design references. Hermes should look like nothing else in the category.
