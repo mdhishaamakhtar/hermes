@@ -31,22 +31,11 @@ export async function createSocialImage() {
         position: "relative",
         overflow: "hidden",
         background:
-          "radial-gradient(circle at 28% 30%, rgba(37,99,235,0.22), transparent 34%), linear-gradient(180deg, #0a0a0f 0%, #0f1117 100%)",
+          "radial-gradient(ellipse 60% 40% at 35% 50%, rgba(37,99,235,0.08), transparent), #0a0a0f",
         color: "#f8fafc",
         fontFamily: "Geist",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "72px 72px",
-          opacity: 0.18,
-        }}
-      />
-
       <div
         style={{
           display: "flex",
