@@ -42,23 +42,14 @@
         fill: #60a5fa;
       }
     </style>
-    <radialGradient id="bloom" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(310 180) rotate(28) scale(470 290)">
-      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.22"/>
+    <radialGradient id="bloom" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(420 315) scale(720 252)">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.08"/>
       <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
   <rect width="1200" height="630" fill="#0a0a0f"/>
   <rect width="1200" height="630" fill="url(#bloom)"/>
-
-  <g opacity="0.18" stroke="#f8fafc" stroke-width="1">
-    <path d="M72 0V630"/><path d="M144 0V630"/><path d="M216 0V630"/><path d="M288 0V630"/>
-    <path d="M360 0V630"/><path d="M432 0V630"/><path d="M504 0V630"/><path d="M576 0V630"/>
-    <path d="M648 0V630"/><path d="M720 0V630"/><path d="M792 0V630"/><path d="M864 0V630"/>
-    <path d="M936 0V630"/><path d="M1008 0V630"/><path d="M1080 0V630"/><path d="M1152 0V630"/>
-    <path d="M0 72H1200"/><path d="M0 144H1200"/><path d="M0 216H1200"/><path d="M0 288H1200"/>
-    <path d="M0 360H1200"/><path d="M0 432H1200"/><path d="M0 504H1200"/><path d="M0 576H1200"/>
-  </g>
 
   <g transform="translate(74 54)">
     <svg width="34" height="34" viewBox="0 0 32 32" fill="none">
