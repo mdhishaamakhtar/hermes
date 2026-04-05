@@ -30,8 +30,7 @@ export async function createSocialImage() {
         display: "flex",
         position: "relative",
         overflow: "hidden",
-        background:
-          "radial-gradient(ellipse 60% 40% at 35% 50%, rgba(37,99,235,0.08), transparent), #0a0a0f",
+        background: "#0a0a0f",
         color: "#f8fafc",
         fontFamily: "Geist",
       }}
