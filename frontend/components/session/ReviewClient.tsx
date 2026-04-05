@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { api } from "@/lib/api";
+import { SessionPageSkeleton } from "@/components/PageSkeleton";
 
 interface OptionResult {
   id: number;
@@ -39,21 +41,30 @@ interface SessionResults {
   questions: QuestionResult[];
 }
 
-export default function ReviewClient({
-  initialResults,
-}: {
-  initialResults: SessionResults;
-}) {
+export default function ReviewClient({ sessionId }: { sessionId: string }) {
+  const [results, setResults] = useState<SessionResults | null>(null);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "questions">(
     "leaderboard",
   );
   const [questionIndex, setQuestionIndex] = useState(0);
 
+  useEffect(() => {
+    api
+      .get<SessionResults>(`/api/sessions/${sessionId}/results`)
+      .then((res) => {
+        if (res.success) setResults(res.data);
+      });
+  }, [sessionId]);
+
   const sortedQuestions = useMemo(
     () =>
-      initialResults.questions.toSorted((a, b) => a.orderIndex - b.orderIndex),
-    [initialResults.questions],
+      (results?.questions ?? []).toSorted(
+        (a, b) => a.orderIndex - b.orderIndex,
+      ),
+    [results?.questions],
   );
+
+  if (!results) return <SessionPageSkeleton />;
 
   const currentQuestion = sortedQuestions[questionIndex];
   const maxCount = currentQuestion
@@ -64,7 +75,7 @@ export default function ReviewClient({
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="mb-2">
         <Link
-          href={`/events/${initialResults.eventId}/quizzes/${initialResults.quizId}`}
+          href={`/events/${results.eventId}/quizzes/${results.quizId}`}
           prefetch
           className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
@@ -80,16 +91,14 @@ export default function ReviewClient({
       >
         <p className="label mb-1">Session Review</p>
         <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">
-          {initialResults.quizTitle}
+          {results.quizTitle}
         </h1>
         <div className="flex items-center gap-6 text-xs text-muted">
           <span className="tabular-nums">
-            {initialResults.participantCount} participants
+            {results.participantCount} participants
           </span>
-          {initialResults.startedAt && (
-            <span>
-              {new Date(initialResults.startedAt).toLocaleDateString()}
-            </span>
+          {results.startedAt && (
+            <span>{new Date(results.startedAt).toLocaleDateString()}</span>
           )}
         </div>
       </motion.div>
@@ -125,13 +134,13 @@ export default function ReviewClient({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
           >
-            {initialResults.leaderboard.length === 0 ? (
+            {results.leaderboard.length === 0 ? (
               <p className="text-center py-16 text-muted text-sm">
                 No results yet.
               </p>
             ) : (
               <div className="space-y-px">
-                {initialResults.leaderboard.map((entry, index) => (
+                {results.leaderboard.map((entry, index) => (
                   <motion.div
                     key={`${entry.rank}-${entry.displayName}`}
                     initial={{ opacity: 0, y: 6 }}

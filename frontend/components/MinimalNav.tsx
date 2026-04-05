@@ -11,7 +11,7 @@ export default function MinimalNav() {
       className="px-8 py-6 border-b border-border"
       aria-label="Site navigation"
     >
-      <Link href="/" aria-label="Hermes — home">
+      <Link href="/" prefetch aria-label="Hermes — home">
         <Logo size="sm" />
       </Link>
     </nav>

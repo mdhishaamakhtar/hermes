@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface Quiz {
   id: number;
@@ -19,19 +20,22 @@ interface EventData {
   quizzes: Quiz[];
 }
 
-export default function EventClient({
-  eventId,
-  initialEvent,
-}: {
-  eventId: string;
-  initialEvent: EventData;
-}) {
-  const [event, setEvent] = useState(initialEvent);
+export default function EventClient({ eventId }: { eventId: string }) {
+  const [event, setEvent] = useState<EventData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [quizTitle, setQuizTitle] = useState("");
-  const [orderIndex, setOrderIndex] = useState(
-    (initialEvent.quizzes.length ?? 0) + 1,
-  );
+  const [orderIndex, setOrderIndex] = useState(1);
+
+  useEffect(() => {
+    api.get<EventData>(`/api/events/${eventId}`).then((res) => {
+      if (res.success) {
+        setEvent(res.data);
+        setOrderIndex((res.data.quizzes.length ?? 0) + 1);
+      }
+      setLoading(false);
+    });
+  }, [eventId]);
 
   const handleCreateQuiz = async (_prev: null, formData: FormData) => {
     const title = formData.get("quizTitle") as string;
@@ -42,14 +46,15 @@ export default function EventClient({
     });
 
     if (res.success) {
-      setEvent((prev) => ({
-        ...prev,
-        quizzes: [...prev.quizzes, res.data].toSorted(
+      setEvent((prev) => {
+        if (!prev) return prev;
+        const updated = [...prev.quizzes, res.data].toSorted(
           (a, b) => a.orderIndex - b.orderIndex,
-        ),
-      }));
+        );
+        setOrderIndex(updated.length + 1);
+        return { ...prev, quizzes: updated };
+      });
       setQuizTitle("");
-      setOrderIndex((event.quizzes.length ?? 0) + 2);
       setShowForm(false);
     }
 
@@ -57,6 +62,9 @@ export default function EventClient({
   };
 
   const [, createQuizAction, creating] = useActionState(handleCreateQuiz, null);
+
+  if (loading || !event) return <ContentSkeleton />;
+
   const quizzes = event.quizzes.toSorted((a, b) => a.orderIndex - b.orderIndex);
 
   return (

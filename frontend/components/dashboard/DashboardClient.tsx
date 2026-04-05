@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface EventItem {
   id: number;
@@ -13,13 +14,17 @@ interface EventItem {
   quizzes: { id: number; title: string; orderIndex: number }[];
 }
 
-export default function DashboardClient({
-  initialEvents,
-}: {
-  initialEvents: EventItem[];
-}) {
-  const [events, setEvents] = useState(initialEvents);
+export default function DashboardClient() {
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    api.get<EventItem[]>("/api/events").then((res) => {
+      if (res.success) setEvents(res.data);
+      setLoading(false);
+    });
+  }, []);
 
   const handleCreate = async (_prev: null, formData: FormData) => {
     const title = formData.get("title") as string;
@@ -36,6 +41,8 @@ export default function DashboardClient({
   };
 
   const [, createAction, creating] = useActionState(handleCreate, null);
+
+  if (loading) return <ContentSkeleton />;
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();

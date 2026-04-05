@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 interface OptionReq {
   text: string;
@@ -51,22 +52,33 @@ const EMPTY_OPTIONS: OptionReq[] = [
 export default function QuizEditorClient({
   eventId,
   quizId,
-  initialQuiz,
-  initialSessions,
 }: {
   eventId: string;
   quizId: string;
-  initialQuiz: Quiz;
-  initialSessions: SessionItem[];
 }) {
   const router = useRouter();
-  const [quiz, setQuiz] = useState(initialQuiz);
-  const [sessions, setSessions] = useState(initialSessions);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [qText, setQText] = useState("");
   const [qTime, setQTime] = useState(30);
-  const [qOrder, setQOrder] = useState((initialQuiz.questions.length ?? 0) + 1);
+  const [qOrder, setQOrder] = useState(1);
   const [options, setOptions] = useState<OptionReq[]>(EMPTY_OPTIONS);
+
+  useEffect(() => {
+    Promise.all([
+      api.get<Quiz>(`/api/quizzes/${quizId}`),
+      api.get<SessionItem[]>(`/api/quizzes/${quizId}/sessions`),
+    ]).then(([quizRes, sessionsRes]) => {
+      if (quizRes.success) {
+        setQuiz(quizRes.data);
+        setQOrder((quizRes.data.questions.length ?? 0) + 1);
+      }
+      if (sessionsRes.success) setSessions(sessionsRes.data);
+      setLoading(false);
+    });
+  }, [quizId]);
   const [creating, setCreating] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editText, setEditText] = useState("");
@@ -81,8 +93,9 @@ export default function QuizEditorClient({
   } | null>(null);
 
   const questions = useMemo(
-    () => quiz.questions.toSorted((a, b) => a.orderIndex - b.orderIndex),
-    [quiz.questions],
+    () =>
+      (quiz?.questions ?? []).toSorted((a, b) => a.orderIndex - b.orderIndex),
+    [quiz?.questions],
   );
 
   const hasBlockingSession = sessions.some(
@@ -270,6 +283,8 @@ export default function QuizEditorClient({
     alert(res.error?.message || "Failed to create session");
     setLaunching(false);
   };
+
+  if (loading || !quiz) return <ContentSkeleton />;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
