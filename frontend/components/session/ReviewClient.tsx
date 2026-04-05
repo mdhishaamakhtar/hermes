@@ -1,55 +1,20 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useApi } from "@/hooks/useApi";
-import { SessionPageSkeleton } from "@/components/PageSkeleton";
-import { useState } from "react";
-
-interface OptionResult {
-  id: number;
-  text: string;
-  orderIndex: number;
-  isCorrect: boolean;
-  count: number;
-}
-
-interface QuestionResult {
-  id: number;
-  text: string;
-  orderIndex: number;
-  timeLimitSeconds: number;
-  options: OptionResult[];
-  totalAnswers: number;
-}
-
-interface LeaderboardEntry {
-  rank: number;
-  displayName: string;
-  score: number;
-}
-
-interface SessionResults {
-  sessionId: number;
-  quizId: number;
-  eventId: number;
-  quizTitle: string;
-  startedAt: string;
-  endedAt: string;
-  participantCount: number;
-  leaderboard: LeaderboardEntry[];
-  questions: QuestionResult[];
-}
+import useSWR from "swr";
+import { ReviewSkeleton } from "@/components/PageSkeleton";
+import type { SessionResults } from "@/lib/types";
 
 export default function ReviewClient({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const {
     data: results,
-    loading,
+    isLoading,
     error,
-  } = useApi<SessionResults>(`/api/sessions/${sessionId}/results`);
+  } = useSWR<SessionResults>(`/api/sessions/${sessionId}/results`);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "questions">(
     "leaderboard",
   );
@@ -67,7 +32,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
     [results?.questions],
   );
 
-  if (loading || !results) return <SessionPageSkeleton />;
+  if (isLoading || !results) return <ReviewSkeleton />;
 
   const currentQuestion = sortedQuestions[questionIndex];
   const maxCount = currentQuestion

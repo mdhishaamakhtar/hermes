@@ -4,60 +4,41 @@ import { useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { ContentSkeleton } from "@/components/PageSkeleton";
-
-interface Quiz {
-  id: number;
-  title: string;
-  orderIndex: number;
-}
-
-interface EventData {
-  id: number;
-  title: string;
-  description: string;
-  createdAt: string;
-  quizzes: Quiz[];
-}
+import useSWR from "swr";
+import { eventsApi } from "@/lib/apiClient";
+import { EventDetailSkeleton } from "@/components/PageSkeleton";
+import type { EventSummary } from "@/lib/types";
 
 export default function EventClient({ eventId }: { eventId: string }) {
   const router = useRouter();
-  const [event, setEvent] = useState<EventData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: event,
+    mutate,
+    isLoading,
+    error,
+  } = useSWR<EventSummary>(`/api/events/${eventId}`);
   const [showForm, setShowForm] = useState(false);
   const [quizTitle, setQuizTitle] = useState("");
-  const [orderIndex, setOrderIndex] = useState(1);
 
   useEffect(() => {
-    api.get<EventData>(`/api/events/${eventId}`).then((res) => {
-      if (res.success) {
-        setEvent(res.data);
-        setOrderIndex((res.data.quizzes.length ?? 0) + 1);
-      } else {
-        router.push("/dashboard");
-      }
-      setLoading(false);
-    });
-  }, [eventId, router]);
+    if (error) router.push("/dashboard");
+  }, [error, router]);
+
+  const orderIndex = (event?.quizzes.length ?? 0) + 1;
 
   const handleCreateQuiz = async (_prev: null, formData: FormData) => {
     const title = formData.get("quizTitle") as string;
     const order = Number(formData.get("orderIndex"));
-    const res = await api.post<Quiz>(`/api/events/${eventId}/quizzes`, {
+    const res = await eventsApi.createQuiz(eventId, {
       title,
       orderIndex: order,
     });
 
-    if (res.success) {
-      setEvent((prev) => {
-        if (!prev) return prev;
-        const updated = [...prev.quizzes, res.data].toSorted(
-          (a, b) => a.orderIndex - b.orderIndex,
-        );
-        setOrderIndex(updated.length + 1);
-        return { ...prev, quizzes: updated };
-      });
+    if (res.success && event) {
+      const updated = [...event.quizzes, res.data].toSorted(
+        (a, b) => a.orderIndex - b.orderIndex,
+      );
+      mutate({ ...event, quizzes: updated }, { revalidate: false });
       setQuizTitle("");
       setShowForm(false);
     }
@@ -67,7 +48,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
 
   const [, createQuizAction, creating] = useActionState(handleCreateQuiz, null);
 
-  if (loading || !event) return <ContentSkeleton />;
+  if (isLoading || !event) return <EventDetailSkeleton />;
 
   const quizzes = event.quizzes.toSorted((a, b) => a.orderIndex - b.orderIndex);
 
@@ -134,8 +115,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
                 <input
                   type="number"
                   name="orderIndex"
-                  value={orderIndex}
-                  onChange={(e) => setOrderIndex(Number(e.target.value))}
+                  defaultValue={orderIndex}
                   min={1}
                   className="input-field font-mono"
                 />

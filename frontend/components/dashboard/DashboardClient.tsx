@@ -1,45 +1,28 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@/lib/api";
-import { ContentSkeleton } from "@/components/PageSkeleton";
-
-interface EventItem {
-  id: number;
-  title: string;
-  description: string;
-  createdAt: string;
-  quizzes: { id: number; title: string; orderIndex: number }[];
-}
+import useSWR from "swr";
+import { eventsApi } from "@/lib/apiClient";
+import { EventListSkeleton } from "@/components/PageSkeleton";
+import type { EventSummary } from "@/lib/types";
 
 export default function DashboardClient() {
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const {
+    data: events,
+    mutate,
+    isLoading,
+    error,
+  } = useSWR<EventSummary[]>("/api/events");
   const [showForm, setShowForm] = useState(false);
-
-  useEffect(() => {
-    api.get<EventItem[]>("/api/events").then((res) => {
-      if (res.success) {
-        setEvents(res.data);
-      } else {
-        setFetchError(res.error?.message ?? "Failed to load events");
-      }
-      setLoading(false);
-    });
-  }, []);
 
   const handleCreate = async (_prev: null, formData: FormData) => {
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
-    const res = await api.post<EventItem>("/api/events", {
-      title,
-      description,
-    });
+    const res = await eventsApi.create({ title, description });
     if (res.success) {
-      setEvents((prev) => [res.data, ...prev]);
+      mutate([res.data, ...(events ?? [])], { revalidate: false });
       setShowForm(false);
     }
     return null;
@@ -49,18 +32,23 @@ export default function DashboardClient() {
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const res = await api.delete(`/api/events/${id}`);
+    const res = await eventsApi.delete(id);
     if (res.success) {
-      setEvents((prev) => prev.filter((event) => event.id !== id));
+      mutate(
+        (events ?? []).filter((event) => event.id !== id),
+        {
+          revalidate: false,
+        },
+      );
     }
   };
 
-  if (loading) return <ContentSkeleton />;
+  if (isLoading) return <EventListSkeleton />;
 
-  if (fetchError) {
+  if (error) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <p className="text-sm text-danger">{fetchError}</p>
+        <p className="text-sm text-danger">{error.message}</p>
       </div>
     );
   }
@@ -128,7 +116,7 @@ export default function DashboardClient() {
 
       <div className="h-px bg-border mb-8" />
 
-      {events.length === 0 ? (
+      {(events ?? []).length === 0 ? (
         <div className="text-center py-20">
           <p className="text-muted text-sm tracking-wide mb-2">No events yet</p>
           <p className="text-muted/50 text-xs">
@@ -138,7 +126,7 @@ export default function DashboardClient() {
       ) : (
         <motion.div className="space-y-px">
           <AnimatePresence>
-            {events.map((event, index) => (
+            {(events ?? []).map((event, index) => (
               <motion.div
                 key={event.id}
                 initial={{ opacity: 0 }}

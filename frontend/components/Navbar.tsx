@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { clearStoredAuthToken } from "@/lib/auth-storage";
-import { useApi } from "@/hooks/useApi";
 import Logo from "./Logo";
 
 export default function Navbar() {
   const router = useRouter();
-  const { data: user } = useApi<{ displayName: string }>("/api/auth/me");
+  const { data: user } = useSWR<{ displayName: string }>("/api/auth/me");
 
   const handleLogout = () => {
     clearStoredAuthToken();

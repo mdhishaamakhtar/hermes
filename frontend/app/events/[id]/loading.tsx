@@ -1,5 +1,5 @@
-import { NavPageSkeleton } from "@/components/PageSkeleton";
+import { ContentSkeleton } from "@/components/PageSkeleton";
 
 export default function Loading() {
-  return <NavPageSkeleton />;
+  return <ContentSkeleton />;
 }

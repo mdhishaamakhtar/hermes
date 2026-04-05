@@ -39,6 +39,7 @@ const kyInstance = ky.create({
         if (response.status === 401) {
           if (typeof window !== "undefined") {
             clearStoredAuthToken();
+            window.location.href = "/auth/login";
           }
         }
         return response;

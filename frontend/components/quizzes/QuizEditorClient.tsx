@@ -4,43 +4,10 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { api } from "@/lib/api";
-import { ContentSkeleton } from "@/components/PageSkeleton";
-
-interface OptionReq {
-  text: string;
-  isCorrect: boolean;
-}
-
-interface Option {
-  id: number;
-  text: string;
-  orderIndex: number;
-  isCorrect: boolean;
-}
-
-interface Question {
-  id: number;
-  text: string;
-  orderIndex: number;
-  timeLimitSeconds: number;
-  options: Option[];
-}
-
-interface Quiz {
-  id: number;
-  title: string;
-  orderIndex: number;
-  questions: Question[];
-}
-
-interface SessionItem {
-  id: number;
-  status: string;
-  startedAt: string | null;
-  endedAt: string | null;
-  participantCount: number;
-}
+import useSWR from "swr";
+import { quizzesApi, questionsApi, sessionsApi } from "@/lib/apiClient";
+import { QuizEditorSkeleton } from "@/components/PageSkeleton";
+import type { Quiz, Question, OptionReq, SessionItem } from "@/lib/types";
 
 const EMPTY_OPTIONS: OptionReq[] = [
   { text: "", isCorrect: true },
@@ -57,35 +24,20 @@ export default function QuizEditorClient({
   quizId: string;
 }) {
   const router = useRouter();
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
+  const {
+    data: quiz,
+    mutate: mutateQuiz,
+    isLoading: quizLoading,
+    error: quizError,
+  } = useSWR<Quiz>(`/api/quizzes/${quizId}`);
+  const { data: sessions = [], mutate: mutateSessions } = useSWR<SessionItem[]>(
+    `/api/quizzes/${quizId}/sessions`,
+  );
+
   const [showForm, setShowForm] = useState(false);
   const [qText, setQText] = useState("");
   const [qTime, setQTime] = useState(30);
-  const [qOrder, setQOrder] = useState(1);
   const [options, setOptions] = useState<OptionReq[]>(EMPTY_OPTIONS);
-
-  useEffect(() => {
-    Promise.all([
-      api.get<Quiz>(`/api/quizzes/${quizId}`),
-      api.get<SessionItem[]>(`/api/quizzes/${quizId}/sessions`),
-    ]).then(([quizRes, sessionsRes]) => {
-      if (!quizRes.success) {
-        setFetchError(true);
-      } else {
-        setQuiz(quizRes.data);
-        setQOrder((quizRes.data.questions.length ?? 0) + 1);
-      }
-      if (sessionsRes.success) setSessions(sessionsRes.data);
-      setLoading(false);
-    });
-  }, [quizId]);
-
-  useEffect(() => {
-    if (fetchError) router.push(`/events/${eventId}`);
-  }, [fetchError, eventId, router]);
   const [creating, setCreating] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editText, setEditText] = useState("");
@@ -98,6 +50,10 @@ export default function QuizEditorClient({
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  useEffect(() => {
+    if (quizError) router.push(`/events/${eventId}`);
+  }, [quizError, eventId, router]);
 
   const questions = useMemo(
     () =>
@@ -133,26 +89,25 @@ export default function QuizEditorClient({
     }
 
     setCreating(true);
-    const res = await api.post<Question>(`/api/quizzes/${quizId}/questions`, {
+    const res = await quizzesApi.createQuestion(quizId, {
       text,
-      orderIndex: qOrder,
+      orderIndex: (questions.length ?? 0) + 1,
       timeLimitSeconds: time,
       options,
     });
 
-    if (res.success) {
-      setQuiz((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          questions: [...prev.questions, res.data].toSorted(
+    if (res.success && quiz) {
+      mutateQuiz(
+        {
+          ...quiz,
+          questions: [...quiz.questions, res.data].toSorted(
             (a, b) => a.orderIndex - b.orderIndex,
           ),
-        };
-      });
+        },
+        { revalidate: false },
+      );
       setQText("");
       setQTime(30);
-      setQOrder((questions.length ?? 0) + 2);
       setOptions(EMPTY_OPTIONS);
       setShowForm(false);
     }
@@ -164,17 +119,17 @@ export default function QuizEditorClient({
   const [, addQuestionFormAction] = useActionState(addQuestionAction, null);
 
   const handleDeleteQuestion = async (questionId: number) => {
-    const res = await api.delete(`/api/questions/${questionId}`);
-    if (res.success) {
-      setQuiz((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          questions: prev.questions.filter(
+    const res = await questionsApi.delete(questionId);
+    if (res.success && quiz) {
+      mutateQuiz(
+        {
+          ...quiz,
+          questions: quiz.questions.filter(
             (question) => question.id !== questionId,
           ),
-        };
-      });
+        },
+        { revalidate: false },
+      );
     }
   };
 
@@ -203,26 +158,23 @@ export default function QuizEditorClient({
     }
 
     setSaving(true);
-    const res = await api.put<Question>(
-      `/api/questions/${editingQuestion.id}`,
-      {
-        text: editText,
-        orderIndex: editingQuestion.orderIndex,
-        timeLimitSeconds: editTime,
-        options: editOptions,
-      },
-    );
+    const res = await questionsApi.update(editingQuestion.id, {
+      text: editText,
+      orderIndex: editingQuestion.orderIndex,
+      timeLimitSeconds: editTime,
+      options: editOptions,
+    });
 
-    if (res.success) {
-      setQuiz((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          questions: prev.questions.map((question) =>
+    if (res.success && quiz) {
+      mutateQuiz(
+        {
+          ...quiz,
+          questions: quiz.questions.map((question) =>
             question.id === editingQuestion.id ? res.data : question,
           ),
-        };
-      });
+        },
+        { revalidate: false },
+      );
       setEditingQuestion(null);
     }
 
@@ -238,14 +190,15 @@ export default function QuizEditorClient({
       onConfirm: async () => {
         setConfirmDialog(null);
         setAbandoning(true);
-        const res = await api.post(`/api/sessions/${sessionId}/end`);
+        const res = await sessionsApi.end(sessionId);
         if (res.success) {
-          setSessions((prev) =>
-            prev.map((session) =>
+          mutateSessions(
+            sessions.map((session) =>
               session.id === sessionId
                 ? { ...session, status: "ENDED" }
                 : session,
             ),
+            { revalidate: false },
           );
         }
         setAbandoning(false);
@@ -265,15 +218,14 @@ export default function QuizEditorClient({
       onConfirm: async () => {
         setConfirmDialog(null);
         setAbandoning(true);
-        await Promise.all(
-          lobbyIds.map((id) => api.post(`/api/sessions/${id}/end`)),
-        );
-        setSessions((prev) =>
-          prev.map((session) =>
+        await Promise.all(lobbyIds.map((id) => sessionsApi.end(id)));
+        mutateSessions(
+          sessions.map((session) =>
             lobbyIds.includes(session.id)
               ? { ...session, status: "ENDED" }
               : session,
           ),
+          { revalidate: false },
         );
         setAbandoning(false);
       },
@@ -282,12 +234,7 @@ export default function QuizEditorClient({
 
   const handleLaunch = async () => {
     setLaunching(true);
-    const res = await api.post<{ id: number; joinCode: string }>(
-      "/api/sessions",
-      {
-        quizId: Number(quizId),
-      },
-    );
+    const res = await sessionsApi.create(Number(quizId));
 
     if (res.success) {
       localStorage.setItem(`hermes_session_${res.data.id}`, res.data.joinCode);
@@ -300,7 +247,7 @@ export default function QuizEditorClient({
     setLaunching(false);
   };
 
-  if (loading || !quiz) return <ContentSkeleton />;
+  if (quizLoading || !quiz) return <QuizEditorSkeleton />;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
