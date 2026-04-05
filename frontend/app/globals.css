@@ -15,7 +15,7 @@
      6. Option colour tokens  — A/B/C/D quiz answer colours (in :root)
      7. Base styles           — body defaults, font stack
      8. Utility classes       — @utility definitions
-     9. Component patterns    — scanlines, live-dot
+     9. Component patterns    — live-dot
     10. Animations            — @keyframes
     11. Accessibility         — reduced-motion overrides
 
@@ -445,27 +445,6 @@ body {
 
 /* ── 9. Component patterns ───────────────────────────────────────────────── */
 
-/*
- * .scanlines
- * CRT scanline texture overlay. Apply to any full-screen root element.
- * Renders a fixed viewport overlay that sits above content (pointer-events: none).
- *
- * Usage: <div className="scanlines min-h-screen ...">
- */
-.scanlines::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(255, 255, 255, 0.03) 2px,
-    rgba(255, 255, 255, 0.03) 4px
-  );
-  pointer-events: none;
-  z-index: 0;
-}
 
 /*
  * .live-dot
