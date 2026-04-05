@@ -362,7 +362,7 @@ export default function HostPage() {
                     }}
                   />
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-snug">
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-snug">
                   {currentQuestion.text}
                 </h2>
               </div>
@@ -386,18 +386,18 @@ export default function HostPage() {
                     const meta = OPTION_META[i % 4];
                     return (
                       <div key={opt.id}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-foreground font-medium truncate pr-4 max-w-[80%]">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-lg text-foreground font-medium truncate pr-4 max-w-[80%]">
                             {opt.text}
                           </span>
                           <span
-                            className="text-sm tabular-nums font-bold shrink-0"
+                            className="text-lg tabular-nums font-bold shrink-0"
                             style={{ color: meta.color }}
                           >
                             {count}
                           </span>
                         </div>
-                        <div className="h-3 bg-surface overflow-hidden rounded-sm relative">
+                        <div className="h-4 bg-surface overflow-hidden rounded-sm relative">
                           <motion.div
                             className="h-full rounded-sm absolute inset-0 origin-left"
                             animate={{ scaleX: pct / 100 }}
