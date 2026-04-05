@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { ContentSkeleton } from "@/components/PageSkeleton";
 
@@ -21,6 +22,7 @@ interface EventData {
 }
 
 export default function EventClient({ eventId }: { eventId: string }) {
+  const router = useRouter();
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,10 +34,12 @@ export default function EventClient({ eventId }: { eventId: string }) {
       if (res.success) {
         setEvent(res.data);
         setOrderIndex((res.data.quizzes.length ?? 0) + 1);
+      } else {
+        router.push("/dashboard");
       }
       setLoading(false);
     });
-  }, [eventId]);
+  }, [eventId, router]);
 
   const handleCreateQuiz = async (_prev: null, formData: FormData) => {
     const title = formData.get("quizTitle") as string;
@@ -119,7 +123,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
                 <input
                   name="quizTitle"
                   value={quizTitle}
-                  onChange={(eventObj) => setQuizTitle(eventObj.target.value)}
+                  onChange={(e) => setQuizTitle(e.target.value)}
                   required
                   className="input-field font-mono"
                   placeholder="Quiz title"
@@ -131,9 +135,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
                   type="number"
                   name="orderIndex"
                   value={orderIndex}
-                  onChange={(eventObj) =>
-                    setOrderIndex(Number(eventObj.target.value))
-                  }
+                  onChange={(e) => setOrderIndex(Number(e.target.value))}
                   min={1}
                   className="input-field font-mono"
                 />

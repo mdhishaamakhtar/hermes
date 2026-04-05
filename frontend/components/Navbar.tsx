@@ -1,21 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearStoredAuthToken } from "@/lib/auth-storage";
-import { api } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
 import Logo from "./Logo";
 
 export default function Navbar() {
   const router = useRouter();
-  const [displayName, setDisplayName] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.get<{ displayName: string }>("/api/auth/me").then((res) => {
-      if (res.success) setDisplayName(res.data.displayName);
-    });
-  }, []);
+  const { data: user } = useApi<{ displayName: string }>("/api/auth/me");
 
   const handleLogout = () => {
     clearStoredAuthToken();
@@ -32,10 +25,10 @@ export default function Navbar() {
           <Logo size="sm" showWordmark />
         </Link>
         <div className="flex items-center gap-6">
-          {displayName && (
+          {user?.displayName && (
             <>
               <span className="text-sm text-muted tracking-wide select-none">
-                {displayName}
+                {user.displayName}
               </span>
               <button
                 onClick={handleLogout}

@@ -60,6 +60,7 @@ export default function QuizEditorClient({
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [qText, setQText] = useState("");
   const [qTime, setQTime] = useState(30);
@@ -71,7 +72,9 @@ export default function QuizEditorClient({
       api.get<Quiz>(`/api/quizzes/${quizId}`),
       api.get<SessionItem[]>(`/api/quizzes/${quizId}/sessions`),
     ]).then(([quizRes, sessionsRes]) => {
-      if (quizRes.success) {
+      if (!quizRes.success) {
+        setFetchError(true);
+      } else {
         setQuiz(quizRes.data);
         setQOrder((quizRes.data.questions.length ?? 0) + 1);
       }
@@ -79,6 +82,10 @@ export default function QuizEditorClient({
       setLoading(false);
     });
   }, [quizId]);
+
+  useEffect(() => {
+    if (fetchError) router.push(`/events/${eventId}`);
+  }, [fetchError, eventId, router]);
   const [creating, setCreating] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editText, setEditText] = useState("");
@@ -134,12 +141,15 @@ export default function QuizEditorClient({
     });
 
     if (res.success) {
-      setQuiz((prev) => ({
-        ...prev,
-        questions: [...prev.questions, res.data].toSorted(
-          (a, b) => a.orderIndex - b.orderIndex,
-        ),
-      }));
+      setQuiz((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: [...prev.questions, res.data].toSorted(
+            (a, b) => a.orderIndex - b.orderIndex,
+          ),
+        };
+      });
       setQText("");
       setQTime(30);
       setQOrder((questions.length ?? 0) + 2);
@@ -156,12 +166,15 @@ export default function QuizEditorClient({
   const handleDeleteQuestion = async (questionId: number) => {
     const res = await api.delete(`/api/questions/${questionId}`);
     if (res.success) {
-      setQuiz((prev) => ({
-        ...prev,
-        questions: prev.questions.filter(
-          (question) => question.id !== questionId,
-        ),
-      }));
+      setQuiz((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.filter(
+            (question) => question.id !== questionId,
+          ),
+        };
+      });
     }
   };
 
@@ -201,12 +214,15 @@ export default function QuizEditorClient({
     );
 
     if (res.success) {
-      setQuiz((prev) => ({
-        ...prev,
-        questions: prev.questions.map((question) =>
-          question.id === editingQuestion.id ? res.data : question,
-        ),
-      }));
+      setQuiz((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.map((question) =>
+            question.id === editingQuestion.id ? res.data : question,
+          ),
+        };
+      });
       setEditingQuestion(null);
     }
 

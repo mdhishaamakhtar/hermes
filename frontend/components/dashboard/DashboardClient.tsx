@@ -17,11 +17,16 @@ interface EventItem {
 export default function DashboardClient() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     api.get<EventItem[]>("/api/events").then((res) => {
-      if (res.success) setEvents(res.data);
+      if (res.success) {
+        setEvents(res.data);
+      } else {
+        setFetchError(res.error?.message ?? "Failed to load events");
+      }
       setLoading(false);
     });
   }, []);
@@ -42,13 +47,23 @@ export default function DashboardClient() {
 
   const [, createAction, creating] = useActionState(handleCreate, null);
 
-  if (loading) return <ContentSkeleton />;
-
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    await api.delete(`/api/events/${id}`);
-    setEvents((prev) => prev.filter((event) => event.id !== id));
+    const res = await api.delete(`/api/events/${id}`);
+    if (res.success) {
+      setEvents((prev) => prev.filter((event) => event.id !== id));
+    }
   };
+
+  if (loading) return <ContentSkeleton />;
+
+  if (fetchError) {
+    return (
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <p className="text-sm text-danger">{fetchError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -151,7 +166,7 @@ export default function DashboardClient() {
                 </div>
                 <div className="relative z-10 flex items-center gap-4">
                   <button
-                    onClick={(eventObj) => handleDelete(event.id, eventObj)}
+                    onClick={(e) => handleDelete(event.id, e)}
                     aria-label={`Delete event: ${event.title}`}
                     className="label text-muted/40 hover:text-danger transition-colors opacity-0 group-hover:opacity-100 focus-visible:outline-none focus-visible:opacity-100 focus-visible:text-danger focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >

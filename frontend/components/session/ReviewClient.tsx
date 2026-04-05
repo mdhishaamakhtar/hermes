@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useApi } from "@/hooks/useApi";
 import { SessionPageSkeleton } from "@/components/PageSkeleton";
+import { useState } from "react";
 
 interface OptionResult {
   id: number;
@@ -42,19 +44,20 @@ interface SessionResults {
 }
 
 export default function ReviewClient({ sessionId }: { sessionId: string }) {
-  const [results, setResults] = useState<SessionResults | null>(null);
+  const router = useRouter();
+  const {
+    data: results,
+    loading,
+    error,
+  } = useApi<SessionResults>(`/api/sessions/${sessionId}/results`);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "questions">(
     "leaderboard",
   );
   const [questionIndex, setQuestionIndex] = useState(0);
 
   useEffect(() => {
-    api
-      .get<SessionResults>(`/api/sessions/${sessionId}/results`)
-      .then((res) => {
-        if (res.success) setResults(res.data);
-      });
-  }, [sessionId]);
+    if (error) router.push("/dashboard");
+  }, [error, router]);
 
   const sortedQuestions = useMemo(
     () =>
@@ -64,7 +67,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
     [results?.questions],
   );
 
-  if (!results) return <SessionPageSkeleton />;
+  if (loading || !results) return <SessionPageSkeleton />;
 
   const currentQuestion = sortedQuestions[questionIndex];
   const maxCount = currentQuestion
