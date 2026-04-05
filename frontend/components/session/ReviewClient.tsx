@@ -163,10 +163,11 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                 >
                   <div className="flex items-start justify-between mb-6">
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-2 mb-2">
                         <p className="label tabular-nums">
                           Q{question.orderIndex}
                         </p>
+                        <span className="text-muted/40 text-xs">·</span>
                         <span className="text-xs text-muted tabular-nums">
                           {question.timeLimitSeconds}s time limit
                         </span>
@@ -176,7 +177,8 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                       </h2>
                     </div>
                     <span className="text-xs text-muted tabular-nums ml-4 shrink-0">
-                      {question.totalAnswers} answers
+                      {question.totalAnswers}{" "}
+                      {question.totalAnswers === 1 ? "answer" : "answers"}
                     </span>
                   </div>
 
