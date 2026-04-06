@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { ReviewSkeleton } from "@/components/PageSkeleton";
+import BackLink from "@/components/ui/BackLink";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import type { SessionResults } from "@/lib/types";
 
 export default function ReviewClient({ sessionId }: { sessionId: string }) {
@@ -35,35 +38,25 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="mb-2">
-        <Link
-          href={`/events/${results.eventId}/quizzes/${results.quizId}`}
-          prefetch
-          className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          ← Back to Quiz
-        </Link>
-      </div>
+      <BackLink
+        href={`/events/${results.eventId}/quizzes/${results.quizId}`}
+        label="Back to Quiz"
+      />
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-        className="mb-10"
-      >
-        <p className="label mb-1">Session Review</p>
-        <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">
-          {results.quizTitle}
-        </h1>
-        <div className="flex items-center gap-6 text-xs text-muted">
-          <span className="tabular-nums">
-            {results.participantCount} participants
-          </span>
-          {results.startedAt && (
-            <span>{new Date(results.startedAt).toLocaleDateString()}</span>
-          )}
-        </div>
-      </motion.div>
+      <PageHeader
+        label="Session Review"
+        title={results.quizTitle}
+        meta={
+          <div className="flex items-center gap-6 text-xs text-muted">
+            <span className="tabular-nums">
+              {results.participantCount} participants
+            </span>
+            {results.startedAt && (
+              <span>{new Date(results.startedAt).toLocaleDateString()}</span>
+            )}
+          </div>
+        }
+      />
 
       <div className="flex gap-0 mb-8 border-b border-border">
         {(["leaderboard", "questions"] as const).map((tab) => (
@@ -97,45 +90,20 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
             transition={{ duration: 0.2 }}
           >
             {results.leaderboard.length === 0 ? (
-              <p className="text-center py-16 text-muted text-sm">
-                No results yet.
-              </p>
+              <EmptyState message="No results yet." />
             ) : (
               <div className="space-y-px">
                 {results.leaderboard.map((entry, index) => (
-                  <motion.div
+                  <LeaderboardRow
                     key={`${entry.rank}-${entry.displayName}`}
+                    rank={entry.rank}
+                    displayName={entry.displayName}
+                    score={entry.score}
+                    variant="review"
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.15, delay: index * 0.04 }}
-                    className={`flex items-center justify-between px-6 py-4 bg-surface border ${
-                      entry.rank === 1 ? "border-primary/40" : "border-border"
-                    }`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <span
-                        className={`font-bold tabular-nums text-lg w-8 ${
-                          entry.rank === 1
-                            ? "text-accent"
-                            : entry.rank <= 3
-                              ? "text-muted"
-                              : "text-muted/40"
-                        }`}
-                      >
-                        {entry.rank}
-                      </span>
-                      <span
-                        className={`font-medium text-sm ${
-                          entry.rank === 1 ? "text-foreground" : "text-muted"
-                        }`}
-                      >
-                        {entry.displayName}
-                      </span>
-                    </div>
-                    <span className="font-bold tabular-nums text-foreground">
-                      {entry.score.toLocaleString()}
-                    </span>
-                  </motion.div>
+                  />
                 ))}
               </div>
             )}

@@ -2,11 +2,15 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { eventsApi } from "@/lib/apiClient";
 import { EventDetailSkeleton } from "@/components/PageSkeleton";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackLink from "@/components/ui/BackLink";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import ResourceRow from "@/components/ui/ResourceRow";
 import type { EventSummary } from "@/lib/types";
 
 export default function EventClient({ eventId }: { eventId: string }) {
@@ -19,6 +23,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
   } = useSWR<EventSummary>(`/api/events/${eventId}`);
   const [showForm, setShowForm] = useState(false);
   const [quizTitle, setQuizTitle] = useState("");
+  const [confirmQuizId, setConfirmQuizId] = useState<number | null>(null);
 
   useEffect(() => {
     if (error) router.push("/dashboard");
@@ -48,36 +53,32 @@ export default function EventClient({ eventId }: { eventId: string }) {
 
   const [, createQuizAction, creating] = useActionState(handleCreateQuiz, null);
 
+  const handleDeleteQuizConfirmed = async () => {
+    if (confirmQuizId === null || !event) return;
+    const id = confirmQuizId;
+    setConfirmQuizId(null);
+    const res = await eventsApi.deleteQuiz(id);
+    if (res.success) {
+      mutate(
+        { ...event, quizzes: event.quizzes.filter((q) => q.id !== id) },
+        { revalidate: false },
+      );
+    }
+  };
+
   if (isLoading || !event) return <EventDetailSkeleton />;
 
   const quizzes = event.quizzes.toSorted((a, b) => a.orderIndex - b.orderIndex);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="mb-2">
-        <Link
-          href="/dashboard"
-          prefetch
-          className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          ← Dashboard
-        </Link>
-      </div>
+      <BackLink href="/dashboard" label="Dashboard" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-        className="mb-10"
-      >
-        <p className="label mb-1">Event</p>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight mb-2">
-          {event.title}
-        </h1>
-        {event.description && (
-          <p className="text-sm text-muted">{event.description}</p>
-        )}
-      </motion.div>
+      <PageHeader
+        label="Event"
+        title={event.title}
+        description={event.description || undefined}
+      />
 
       <div className="flex items-center justify-between mb-6">
         <h2 className="label">Quizzes</h2>
@@ -135,43 +136,44 @@ export default function EventClient({ eventId }: { eventId: string }) {
       <div className="h-px bg-border mb-4" />
 
       {quizzes.length === 0 ? (
-        <p className="text-center py-16 text-muted text-sm">
-          No quizzes yet. Add one above.
-        </p>
+        <EmptyState message="No quizzes yet. Add one above." />
       ) : (
         <div className="space-y-px">
           {quizzes.map((quiz, index) => (
-            <motion.div
+            <ResourceRow
               key={quiz.id}
+              href={`/events/${eventId}/quizzes/${quiz.id}`}
+              ariaLabel={`Open quiz: ${quiz.title}`}
+              onDelete={() => setConfirmQuizId(quiz.id)}
+              deleteAriaLabel={`Delete quiz: ${quiz.title}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.15, delay: index * 0.04 }}
-              className="group"
             >
-              <Link
-                href={`/events/${eventId}/quizzes/${quiz.id}`}
-                prefetch
-                className="flex items-center justify-between px-6 py-4 bg-surface border border-border hover:border-primary/40 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-xs text-muted tabular-nums w-5">
-                    {quiz.orderIndex}
-                  </span>
-                  <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">
-                    {quiz.title}
-                  </span>
-                </div>
-                <span
-                  aria-hidden
-                  className="text-muted/40 group-hover:text-accent transition-colors select-none"
-                >
-                  →
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-xs text-muted tabular-nums w-5">
+                  {quiz.orderIndex}
                 </span>
-              </Link>
-            </motion.div>
+                <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">
+                  {quiz.title}
+                </span>
+              </div>
+            </ResourceRow>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        message={
+          confirmQuizId !== null
+            ? `Delete "${quizzes.find((q) => q.id === confirmQuizId)?.title}"? All questions and session history for this quiz will be permanently removed.`
+            : null
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteQuizConfirmed}
+        onCancel={() => setConfirmQuizId(null)}
+      />
     </div>
   );
 }
