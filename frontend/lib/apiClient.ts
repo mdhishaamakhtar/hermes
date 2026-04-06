@@ -12,6 +12,7 @@ export const eventsApi = {
   delete: (id: number) => api.delete(`/api/events/${id}`),
   createQuiz: (eventId: string, data: { title: string; orderIndex: number }) =>
     api.post<QuizSummary>(`/api/events/${eventId}/quizzes`, data),
+  deleteQuiz: (quizId: number) => api.delete(`/api/quizzes/${quizId}`),
 };
 
 export const quizzesApi = {
@@ -42,5 +43,7 @@ export const questionsApi = {
 export const sessionsApi = {
   create: (quizId: number) =>
     api.post<{ id: number; joinCode: string }>("/api/sessions", { quizId }),
-  end: (id: number) => api.post(`/api/sessions/${id}/end`),
+  start: (id: number | string) => api.post(`/api/sessions/${id}/start`),
+  next: (id: number | string) => api.post(`/api/sessions/${id}/next`),
+  end: (id: number | string) => api.post(`/api/sessions/${id}/end`),
 };

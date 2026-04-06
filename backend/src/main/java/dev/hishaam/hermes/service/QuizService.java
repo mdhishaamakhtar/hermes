@@ -9,6 +9,7 @@ import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
+import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
@@ -25,6 +26,7 @@ public class QuizService {
   private final QuizRepository quizRepository;
   private final QuizSessionRepository sessionRepository;
   private final ParticipantRepository participantRepository;
+  private final ParticipantAnswerRepository participantAnswerRepository;
   private final OwnershipService ownershipService;
   private final QuestionService questionService;
 
@@ -32,11 +34,13 @@ public class QuizService {
       QuizRepository quizRepository,
       QuizSessionRepository sessionRepository,
       ParticipantRepository participantRepository,
+      ParticipantAnswerRepository participantAnswerRepository,
       OwnershipService ownershipService,
       QuestionService questionService) {
     this.quizRepository = quizRepository;
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
+    this.participantAnswerRepository = participantAnswerRepository;
     this.ownershipService = ownershipService;
     this.questionService = questionService;
   }
@@ -67,6 +71,15 @@ public class QuizService {
   @Transactional
   public void deleteQuiz(Long quizId, Long userId) {
     Quiz quiz = ownershipService.requireQuizOwner(quizId, userId);
+    List<Long> sessionIds =
+        sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId).stream()
+            .map(QuizSession::getId)
+            .toList();
+    if (!sessionIds.isEmpty()) {
+      participantAnswerRepository.deleteBySessionIdIn(sessionIds);
+      participantRepository.deleteBySessionIdIn(sessionIds);
+      sessionRepository.deleteAllByIdInBatch(sessionIds);
+    }
     quizRepository.delete(quiz);
   }
 

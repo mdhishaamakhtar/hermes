@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 public interface QuizSessionRepository extends JpaRepository<QuizSession, Long> {
   List<QuizSession> findByQuizIdOrderByCreatedAtDesc(Long quizId);
 
+  List<QuizSession> findByQuizIdIn(List<Long> quizIds);
+
   boolean existsByQuizIdAndStatusIn(Long quizId, List<SessionStatus> statuses);
 
   @Query(
