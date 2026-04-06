@@ -14,12 +14,9 @@ export function ContentSkeleton() {
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="h-4 w-16 bg-surface/50 animate-pulse mb-3" />
       <div className="h-7 w-48 bg-surface animate-pulse mb-10" />
-      <div className="space-y-px">
+      <div className="space-y-2">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-[4.5rem] bg-surface border border-border animate-pulse"
-          />
+          <RowSkeleton key={i} />
         ))}
       </div>
     </div>
@@ -38,12 +35,9 @@ export function EventListSkeleton() {
         <div className="h-9 w-28 bg-surface animate-pulse" />
       </div>
       <div className="h-px bg-border mb-8" />
-      <div className="space-y-px">
-        {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="h-[4.5rem] bg-surface border border-border animate-pulse"
-          />
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <RowSkeleton key={i} subtitle />
         ))}
       </div>
     </div>
@@ -65,12 +59,9 @@ export function EventDetailSkeleton() {
         <div className="h-8 w-24 bg-surface animate-pulse" />
       </div>
       <div className="h-px bg-border mb-4" />
-      <div className="space-y-px">
+      <div className="space-y-2">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-[3.5rem] bg-surface border border-border animate-pulse"
-          />
+          <QuizRowSkeleton key={i} />
         ))}
       </div>
     </div>
@@ -96,10 +87,7 @@ export function QuizEditorSkeleton() {
       <div className="h-px bg-border mb-4" />
       <div className="space-y-2">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-[5.5rem] bg-surface border border-border animate-pulse"
-          />
+          <QuestionSkeleton key={i} />
         ))}
       </div>
     </div>
@@ -117,12 +105,9 @@ export function ReviewSkeleton() {
         <div className="h-3 w-32 bg-surface/50 animate-pulse" />
       </div>
       <div className="h-px bg-border mb-8" />
-      <div className="space-y-px">
+      <div className="space-y-2">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className="h-[3.5rem] bg-surface border border-border animate-pulse"
-          />
+          <LeaderboardRowSkeleton key={i} />
         ))}
       </div>
     </div>
@@ -133,6 +118,78 @@ export function SessionPageSkeleton() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="w-5 h-5 border border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// --- Row skeletons matching real component internals ---
+
+// Matches ResourceRow: px-6 py-4, title + optional subtitle, arrow on right
+function RowSkeleton({ subtitle = false }: { subtitle?: boolean }) {
+  return (
+    <div className="flex items-center justify-between px-6 py-4 bg-surface border border-border">
+      <div>
+        <div className="h-4 w-36 bg-border animate-pulse" />
+        {subtitle && (
+          <div className="h-3 w-24 bg-border/50 animate-pulse mt-2" />
+        )}
+      </div>
+      <div className="h-4 w-4 bg-border/50 animate-pulse" />
+    </div>
+  );
+}
+
+// Matches quiz rows in EventClient: order number + title
+function QuizRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between px-6 py-4 bg-surface border border-border">
+      <div className="flex items-center gap-4">
+        <div className="h-3 w-5 bg-border/50 animate-pulse" />
+        <div className="h-4 w-32 bg-border animate-pulse" />
+      </div>
+      <div className="h-4 w-4 bg-border/50 animate-pulse" />
+    </div>
+  );
+}
+
+// Matches QuestionCard: p-6, order + text + time, options grid
+function QuestionSkeleton() {
+  return (
+    <div className="border border-border bg-surface p-6">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start gap-3">
+          <div className="h-3 w-4 bg-border/50 animate-pulse mt-0.5" />
+          <div>
+            <div className="h-4 w-48 bg-border animate-pulse" />
+            <div className="h-3 w-10 bg-border/50 animate-pulse mt-1.5" />
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="h-3 w-8 bg-border/50 animate-pulse" />
+          <div className="h-3 w-10 bg-border/50 animate-pulse" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 ml-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="px-3 py-1.5 border border-border h-7 animate-pulse bg-border/20"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Matches LeaderboardRow (review variant): px-6 py-4, rank + name + score
+function LeaderboardRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between px-6 py-4 bg-surface border border-border">
+      <div className="flex items-center gap-5">
+        <div className="h-5 w-8 bg-border animate-pulse" />
+        <div className="h-4 w-28 bg-border/50 animate-pulse" />
+      </div>
+      <div className="h-4 w-12 bg-border animate-pulse" />
     </div>
   );
 }
