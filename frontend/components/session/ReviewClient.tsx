@@ -92,7 +92,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
             {results.leaderboard.length === 0 ? (
               <EmptyState message="No results yet." />
             ) : (
-              <div className="space-y-px">
+              <div className="space-y-2">
                 {results.leaderboard.map((entry, index) => (
                   <LeaderboardRow
                     key={`${entry.rank}-${entry.displayName}`}
