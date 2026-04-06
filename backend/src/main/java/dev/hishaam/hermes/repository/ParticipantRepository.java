@@ -14,6 +14,8 @@ import org.springframework.stereotype.Repository;
 public interface ParticipantRepository extends JpaRepository<Participant, Long> {
   Optional<Participant> findByRejoinToken(String rejoinToken);
 
+  void deleteBySessionIdIn(List<Long> sessionIds);
+
   long countBySessionId(Long sessionId);
 
   List<Participant> findBySessionId(Long sessionId);

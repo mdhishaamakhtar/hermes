@@ -59,6 +59,7 @@
   --palette-amber-700: #b45309;
 
   /* Red (danger / incorrect) */
+  --palette-red-600: #dc2626;
   --palette-red-500: #ef4444;
   --palette-red-400: #f87171;
 
@@ -112,6 +113,7 @@
   --color-warning: var(--palette-amber-600);
   --color-warning-hover: var(--palette-amber-700);
   --color-danger: var(--palette-red-500);
+  --color-danger-hover: var(--palette-red-600);
 
   /* Answer options — generated as text-option-a etc. */
   --color-option-a: var(--palette-option-a);
@@ -444,7 +446,6 @@ body {
 }
 
 /* ── 9. Component patterns ───────────────────────────────────────────────── */
-
 
 /*
  * .live-dot

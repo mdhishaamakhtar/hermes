@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 interface Props {
   message: string | null;
   confirmLabel?: string;
+  variant?: "warning" | "danger";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -12,9 +13,11 @@ interface Props {
 export default function ConfirmDialog({
   message,
   confirmLabel = "Confirm",
+  variant = "warning",
   onConfirm,
   onCancel,
 }: Props) {
+  const isDanger = variant === "danger";
   return (
     <AnimatePresence>
       {message && (
@@ -30,7 +33,9 @@ export default function ConfirmDialog({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
-            className="bg-surface border border-warning/40 p-8 max-w-md w-full mx-6 space-y-6"
+            className={`bg-surface border p-8 max-w-md w-full mx-6 space-y-6 ${
+              isDanger ? "border-danger/40" : "border-warning/40"
+            }`}
           >
             <p className="text-sm text-foreground leading-relaxed">{message}</p>
             <div className="flex items-center justify-end gap-4">
@@ -42,7 +47,11 @@ export default function ConfirmDialog({
               </button>
               <button
                 onClick={onConfirm}
-                className="bg-warning text-white px-5 py-2 text-sm tracking-widest uppercase hover:bg-warning-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className={`text-white px-5 py-2 text-sm tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  isDanger
+                    ? "bg-danger hover:bg-danger-hover focus-visible:ring-danger"
+                    : "bg-warning hover:bg-warning-hover focus-visible:ring-warning"
+                }`}
               >
                 {confirmLabel}
               </button>

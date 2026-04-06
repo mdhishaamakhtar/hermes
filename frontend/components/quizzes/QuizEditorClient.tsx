@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { AnimatePresence } from "framer-motion";
 import useSWR from "swr";
 import { sessionsApi } from "@/lib/apiClient";
 import { QuizEditorSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackLink from "@/components/ui/BackLink";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
 import QuestionCard from "@/components/quizzes/QuestionCard";
 import QuestionForm from "@/components/quizzes/QuestionForm";
 import SessionList from "@/components/quizzes/SessionList";
@@ -37,6 +39,9 @@ export default function QuizEditorClient({
   const [abandoning, setAbandoning] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const [confirmLabel, setConfirmLabel] = useState("Confirm");
+  const [confirmVariant, setConfirmVariant] = useState<"warning" | "danger">(
+    "warning",
+  );
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
@@ -83,6 +88,7 @@ export default function QuizEditorClient({
   const handleQuestionDeleted = (questionId: number) => {
     setConfirmMessage("Delete this question? This cannot be undone.");
     setConfirmLabel("Delete");
+    setConfirmVariant("danger");
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       const { questionsApi } = await import("@/lib/apiClient");
@@ -120,6 +126,7 @@ export default function QuizEditorClient({
       "Abandon this session? The quiz will become editable again.",
     );
     setConfirmLabel("Abandon");
+    setConfirmVariant("warning");
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
@@ -146,6 +153,7 @@ export default function QuizEditorClient({
       `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
     );
     setConfirmLabel("Abandon");
+    setConfirmVariant("warning");
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
@@ -164,39 +172,26 @@ export default function QuizEditorClient({
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="mb-2">
-        <Link
-          href={`/events/${eventId}`}
-          prefetch
-          className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          ← Event
-        </Link>
-      </div>
+      <BackLink href={`/events/${eventId}`} label="Event" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-        className="flex items-start justify-between mb-10"
-      >
-        <div>
-          <p className="label mb-1">Quiz Editor</p>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
-            {quiz.title}
-          </h1>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <button
-            onClick={handleLaunch}
-            disabled={launching || questions.length === 0}
-            className="bg-primary text-white px-6 py-3 text-sm tracking-widest uppercase hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            {launching ? "Launching..." : "↑ Launch Session"}
-          </button>
-          {launchError && <p className="text-xs text-danger">{launchError}</p>}
-        </div>
-      </motion.div>
+      <PageHeader
+        label="Quiz Editor"
+        title={quiz.title}
+        action={
+          <div className="flex flex-col items-end gap-2">
+            <button
+              onClick={handleLaunch}
+              disabled={launching || questions.length === 0}
+              className="bg-primary text-white px-6 py-3 text-sm tracking-widest uppercase hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              {launching ? "Launching..." : "↑ Launch Session"}
+            </button>
+            {launchError && (
+              <p className="text-xs text-danger">{launchError}</p>
+            )}
+          </div>
+        }
+      />
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="label">Questions ({questions.length})</h2>
@@ -223,9 +218,7 @@ export default function QuizEditorClient({
       <div className="h-px bg-border mb-4" />
 
       {questions.length === 0 ? (
-        <p className="text-center py-16 text-muted text-sm">
-          No questions yet. Add one above.
-        </p>
+        <EmptyState message="No questions yet. Add one above." />
       ) : (
         <div className="space-y-2 mb-12">
           {questions.map((question, index) => (
@@ -252,6 +245,7 @@ export default function QuizEditorClient({
       <ConfirmDialog
         message={confirmMessage}
         confirmLabel={confirmLabel}
+        variant={confirmVariant}
         onConfirm={() => confirmAction?.()}
         onCancel={() => setConfirmMessage(null)}
       />

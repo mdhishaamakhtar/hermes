@@ -5,10 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { sessionsApi } from "@/lib/apiClient";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import Logo from "@/components/Logo";
 import { OPTION_META } from "@/lib/session-constants";
+import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { colorRgb } from "@/lib/design-tokens";
 
 interface Option {
@@ -77,8 +79,25 @@ export default function HostPage() {
   const [copied, setCopied] = useState(false);
 
   const authToken = getStoredAuthToken();
+
+  const fetchLobbyState = useCallback(() => {
+    if (!id) return;
+    api
+      .get<{ status: string; participantCount: number; joinCode: string }>(
+        `/api/sessions/${id}/lobby`,
+      )
+      .then((res) => {
+        if (!res.success) return;
+        const { participantCount: count, joinCode: code } = res.data;
+        setParticipantCount(count);
+        if (code) setJoinCode(code);
+      })
+      .catch(() => {});
+  }, [id]);
+
   const { subscribe, unsubscribe } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    onConnect: fetchLobbyState,
   });
 
   useEffect(() => {
@@ -161,20 +180,20 @@ export default function HostPage() {
 
   const handleStart = async () => {
     setLoading(true);
-    await api.post(`/api/sessions/${id}/start`);
+    await sessionsApi.start(id);
     setSessionStatus("ACTIVE");
     setLoading(false);
   };
 
   const handleNext = async () => {
     setLoading(true);
-    await api.post(`/api/sessions/${id}/next`);
+    await sessionsApi.next(id);
     setLoading(false);
   };
 
   const handleEnd = async () => {
     setLoading(true);
-    await api.post(`/api/sessions/${id}/end`);
+    await sessionsApi.end(id);
     setSessionStatus("ENDED");
     setLoading(false);
   };
@@ -424,34 +443,17 @@ export default function HostPage() {
                 <div className="flex-1 space-y-2 overflow-y-auto">
                   <AnimatePresence>
                     {leaderboard.slice(0, 10).map((entry) => (
-                      <motion.div
+                      <LeaderboardRow
                         key={entry.participantId}
+                        rank={entry.rank}
+                        displayName={entry.displayName}
+                        score={entry.score}
+                        variant="compact"
                         layout
                         initial={{ opacity: 0, x: 16 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0 }}
-                        className="flex items-center justify-between px-3 py-2.5 border border-border bg-surface"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span
-                            className="text-xs tabular-nums w-5 shrink-0 font-bold"
-                            style={{
-                              color:
-                                entry.rank <= 3
-                                  ? "var(--color-warning)"
-                                  : "var(--color-muted-dark)",
-                            }}
-                          >
-                            {entry.rank}
-                          </span>
-                          <span className="text-sm text-foreground truncate">
-                            {entry.displayName}
-                          </span>
-                        </div>
-                        <span className="text-sm tabular-nums text-success font-bold shrink-0 ml-2">
-                          {entry.score}
-                        </span>
-                      </motion.div>
+                      />
                     ))}
                   </AnimatePresence>
                   {leaderboard.length === 0 && (
@@ -512,33 +514,15 @@ export default function HostPage() {
             </div>
             <div className="w-full max-w-sm space-y-2">
               {(finalLeaderboard || leaderboard).slice(0, 10).map((entry) => (
-                <motion.div
+                <LeaderboardRow
                   key={entry.participantId}
+                  rank={entry.rank}
+                  displayName={entry.displayName}
+                  score={entry.score}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: entry.rank * 0.05 }}
-                  className="flex items-center justify-between px-4 py-3 border border-border bg-surface"
-                >
-                  <div className="flex items-center gap-4">
-                    <span
-                      className="text-sm tabular-nums w-6 font-bold"
-                      style={{
-                        color:
-                          entry.rank === 1
-                            ? "var(--color-warning)"
-                            : entry.rank <= 3
-                              ? "var(--color-muted)"
-                              : "var(--color-muted-dark)",
-                      }}
-                    >
-                      {entry.rank}
-                    </span>
-                    <span className="text-foreground">{entry.displayName}</span>
-                  </div>
-                  <span className="tabular-nums text-success font-bold">
-                    {entry.score}
-                  </span>
-                </motion.div>
+                />
               ))}
             </div>
             <Link

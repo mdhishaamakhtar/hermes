@@ -21,6 +21,10 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
   List<Long> findAnsweredQuestionIds(@Param("participantId") Long participantId);
 
   @Modifying
+  @Query("DELETE FROM ParticipantAnswer a WHERE a.sessionId IN :sessionIds")
+  void deleteBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
+
+  @Modifying
   @Query(
       value =
           "INSERT INTO participant_answers"
