@@ -107,7 +107,7 @@ public class SessionResultsService {
                           : null;
                   QuizSnapshot.OptionSnapshot correct =
                       q.options().stream()
-                          .filter(QuizSnapshot.OptionSnapshot::isCorrect)
+                          .filter(o -> o.pointValue() > 0)
                           .findFirst()
                           .orElse(null);
                   boolean isCorrect = ans != null && ans.isCorrect();
@@ -170,7 +170,7 @@ public class SessionResultsService {
                                   new SessionResultsResponse.OptionInfo(
                                       o.id(),
                                       o.text(),
-                                      o.isCorrect(),
+                                      o.pointValue() > 0,
                                       o.orderIndex(),
                                       optionCounts.getOrDefault(o.id(), 0L)))
                           .toList();

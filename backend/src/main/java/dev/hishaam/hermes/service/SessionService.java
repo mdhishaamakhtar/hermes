@@ -1,6 +1,7 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.*;
+import dev.hishaam.hermes.entity.Passage;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
@@ -175,13 +176,37 @@ public class SessionService {
                           .map(
                               o ->
                                   new QuizSnapshot.OptionSnapshot(
-                                      o.getId(), o.getText(), o.isCorrect(), o.getOrderIndex()))
+                                      o.getId(),
+                                      o.getText(),
+                                      o.getPointValue(),
+                                      o.getOrderIndex()))
                           .toList();
                   return new QuizSnapshot.QuestionSnapshot(
-                      q.getId(), q.getText(), q.getOrderIndex(), q.getTimeLimitSeconds(), options);
+                      q.getId(),
+                      q.getText(),
+                      q.getQuestionType().name(),
+                      q.getOrderIndex(),
+                      q.getTimeLimitSeconds(),
+                      q.getPassage() != null ? q.getPassage().getId() : null,
+                      options);
                 })
             .toList();
-    return new QuizSnapshot(quiz.getId(), quiz.getTitle(), questions);
+    List<QuizSnapshot.PassageSnapshot> passages =
+        quiz.getPassages().stream()
+            .map(this::toPassageSnapshot)
+            .toList();
+    return new QuizSnapshot(quiz.getId(), quiz.getTitle(), questions, passages);
+  }
+
+  private QuizSnapshot.PassageSnapshot toPassageSnapshot(Passage passage) {
+    List<Long> subQuestionIds = passage.getSubQuestions().stream().map(q -> q.getId()).toList();
+    return new QuizSnapshot.PassageSnapshot(
+        passage.getId(),
+        passage.getText(),
+        passage.getOrderIndex(),
+        passage.getTimerMode().name(),
+        passage.getTimeLimitSeconds(),
+        subQuestionIds);
   }
 
   private SessionResponse toResponse(QuizSession session) {

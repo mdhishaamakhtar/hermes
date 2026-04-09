@@ -69,7 +69,7 @@ public class SessionEngine {
       if (currentQ != null) {
         Long correctOptionId =
             currentQ.options().stream()
-                .filter(QuizSnapshot.OptionSnapshot::isCorrect)
+                .filter(o -> o.pointValue() > 0)
                 .map(QuizSnapshot.OptionSnapshot::id)
                 .findFirst()
                 .orElse(null);

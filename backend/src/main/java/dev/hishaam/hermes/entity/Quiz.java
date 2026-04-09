@@ -41,6 +41,12 @@ public class Quiz {
   @Builder.Default
   private List<Question> questions = new ArrayList<>();
 
+  @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("orderIndex ASC")
+  @BatchSize(size = 50)
+  @Builder.Default
+  private List<Passage> passages = new ArrayList<>();
+
   @PrePersist
   protected void onCreate() {
     if (createdAt == null) createdAt = OffsetDateTime.now();

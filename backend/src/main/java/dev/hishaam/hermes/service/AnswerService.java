@@ -68,7 +68,11 @@ public class AnswerService {
     // Step 5: insert with ON CONFLICT DO NOTHING
     int inserted =
         answerRepository.insertAnswerIgnoreConflict(
-            sessionId, participantId, request.questionId(), request.optionId(), option.isCorrect());
+            sessionId,
+            participantId,
+            request.questionId(),
+            request.optionId(),
+            option.pointValue() > 0);
     if (inserted == 0) return; // duplicate answer
 
     // Step 6: update per-option counts
@@ -76,7 +80,7 @@ public class AnswerService {
     redis.opsForHash().increment(countsKey, request.optionId().toString(), 1);
 
     // Step 7: update leaderboard score if correct
-    if (option.isCorrect()) {
+    if (option.pointValue() > 0) {
       redis
           .opsForZSet()
           .incrementScore(redisHelper.key(sid, "leaderboard"), participantId.toString(), 1);

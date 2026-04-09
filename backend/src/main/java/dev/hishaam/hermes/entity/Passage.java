@@ -1,6 +1,6 @@
 package dev.hishaam.hermes.entity;
 
-import dev.hishaam.hermes.entity.enums.QuestionType;
+import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -10,17 +10,14 @@ import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(
-    name = "questions",
-    indexes = {
-      @Index(name = "idx_questions_quiz_id", columnList = "quiz_id"),
-      @Index(name = "idx_questions_passage_id", columnList = "passage_id")
-    })
+    name = "passages",
+    indexes = {@Index(name = "idx_passages_quiz_id", columnList = "quiz_id")})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Question {
+public class Passage {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,10 +27,6 @@ public class Question {
   @JoinColumn(name = "quiz_id", nullable = false)
   private Quiz quiz;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "passage_id")
-  private Passage passage;
-
   @Column(columnDefinition = "TEXT", nullable = false)
   private String text;
 
@@ -41,25 +34,25 @@ public class Question {
   private int orderIndex;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "question_type", nullable = false)
+  @Column(name = "timer_mode", nullable = false)
   @Builder.Default
-  private QuestionType questionType = QuestionType.SINGLE_SELECT;
+  private PassageTimerMode timerMode = PassageTimerMode.PER_SUB_QUESTION;
 
-  @Column(name = "time_limit_seconds", nullable = false)
-  private int timeLimitSeconds;
+  @Column(name = "time_limit_seconds")
+  private Integer timeLimitSeconds;
 
   @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
-  @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(mappedBy = "passage", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("orderIndex ASC")
   @BatchSize(size = 50)
   @Builder.Default
-  private List<AnswerOption> options = new ArrayList<>();
+  private List<Question> subQuestions = new ArrayList<>();
 
   @PrePersist
   protected void onCreate() {
     if (createdAt == null) createdAt = OffsetDateTime.now();
-    if (questionType == null) questionType = QuestionType.SINGLE_SELECT;
+    if (timerMode == null) timerMode = PassageTimerMode.PER_SUB_QUESTION;
   }
 }

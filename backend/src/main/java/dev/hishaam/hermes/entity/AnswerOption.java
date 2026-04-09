@@ -5,8 +5,8 @@ import lombok.*;
 
 @Entity
 @Table(
-    name = "options",
-    indexes = {@Index(name = "idx_options_question_id", columnList = "question_id")})
+    name = "answer_options",
+    indexes = {@Index(name = "idx_answer_options_question_id", columnList = "question_id")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,6 +28,7 @@ public class AnswerOption {
   @Column(name = "order_index", nullable = false)
   private int orderIndex;
 
-  @Column(name = "is_correct", nullable = false)
-  private boolean isCorrect;
+  @Column(name = "point_value", nullable = false)
+  @Builder.Default
+  private int pointValue = 0;
 }

@@ -3,12 +3,27 @@ package dev.hishaam.hermes.dto;
 import java.util.Comparator;
 import java.util.List;
 
-public record QuizSnapshot(Long quizId, String title, List<QuestionSnapshot> questions) {
+public record QuizSnapshot(
+    Long quizId, String title, List<QuestionSnapshot> questions, List<PassageSnapshot> passages) {
 
   public record QuestionSnapshot(
-      Long id, String text, int orderIndex, int timeLimitSeconds, List<OptionSnapshot> options) {}
+      Long id,
+      String text,
+      String questionType,
+      int orderIndex,
+      int timeLimitSeconds,
+      Long passageId,
+      List<OptionSnapshot> options) {}
 
-  public record OptionSnapshot(Long id, String text, boolean isCorrect, int orderIndex) {}
+  public record OptionSnapshot(Long id, String text, int pointValue, int orderIndex) {}
+
+  public record PassageSnapshot(
+      Long id,
+      String text,
+      int orderIndex,
+      String timerMode,
+      Integer timeLimitSeconds,
+      List<Long> subQuestionIds) {}
 
   public QuestionSnapshot findQuestion(Long questionId) {
     return questions.stream().filter(q -> q.id().equals(questionId)).findFirst().orElse(null);

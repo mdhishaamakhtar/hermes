@@ -39,7 +39,6 @@ public class QuestionService {
   @Transactional
   public QuestionResponse createQuestion(Long quizId, CreateQuestionRequest request, Long userId) {
     Quiz quiz = ownershipService.requireQuizOwner(quizId, userId);
-    validateSingleCorrect(request.options().stream().map(OptionRequest::isCorrect).toList());
     Question question =
         Question.builder()
             .quiz(quiz)
@@ -57,7 +56,6 @@ public class QuestionService {
       Long questionId, UpdateQuestionRequest request, Long userId) {
     Question question = ownershipService.requireQuestionOwner(questionId, userId);
     checkNoActiveSession(question.getQuiz().getId());
-    validateSingleCorrect(request.options().stream().map(OptionRequest::isCorrect).toList());
 
     question.setText(request.text());
     question.setOrderIndex(request.orderIndex());
@@ -80,7 +78,10 @@ public class QuestionService {
   public QuestionResponse toResponse(Question question) {
     List<OptionResponse> options =
         question.getOptions().stream()
-            .map(o -> new OptionResponse(o.getId(), o.getText(), o.getOrderIndex(), o.isCorrect()))
+            .map(
+                o ->
+                    new OptionResponse(
+                        o.getId(), o.getText(), o.getOrderIndex(), o.getPointValue() > 0))
             .toList();
     return new QuestionResponse(
         question.getId(),
@@ -100,17 +101,10 @@ public class QuestionService {
               .question(question)
               .text(req.text())
               .orderIndex(i + 1)
-              .isCorrect(req.isCorrect())
+              .pointValue(Boolean.TRUE.equals(req.isCorrect()) ? 10 : 0)
               .build());
     }
     return options;
-  }
-
-  private void validateSingleCorrect(List<Boolean> correctFlags) {
-    long count = correctFlags.stream().filter(Boolean::booleanValue).count();
-    if (count != 1) {
-      throw AppException.badRequest("Exactly one option must be marked as correct");
-    }
   }
 
   private void checkNoActiveSession(Long quizId) {
