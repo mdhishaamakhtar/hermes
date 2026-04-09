@@ -45,6 +45,7 @@ public class QuestionService {
             .text(request.text())
             .orderIndex(request.orderIndex())
             .timeLimitSeconds(request.timeLimitSeconds())
+            .displayModeOverride(request.displayModeOverride())
             .build();
     question.getOptions().addAll(buildOptions(question, request.options()));
     question = questionRepository.save(question);
@@ -60,6 +61,7 @@ public class QuestionService {
     question.setText(request.text());
     question.setOrderIndex(request.orderIndex());
     question.setTimeLimitSeconds(request.timeLimitSeconds());
+    question.setDisplayModeOverride(request.displayModeOverride());
 
     question.getOptions().clear();
     question.getOptions().addAll(buildOptions(question, request.options()));
@@ -83,12 +85,21 @@ public class QuestionService {
                     new OptionResponse(
                         o.getId(), o.getText(), o.getOrderIndex(), o.getPointValue() > 0))
             .toList();
+    String displayModeOverride =
+        question.getDisplayModeOverride() != null ? question.getDisplayModeOverride().name() : null;
+    String effectiveDisplayMode =
+        (question.getDisplayModeOverride() != null
+                ? question.getDisplayModeOverride()
+                : question.getQuiz().getDisplayMode())
+            .name();
     return new QuestionResponse(
         question.getId(),
         question.getQuiz().getId(),
         question.getText(),
         question.getOrderIndex(),
         question.getTimeLimitSeconds(),
+        displayModeOverride,
+        effectiveDisplayMode,
         options);
   }
 

@@ -188,6 +188,7 @@ public class SessionService {
                       q.getOrderIndex(),
                       q.getTimeLimitSeconds(),
                       q.getPassage() != null ? q.getPassage().getId() : null,
+                      resolveEffectiveDisplayMode(quiz, q),
                       options);
                 })
             .toList();
@@ -207,6 +208,13 @@ public class SessionService {
         passage.getTimerMode().name(),
         passage.getTimeLimitSeconds(),
         subQuestionIds);
+  }
+
+  private String resolveEffectiveDisplayMode(Quiz quiz, dev.hishaam.hermes.entity.Question question) {
+    return (question.getDisplayModeOverride() != null
+            ? question.getDisplayModeOverride()
+            : quiz.getDisplayMode())
+        .name();
   }
 
   private SessionResponse toResponse(QuizSession session) {

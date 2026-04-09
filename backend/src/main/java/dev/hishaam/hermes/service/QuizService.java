@@ -8,6 +8,7 @@ import dev.hishaam.hermes.entity.Event;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
@@ -49,7 +50,12 @@ public class QuizService {
   public QuizResponse createQuiz(Long eventId, CreateQuizRequest request, Long userId) {
     Event event = ownershipService.requireEventOwner(eventId, userId);
     Quiz quiz =
-        Quiz.builder().event(event).title(request.title()).orderIndex(request.orderIndex()).build();
+        Quiz.builder()
+            .event(event)
+            .title(request.title())
+            .orderIndex(request.orderIndex() != null ? request.orderIndex() : 0)
+            .displayMode(request.displayMode() != null ? request.displayMode() : DisplayMode.BLIND)
+            .build();
     return toResponse(quizRepository.save(quiz));
   }
 
@@ -64,7 +70,8 @@ public class QuizService {
     Quiz quiz = ownershipService.requireQuizOwner(quizId, userId);
     checkNoActiveSession(quizId);
     quiz.setTitle(request.title());
-    quiz.setOrderIndex(request.orderIndex());
+    quiz.setOrderIndex(request.orderIndex() != null ? request.orderIndex() : 0);
+    quiz.setDisplayMode(request.displayMode() != null ? request.displayMode() : DisplayMode.BLIND);
     return toResponse(quizRepository.save(quiz));
   }
 
@@ -113,6 +120,7 @@ public class QuizService {
         quiz.getEvent().getId(),
         quiz.getTitle(),
         quiz.getOrderIndex(),
+        quiz.getDisplayMode().name(),
         quiz.getCreatedAt(),
         questions);
   }

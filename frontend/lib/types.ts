@@ -21,6 +21,8 @@ export interface Question {
   text: string;
   orderIndex: number;
   timeLimitSeconds: number;
+  displayModeOverride: string | null;
+  effectiveDisplayMode: string;
   options: Option[];
 }
 
@@ -28,6 +30,7 @@ export interface Quiz {
   id: number;
   title: string;
   orderIndex: number;
+  displayMode: string;
   questions: Question[];
 }
 

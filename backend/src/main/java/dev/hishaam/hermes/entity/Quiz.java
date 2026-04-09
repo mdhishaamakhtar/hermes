@@ -1,5 +1,6 @@
 package dev.hishaam.hermes.entity;
 
+import dev.hishaam.hermes.entity.enums.DisplayMode;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -32,6 +33,11 @@ public class Quiz {
   @Column(name = "order_index", nullable = false)
   private int orderIndex;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "display_mode", nullable = false)
+  @Builder.Default
+  private DisplayMode displayMode = DisplayMode.BLIND;
+
   @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
@@ -50,5 +56,6 @@ public class Quiz {
   @PrePersist
   protected void onCreate() {
     if (createdAt == null) createdAt = OffsetDateTime.now();
+    if (displayMode == null) displayMode = DisplayMode.BLIND;
   }
 }

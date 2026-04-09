@@ -96,7 +96,7 @@ Hermes reads configuration from `src/main/resources/application.yaml`, with envi
 | `SPRING_DATASOURCE_URL`         | `jdbc:postgresql://localhost:5432/hermes` | PostgreSQL connection URL |
 | `SPRING_DATASOURCE_USERNAME`    | `hermes`                                  | PostgreSQL user           |
 | `SPRING_DATASOURCE_PASSWORD`    | `hermes`                                  | PostgreSQL password       |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update`                                  | Hibernate schema strategy |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `create-drop`                             | Hibernate schema strategy |
 
 ### Redis
 

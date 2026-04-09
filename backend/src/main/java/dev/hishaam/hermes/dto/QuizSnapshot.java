@@ -13,6 +13,7 @@ public record QuizSnapshot(
       int orderIndex,
       int timeLimitSeconds,
       Long passageId,
+      String effectiveDisplayMode,
       List<OptionSnapshot> options) {}
 
   public record OptionSnapshot(Long id, String text, int pointValue, int orderIndex) {}

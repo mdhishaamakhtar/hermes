@@ -8,4 +8,6 @@ public record QuestionResponse(
     String text,
     int orderIndex,
     int timeLimitSeconds,
+    String displayModeOverride,
+    String effectiveDisplayMode,
     List<OptionResponse> options) {}

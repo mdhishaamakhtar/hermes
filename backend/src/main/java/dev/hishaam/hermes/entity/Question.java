@@ -1,5 +1,6 @@
 package dev.hishaam.hermes.entity;
 
+import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
@@ -44,6 +45,10 @@ public class Question {
   @Column(name = "question_type", nullable = false)
   @Builder.Default
   private QuestionType questionType = QuestionType.SINGLE_SELECT;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "display_mode_override")
+  private DisplayMode displayModeOverride;
 
   @Column(name = "time_limit_seconds", nullable = false)
   private int timeLimitSeconds;

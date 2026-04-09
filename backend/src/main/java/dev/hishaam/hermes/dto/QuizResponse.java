@@ -8,5 +8,6 @@ public record QuizResponse(
     Long eventId,
     String title,
     int orderIndex,
+    String displayMode,
     OffsetDateTime createdAt,
     List<QuestionResponse> questions) {}

@@ -17,7 +17,7 @@ spring:
       connection-timeout: 30000
   jpa:
     hibernate:
-      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+      ddl-auto: create-drop
     show-sql: false
     properties:
       hibernate:
