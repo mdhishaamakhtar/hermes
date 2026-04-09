@@ -53,7 +53,9 @@ public class PassageService {
                     ? request.timerMode()
                     : PassageTimerMode.PER_SUB_QUESTION)
             .timeLimitSeconds(
-                (request.timerMode() != null ? request.timerMode() : PassageTimerMode.PER_SUB_QUESTION)
+                (request.timerMode() != null
+                            ? request.timerMode()
+                            : PassageTimerMode.PER_SUB_QUESTION)
                         == PassageTimerMode.ENTIRE_PASSAGE
                     ? request.timeLimitSeconds()
                     : null)
@@ -109,7 +111,8 @@ public class PassageService {
     if (request.subQuestions().isEmpty()) {
       throw AppException.badRequest("Passage must have at least 1 sub-question");
     }
-    validatePassageLevelOrderIndex(quiz, request.orderIndex() != null ? request.orderIndex() : 0, null);
+    validatePassageLevelOrderIndex(
+        quiz, request.orderIndex() != null ? request.orderIndex() : 0, null);
     validatePassageTimerMode(timerMode, request.timeLimitSeconds());
 
     long uniqueSubQuestionOrders =
@@ -118,7 +121,8 @@ public class PassageService {
             .distinct()
             .count();
     if (uniqueSubQuestionOrders != request.subQuestions().size()) {
-      throw AppException.badRequest("Sub-question orderIndex values must be unique within the passage");
+      throw AppException.badRequest(
+          "Sub-question orderIndex values must be unique within the passage");
     }
   }
 
@@ -126,7 +130,9 @@ public class PassageService {
     PassageTimerMode timerMode =
         request.timerMode() != null ? request.timerMode() : PassageTimerMode.PER_SUB_QUESTION;
     validatePassageLevelOrderIndex(
-        passage.getQuiz(), request.orderIndex() != null ? request.orderIndex() : 0, passage.getId());
+        passage.getQuiz(),
+        request.orderIndex() != null ? request.orderIndex() : 0,
+        passage.getId());
     validatePassageTimerMode(timerMode, request.timeLimitSeconds());
   }
 

@@ -1,7 +1,9 @@
 package dev.hishaam.hermes.dto;
 
+import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 public record QuizSnapshot(
     Long quizId, String title, List<QuestionSnapshot> questions, List<PassageSnapshot> passages) {
@@ -14,7 +16,8 @@ public record QuizSnapshot(
       int timeLimitSeconds,
       Long passageId,
       String effectiveDisplayMode,
-      List<OptionSnapshot> options) {}
+      List<OptionSnapshot> options,
+      OffsetDateTime correctedAt) {}
 
   public record OptionSnapshot(Long id, String text, int pointValue, int orderIndex) {}
 
@@ -70,5 +73,41 @@ public record QuizSnapshot(
     QuestionSnapshot target = findQuestion(questionId);
     if (target == null) return -1;
     return (int) questions.stream().filter(q -> q.orderIndex() <= target.orderIndex()).count();
+  }
+
+  /**
+   * Returns a new QuizSnapshot with the point values of the specified question's options replaced
+   * by the provided map. Options not present in the map keep their original point values.
+   */
+  public QuizSnapshot withCorrectedScoring(
+      Long questionId, Map<Long, Integer> newPointValues, OffsetDateTime correctedAt) {
+    List<QuestionSnapshot> updatedQuestions =
+        questions.stream()
+            .map(
+                q -> {
+                  if (!q.id().equals(questionId)) return q;
+                  List<OptionSnapshot> updatedOptions =
+                      q.options().stream()
+                          .map(
+                              o ->
+                                  new OptionSnapshot(
+                                      o.id(),
+                                      o.text(),
+                                      newPointValues.getOrDefault(o.id(), o.pointValue()),
+                                      o.orderIndex()))
+                          .toList();
+                  return new QuestionSnapshot(
+                      q.id(),
+                      q.text(),
+                      q.questionType(),
+                      q.orderIndex(),
+                      q.timeLimitSeconds(),
+                      q.passageId(),
+                      q.effectiveDisplayMode(),
+                      updatedOptions,
+                      correctedAt);
+                })
+            .toList();
+    return new QuizSnapshot(quizId, title, updatedQuestions, passages);
   }
 }

@@ -46,6 +46,15 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
       nativeQuery = true)
   void deleteSelectionsBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
 
+  @Query("SELECT a FROM ParticipantAnswer a WHERE a.sessionId = :sessionId AND a.score IS NOT NULL")
+  List<ParticipantAnswer> findGradedBySessionId(@Param("sessionId") Long sessionId);
+
+  @Query(
+      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions"
+          + " WHERE a.sessionId = :sessionId AND a.questionId = :questionId AND a.frozenAt IS NOT NULL")
+  List<ParticipantAnswer> findFrozenBySessionIdAndQuestionId(
+      @Param("sessionId") Long sessionId, @Param("questionId") Long questionId);
+
   @Modifying
   @Query(
       "UPDATE ParticipantAnswer a SET a.frozenAt = :frozenAt"

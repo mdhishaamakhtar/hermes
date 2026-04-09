@@ -4,6 +4,7 @@ import dev.hishaam.hermes.dto.QuizSnapshot;
 import dev.hishaam.hermes.dto.SessionResultsResponse;
 import dev.hishaam.hermes.entity.SessionStatus;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +182,38 @@ public class SessionLiveStateService {
     redis.expire(redisHelper.leaderboardKey(sid), SessionRedisHelper.SESSION_TTL);
   }
 
+  public void incrementLeaderboardScore(String sid, Long participantId, long deltaPoints) {
+    redis
+        .opsForZSet()
+        .incrementScore(redisHelper.leaderboardKey(sid), participantId.toString(), deltaPoints);
+  }
+
+  /** Replaces a participant's leaderboard score (used during regrading). */
+  public void setLeaderboardScore(String sid, Long participantId, long newScore) {
+    redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), newScore);
+  }
+
+  public void recordTimerStartedAt(String sid, long epochMillis) {
+    redis
+        .opsForValue()
+        .set(
+            redisHelper.timerStartedAtKey(sid),
+            String.valueOf(epochMillis),
+            SessionRedisHelper.SESSION_TTL);
+  }
+
+  public Long getTimerStartedAt(String sid) {
+    String val = redis.opsForValue().get(redisHelper.timerStartedAtKey(sid));
+    return val != null ? Long.parseLong(val) : null;
+  }
+
+  public void incrementCumulativeTime(String sid, Long participantId, long millis) {
+    redis
+        .opsForHash()
+        .increment(redisHelper.cumulativeTimeKey(sid), participantId.toString(), millis);
+    redis.expire(redisHelper.cumulativeTimeKey(sid), SessionRedisHelper.SESSION_TTL);
+  }
+
   public List<SessionResultsResponse.LeaderboardEntry> buildLeaderboard(String sid) {
     Set<ZSetOperations.TypedTuple<String>> data =
         redis.opsForZSet().reverseRangeWithScores(redisHelper.leaderboardKey(sid), 0, -1);
@@ -189,8 +222,23 @@ public class SessionLiveStateService {
     }
 
     Map<Object, Object> namesMap = redis.opsForHash().entries(redisHelper.participantNamesKey(sid));
+    Map<Object, Object> timesMap = redis.opsForHash().entries(redisHelper.cumulativeTimeKey(sid));
+
+    // Sort by score desc, then cumulative time asc as tiebreaker
+    List<ZSetOperations.TypedTuple<String>> sorted =
+        data.stream()
+            .sorted(
+                Comparator.<ZSetOperations.TypedTuple<String>>comparingDouble(
+                        t -> -(t.getScore() != null ? t.getScore() : 0.0))
+                    .thenComparingLong(
+                        t -> {
+                          Object val = timesMap.get(t.getValue());
+                          return val != null ? Long.parseLong(val.toString()) : 0L;
+                        }))
+            .toList();
+
     AtomicLong rank = new AtomicLong(1);
-    return data.stream()
+    return sorted.stream()
         .map(
             tuple -> {
               Long participantId = Long.parseLong(Objects.requireNonNull(tuple.getValue()));
@@ -306,6 +354,8 @@ public class SessionLiveStateService {
             redisHelper.leaderboardKey(sid),
             redisHelper.participantNamesKey(sid),
             redisHelper.questionStateKey(sid),
-            redisHelper.currentPassageKey(sid)));
+            redisHelper.currentPassageKey(sid),
+            redisHelper.timerStartedAtKey(sid),
+            redisHelper.cumulativeTimeKey(sid)));
   }
 }

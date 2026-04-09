@@ -51,7 +51,8 @@ public class ParticipantService {
 
   @Transactional
   public JoinResponse joinSession(JoinSessionRequest request) {
-    String sessionIdStr = liveStateService.getSessionIdForJoinCode(request.joinCode().toUpperCase());
+    String sessionIdStr =
+        liveStateService.getSessionIdForJoinCode(request.joinCode().toUpperCase());
     if (sessionIdStr == null) {
       throw AppException.notFound("Invalid or expired join code");
     }

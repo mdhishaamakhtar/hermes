@@ -2,6 +2,7 @@ package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.*;
 import dev.hishaam.hermes.entity.Passage;
+import dev.hishaam.hermes.entity.Question;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
@@ -14,6 +15,8 @@ import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ public class SessionService {
   private final SessionCodeService sessionCodeService;
   private final SessionEngine engine;
   private final SessionTimerScheduler timerScheduler;
+  private final GradingService gradingService;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -41,7 +45,8 @@ public class SessionService {
       SessionLiveStateService liveStateService,
       SessionCodeService sessionCodeService,
       SessionEngine engine,
-      SessionTimerScheduler timerScheduler) {
+      SessionTimerScheduler timerScheduler,
+      GradingService gradingService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.questionRepository = questionRepository;
@@ -52,6 +57,7 @@ public class SessionService {
     this.sessionCodeService = sessionCodeService;
     this.engine = engine;
     this.timerScheduler = timerScheduler;
+    this.gradingService = gradingService;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -179,6 +185,45 @@ public class SessionService {
         session.getStatus().name(), participantCount, session.getJoinCode());
   }
 
+  // ─── Answer correction ────────────────────────────────────────────────────────
+
+  @Transactional
+  public void correctScoring(
+      Long sessionId, Long questionId, ScoringCorrectionRequest request, Long userId) {
+    QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
+    String sid = sessionId.toString();
+
+    // Allow correction during REVIEWING state or after session ends
+    if (session.getStatus() == SessionStatus.ACTIVE) {
+      String questionState = liveStateService.getQuestionState(sid);
+      if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
+        throw AppException.conflict(
+            "Scoring can only be corrected while reviewing or after session ends");
+      }
+    } else if (session.getStatus() != SessionStatus.ENDED) {
+      throw AppException.conflict(
+          "Scoring can only be corrected while reviewing or after session ends");
+    }
+
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+    if (snapshot.findQuestion(questionId) == null) {
+      throw AppException.notFound("Question not found in session snapshot");
+    }
+
+    Map<Long, Integer> newPointValues =
+        request.options().stream()
+            .collect(
+                Collectors.toMap(
+                    ScoringCorrectionRequest.OptionScoring::optionId,
+                    ScoringCorrectionRequest.OptionScoring::pointValue));
+
+    QuizSnapshot updated =
+        snapshot.withCorrectedScoring(questionId, newPointValues, OffsetDateTime.now());
+    snapshotService.updateSnapshot(sid, sessionId, updated);
+
+    gradingService.regradeQuestion(sessionId, questionId);
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
   private QuizSnapshot buildSnapshot(Quiz quiz) {
@@ -201,7 +246,8 @@ public class SessionService {
                       q.getTimeLimitSeconds(),
                       q.getPassage() != null ? q.getPassage().getId() : null,
                       resolveEffectiveDisplayMode(quiz, q),
-                      options);
+                      options,
+                      null);
                 })
             .toList();
     List<QuizSnapshot.PassageSnapshot> passages =
@@ -220,8 +266,7 @@ public class SessionService {
         subQuestionIds);
   }
 
-  private String resolveEffectiveDisplayMode(
-      Quiz quiz, dev.hishaam.hermes.entity.Question question) {
+  private String resolveEffectiveDisplayMode(Quiz quiz, Question question) {
     return (question.getDisplayModeOverride() != null
             ? question.getDisplayModeOverride()
             : quiz.getDisplayMode())

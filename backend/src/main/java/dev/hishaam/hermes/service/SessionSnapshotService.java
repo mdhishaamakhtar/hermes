@@ -44,6 +44,19 @@ public class SessionSnapshotService {
     }
   }
 
+  /** Persists the updated snapshot to both Redis and PostgreSQL. */
+  public void updateSnapshot(String sid, Long sessionId, QuizSnapshot updated) {
+    String json = serialize(updated);
+    redis.opsForValue().set(redisHelper.snapshotKey(sid), json, SessionRedisHelper.SESSION_TTL);
+    sessionRepository
+        .findById(sessionId)
+        .ifPresent(
+            session -> {
+              session.setSnapshot(json);
+              sessionRepository.save(session);
+            });
+  }
+
   public QuizSnapshot loadSnapshot(String sid) {
     String json = redis.opsForValue().get(redisHelper.snapshotKey(sid));
     if (json == null || json.isEmpty()) {

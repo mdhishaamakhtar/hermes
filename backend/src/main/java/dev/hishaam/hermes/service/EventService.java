@@ -82,9 +82,7 @@ public class EventService {
     List<Long> quizIds = event.getQuizzes().stream().map(Quiz::getId).toList();
     if (!quizIds.isEmpty()) {
       List<Long> sessionIds =
-          sessionRepository.findByQuizIdIn(quizIds).stream()
-              .map(QuizSession::getId)
-              .toList();
+          sessionRepository.findByQuizIdIn(quizIds).stream().map(QuizSession::getId).toList();
       if (!sessionIds.isEmpty()) {
         participantAnswerRepository.deleteSelectionsBySessionIdIn(sessionIds);
         participantAnswerRepository.deleteBySessionIdIn(sessionIds);

@@ -116,10 +116,7 @@ public class SessionResultsService {
                               .orElse(null)
                           : null;
                   QuizSnapshot.OptionSnapshot correct =
-                      q.options().stream()
-                          .filter(o -> o.pointValue() > 0)
-                          .findFirst()
-                          .orElse(null);
+                      q.options().stream().filter(o -> o.pointValue() > 0).findFirst().orElse(null);
                   boolean isCorrect = isCorrectSelection(ans, q);
                   return new MyResultsResponse.QuestionResult(
                       q.id(),
@@ -170,10 +167,10 @@ public class SessionResultsService {
                       .filter(a -> a.getQuestionId().equals(q.id()))
                       .forEach(
                           answer ->
-                              answer.getSelectedOptions()
+                              answer
+                                  .getSelectedOptions()
                                   .forEach(
-                                      option ->
-                                          optionCounts.merge(option.getId(), 1L, Long::sum)));
+                                      option -> optionCounts.merge(option.getId(), 1L, Long::sum)));
 
                   long totalAnswers =
                       optionCounts.values().stream().mapToLong(Long::longValue).sum();

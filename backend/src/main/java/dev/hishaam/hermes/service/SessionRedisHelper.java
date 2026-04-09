@@ -71,6 +71,14 @@ public class SessionRedisHelper {
     return key(sid, "current_passage");
   }
 
+  public String timerStartedAtKey(String sid) {
+    return key(sid, "timer_started_at");
+  }
+
+  public String cumulativeTimeKey(String sid) {
+    return key(sid, "cumulative_time");
+  }
+
   public String joinCodeKey(String joinCode) {
     return "joincode:" + joinCode;
   }

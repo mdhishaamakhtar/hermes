@@ -56,4 +56,8 @@ public class ParticipantAnswer {
 
   @Column(name = "answered_at")
   private OffsetDateTime answeredAt;
+
+  /** Computed by the grading engine after the question is frozen. Null until graded. */
+  @Column(name = "score")
+  private Integer score;
 }

@@ -13,10 +13,14 @@ public final class WsPayloads {
     TIMER_START,
     QUESTION_FROZEN,
     PASSAGE_FROZEN,
+    QUESTION_REVIEWED,
+    PARTICIPANT_LEADERBOARD,
     SESSION_END,
     PARTICIPANT_JOINED,
     ANSWER_UPDATE,
-    LEADERBOARD_UPDATE
+    ANSWER_REVEAL,
+    LEADERBOARD_UPDATE,
+    SCORING_CORRECTED
   }
 
   // ─── Question lifecycle events ────────────────────────────────────────────────
@@ -29,7 +33,8 @@ public final class WsPayloads {
       List<Option> options,
       int questionIndex,
       int totalQuestions,
-      PassageContext passage) {
+      PassageContext passage,
+      String effectiveDisplayMode) {
     public QuestionDisplayed(
         Long questionId,
         String text,
@@ -37,7 +42,8 @@ public final class WsPayloads {
         List<Option> options,
         int questionIndex,
         int totalQuestions,
-        PassageContext passage) {
+        PassageContext passage,
+        String effectiveDisplayMode) {
       this(
           EventType.QUESTION_DISPLAYED,
           questionId,
@@ -46,7 +52,8 @@ public final class WsPayloads {
           options,
           questionIndex,
           totalQuestions,
-          passage);
+          passage,
+          effectiveDisplayMode);
     }
   }
 
@@ -60,20 +67,23 @@ public final class WsPayloads {
       String passageText,
       List<SubQuestion> subQuestions,
       int questionIndex,
-      int totalQuestions) {
+      int totalQuestions,
+      String effectiveDisplayMode) {
     public PassageDisplayed(
         Long passageId,
         String passageText,
         List<SubQuestion> subQuestions,
         int questionIndex,
-        int totalQuestions) {
+        int totalQuestions,
+        String effectiveDisplayMode) {
       this(
           EventType.PASSAGE_DISPLAYED,
           passageId,
           passageText,
           subQuestions,
           questionIndex,
-          totalQuestions);
+          totalQuestions,
+          effectiveDisplayMode);
     }
   }
 
@@ -103,6 +113,33 @@ public final class WsPayloads {
       this(EventType.PASSAGE_FROZEN, passageId, subQuestionIds);
     }
   }
+
+  // ─── Grading events ───────────────────────────────────────────────────────────
+
+  /**
+   * Broadcast after a question is graded. Clients compute their own score from local selections +
+   * optionPoints map. correctOptionIds contains all options with pointValue > 0.
+   */
+  public record QuestionReviewed(
+      EventType event,
+      Long questionId,
+      List<Long> correctOptionIds,
+      Map<Long, Integer> optionPoints) {
+    public QuestionReviewed(
+        Long questionId, List<Long> correctOptionIds, Map<Long, Integer> optionPoints) {
+      this(EventType.QUESTION_REVIEWED, questionId, correctOptionIds, optionPoints);
+    }
+  }
+
+  /** Top-5 leaderboard broadcast to all participants after each question is reviewed. */
+  public record ParticipantLeaderboard(
+      EventType event, List<ParticipantLeaderboardEntry> top, long totalParticipants) {
+    public ParticipantLeaderboard(List<ParticipantLeaderboardEntry> top, long totalParticipants) {
+      this(EventType.PARTICIPANT_LEADERBOARD, top, totalParticipants);
+    }
+  }
+
+  public record ParticipantLeaderboardEntry(int rank, String displayName, long score) {}
 
   // ─── Session lifecycle ────────────────────────────────────────────────────────
 
@@ -157,6 +194,39 @@ public final class WsPayloads {
       EventType event, List<SessionResultsResponse.LeaderboardEntry> leaderboard) {
     public LeaderboardUpdate(List<SessionResultsResponse.LeaderboardEntry> leaderboard) {
       this(EventType.LEADERBOARD_UPDATE, leaderboard);
+    }
+  }
+
+  /**
+   * Sent after grading in BLIND/CODE_DISPLAY modes to reveal the full answer distribution. Clients
+   * use this to display the final counts the host was not shown during the TIMED state.
+   */
+  public record AnswerReveal(
+      EventType event,
+      Long questionId,
+      Map<Long, Long> counts,
+      long totalAnswered,
+      long totalParticipants) {
+    public AnswerReveal(
+        Long questionId, Map<Long, Long> counts, long totalAnswered, long totalParticipants) {
+      this(EventType.ANSWER_REVEAL, questionId, counts, totalAnswered, totalParticipants);
+    }
+  }
+
+  // ─── Scoring correction ───────────────────────────────────────────────────────
+
+  /**
+   * Broadcast after a host corrects option point values. Clients recalculate their score for this
+   * question using local selection state + the new optionPoints map.
+   */
+  public record ScoringCorrected(
+      EventType event,
+      Long questionId,
+      List<Long> correctOptionIds,
+      Map<Long, Integer> optionPoints) {
+    public ScoringCorrected(
+        Long questionId, List<Long> correctOptionIds, Map<Long, Integer> optionPoints) {
+      this(EventType.SCORING_CORRECTED, questionId, correctOptionIds, optionPoints);
     }
   }
 

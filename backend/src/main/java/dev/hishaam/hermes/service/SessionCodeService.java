@@ -32,9 +32,7 @@ public class SessionCodeService {
           redis
               .opsForValue()
               .setIfAbsent(
-                  redisHelper.joinCodeKey(candidate),
-                  "reserving",
-                  SessionRedisHelper.SESSION_TTL);
+                  redisHelper.joinCodeKey(candidate), "reserving", SessionRedisHelper.SESSION_TTL);
       if (Boolean.TRUE.equals(reserved)) {
         return candidate;
       }

@@ -127,4 +127,15 @@ public class SessionController {
     answerService.lockInAnswer(id, request);
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
+
+  @PatchMapping("/{id}/questions/{questionId}/scoring")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<Void>> correctScoring(
+      @PathVariable Long id,
+      @PathVariable Long questionId,
+      @Valid @RequestBody ScoringCorrectionRequest request,
+      @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.correctScoring(id, questionId, request, user.getId());
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
 }

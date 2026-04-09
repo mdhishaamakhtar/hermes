@@ -10,6 +10,7 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -33,6 +34,7 @@ public class SessionEngine {
   private final SessionLiveStateService liveStateService;
   private final SimpMessagingTemplate messaging;
   private final SessionTimerScheduler timerScheduler;
+  private final GradingService gradingService;
 
   public SessionEngine(
       QuizSessionRepository sessionRepository,
@@ -41,7 +43,8 @@ public class SessionEngine {
       SessionSnapshotService snapshotService,
       SessionLiveStateService liveStateService,
       SimpMessagingTemplate messaging,
-      SessionTimerScheduler timerScheduler) {
+      SessionTimerScheduler timerScheduler,
+      GradingService gradingService) {
     this.sessionRepository = sessionRepository;
     this.questionRepository = questionRepository;
     this.answerRepository = answerRepository;
@@ -49,6 +52,7 @@ public class SessionEngine {
     this.liveStateService = liveStateService;
     this.messaging = messaging;
     this.timerScheduler = timerScheduler;
+    this.gradingService = gradingService;
   }
 
   // ─── Advance to next question (called by host pressing "Next" from REVIEWING) ─
@@ -119,6 +123,7 @@ public class SessionEngine {
 
       liveStateService.setQuestionState(sid, QuestionLifecycleState.TIMED.name());
       liveStateService.setTimer(sid, passage.timeLimitSeconds());
+      liveStateService.recordTimerStartedAt(sid, Instant.now().toEpochMilli());
 
       messaging.convertAndSend(
           "/topic/session." + sessionId + ".question",
@@ -143,6 +148,7 @@ public class SessionEngine {
 
       liveStateService.setQuestionState(sid, QuestionLifecycleState.TIMED.name());
       liveStateService.setTimer(sid, question.timeLimitSeconds());
+      liveStateService.recordTimerStartedAt(sid, Instant.now().toEpochMilli());
 
       messaging.convertAndSend(
           "/topic/session." + sessionId + ".question",
@@ -170,7 +176,7 @@ public class SessionEngine {
     String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
 
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
-      // ENTIRE_PASSAGE mode — freeze all sub-questions
+      // ENTIRE_PASSAGE mode — freeze all sub-questions, then grade passage
       Long passageId = Long.parseLong(currentPassageIdStr);
       QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
@@ -183,6 +189,8 @@ public class SessionEngine {
           "/topic/session." + sessionId + ".question",
           new WsPayloads.PassageFrozen(passageId, subQuestionIds));
 
+      gradingService.gradePassage(sessionId, passageId);
+
     } else {
       // Standalone / PER_SUB_QUESTION question
       if (currentQIdStr != null && !currentQIdStr.isEmpty()) {
@@ -191,10 +199,11 @@ public class SessionEngine {
 
         messaging.convertAndSend(
             "/topic/session." + sessionId + ".question", new WsPayloads.QuestionFrozen(questionId));
+
+        gradingService.gradeQuestion(sessionId, questionId);
       }
     }
 
-    // Transition to REVIEWING — grading will be added in step 07
     liveStateService.setQuestionState(sid, QuestionLifecycleState.REVIEWING.name());
   }
 
@@ -287,7 +296,8 @@ public class SessionEngine {
             options,
             questionIndex,
             totalQuestions,
-            passageContext));
+            passageContext,
+            question.effectiveDisplayMode()));
   }
 
   // ─── Leaderboard broadcast (shared with AnswerService) ────────────────────────
@@ -309,10 +319,21 @@ public class SessionEngine {
       long totalAnswered,
       long totalParticipants,
       long totalLockedIn) {
+    String sid = sessionId.toString();
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
+    String mode = question != null ? question.effectiveDisplayMode() : "LIVE";
+
+    if ("CODE_DISPLAY".equals(mode)) {
+      // Suppress entirely during TIMED state
+      return;
+    }
+
+    Map<Long, Long> broadcastCounts = "BLIND".equals(mode) ? Map.of() : counts;
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".analytics",
         new WsPayloads.AnswerUpdate(
-            questionId, counts, totalAnswered, totalParticipants, totalLockedIn));
+            questionId, broadcastCounts, totalAnswered, totalParticipants, totalLockedIn));
   }
 
   // ─── Passage display helpers ──────────────────────────────────────────────────
@@ -349,10 +370,20 @@ public class SessionEngine {
                 })
             .toList();
 
+    // Use the first sub-question's effective display mode for the passage (sub-questions share
+    // mode)
+    String effectiveDisplayMode =
+        subQuestions.isEmpty() ? "LIVE" : subQuestions.get(0).effectiveDisplayMode();
+
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".question",
         new WsPayloads.PassageDisplayed(
-            passage.id(), passage.text(), wsSubQuestions, questionIndex, totalQuestions));
+            passage.id(),
+            passage.text(),
+            wsSubQuestions,
+            questionIndex,
+            totalQuestions,
+            effectiveDisplayMode));
   }
 
   private QuizSnapshot.QuestionSnapshot findLastSubQuestion(

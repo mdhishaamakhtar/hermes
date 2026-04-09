@@ -104,10 +104,7 @@ public class QuestionService {
             .map(
                 o ->
                     new OptionResponse(
-                        o.getId(),
-                        o.getText(),
-                        o.getOrderIndex(),
-                        o.getPointValue()))
+                        o.getId(), o.getText(), o.getOrderIndex(), o.getPointValue()))
             .toList();
     String displayModeOverride =
         question.getDisplayModeOverride() != null ? question.getDisplayModeOverride().name() : null;
@@ -187,7 +184,8 @@ public class QuestionService {
     if (optionRequests.size() < 2) {
       throw AppException.badRequest("Questions must have at least 2 options");
     }
-    if (optionRequests.stream().anyMatch(o -> o.normalizedText() == null || o.normalizedText().isBlank())) {
+    if (optionRequests.stream()
+        .anyMatch(o -> o.normalizedText() == null || o.normalizedText().isBlank())) {
       throw AppException.badRequest("Option text is required");
     }
 
@@ -225,7 +223,8 @@ public class QuestionService {
     validatePassageLevelOrderIndex(passage, orderIndex, currentQuestionId);
   }
 
-  private int resolveTimeLimitSeconds(Passage passage, Integer requestTimeLimitSeconds, boolean passageSubQuestion) {
+  private int resolveTimeLimitSeconds(
+      Passage passage, Integer requestTimeLimitSeconds, boolean passageSubQuestion) {
     if (!passageSubQuestion || passage == null) {
       if (requestTimeLimitSeconds == null) {
         throw AppException.badRequest("Questions must define timeLimitSeconds");
@@ -258,7 +257,8 @@ public class QuestionService {
     }
   }
 
-  private void validatePassageLevelOrderIndex(Passage passage, int orderIndex, Long currentQuestionId) {
+  private void validatePassageLevelOrderIndex(
+      Passage passage, int orderIndex, Long currentQuestionId) {
     boolean clashes =
         passage.getSubQuestions().stream()
             .filter(q -> currentQuestionId == null || !q.getId().equals(currentQuestionId))
