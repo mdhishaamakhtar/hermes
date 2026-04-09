@@ -35,7 +35,7 @@ public class SessionTimeoutJob implements Job {
         return;
       }
 
-      sessionEngine.advanceSessionInternal(sessionId);
+      sessionEngine.onTimerExpired(sessionId);
     } catch (Exception e) {
       throw new JobExecutionException("Failed to execute session timeout job", e);
     }

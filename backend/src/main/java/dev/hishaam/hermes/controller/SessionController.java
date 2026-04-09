@@ -3,8 +3,8 @@ package dev.hishaam.hermes.controller;
 import dev.hishaam.hermes.dto.*;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.security.AuthenticatedUser;
-import dev.hishaam.hermes.service.ParticipantService;
 import dev.hishaam.hermes.service.AnswerService;
+import dev.hishaam.hermes.service.ParticipantService;
 import dev.hishaam.hermes.service.SessionResultsService;
 import dev.hishaam.hermes.service.SessionService;
 import jakarta.validation.Valid;
@@ -48,6 +48,14 @@ public class SessionController {
   public ResponseEntity<ApiResponse<Void>> startSession(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.startSession(id, user.getId());
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
+
+  @PostMapping("/{id}/start-timer")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<Void>> startTimer(
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.startTimer(id, user.getId());
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 

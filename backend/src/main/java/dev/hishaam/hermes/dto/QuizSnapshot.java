@@ -30,6 +30,10 @@ public record QuizSnapshot(
     return questions.stream().filter(q -> q.id().equals(questionId)).findFirst().orElse(null);
   }
 
+  public PassageSnapshot findPassage(Long passageId) {
+    return passages.stream().filter(p -> p.id().equals(passageId)).findFirst().orElse(null);
+  }
+
   public QuestionSnapshot findNextQuestion(Long currentQuestionId) {
     if (currentQuestionId == null) {
       return questions.stream()
@@ -40,6 +44,23 @@ public record QuizSnapshot(
     if (current == null) return null;
     return questions.stream()
         .filter(q -> q.orderIndex() > current.orderIndex())
+        .min(Comparator.comparingInt(QuestionSnapshot::orderIndex))
+        .orElse(null);
+  }
+
+  /**
+   * Finds the first question whose orderIndex is greater than the highest orderIndex of any
+   * sub-question in the given passage. Used to advance past an ENTIRE_PASSAGE unit.
+   */
+  public QuestionSnapshot findNextAfterPassage(Long passageId) {
+    int maxPassageOrderIndex =
+        questions.stream()
+            .filter(q -> passageId.equals(q.passageId()))
+            .mapToInt(QuestionSnapshot::orderIndex)
+            .max()
+            .orElse(0);
+    return questions.stream()
+        .filter(q -> q.orderIndex() > maxPassageOrderIndex)
         .min(Comparator.comparingInt(QuestionSnapshot::orderIndex))
         .orElse(null);
   }

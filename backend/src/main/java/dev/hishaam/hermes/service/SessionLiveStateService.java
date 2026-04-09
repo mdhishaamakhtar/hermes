@@ -87,6 +87,33 @@ public class SessionLiveStateService {
             SessionRedisHelper.SESSION_TTL);
   }
 
+  public void setQuestionState(String sid, String state) {
+    redis
+        .opsForValue()
+        .set(redisHelper.questionStateKey(sid), state, SessionRedisHelper.SESSION_TTL);
+  }
+
+  public String getQuestionState(String sid) {
+    return redis.opsForValue().get(redisHelper.questionStateKey(sid));
+  }
+
+  public void setCurrentPassage(String sid, Long passageId) {
+    redis
+        .opsForValue()
+        .set(
+            redisHelper.currentPassageKey(sid),
+            passageId.toString(),
+            SessionRedisHelper.SESSION_TTL);
+  }
+
+  public String getCurrentPassageId(String sid) {
+    return redis.opsForValue().get(redisHelper.currentPassageKey(sid));
+  }
+
+  public void clearCurrentPassage(String sid) {
+    redis.delete(redisHelper.currentPassageKey(sid));
+  }
+
   public String getStatus(String sid) {
     return redis.opsForValue().get(redisHelper.statusKey(sid));
   }
@@ -99,14 +126,19 @@ public class SessionLiveStateService {
     redis.opsForValue().set(redisHelper.currentQuestionKey(sid), questionId.toString());
   }
 
+  /** Resets current_question to empty so the next advance finds the first question. */
+  public void clearCurrentQuestion(String sid) {
+    redis
+        .opsForValue()
+        .set(redisHelper.currentQuestionKey(sid), "", SessionRedisHelper.SESSION_TTL);
+  }
+
   public void clearTimer(String sid) {
     redis.delete(redisHelper.timerKey(sid));
   }
 
   public void setTimer(String sid, int timeLimitSeconds) {
-    redis
-        .opsForValue()
-        .set(redisHelper.timerKey(sid), "1", Duration.ofSeconds(timeLimitSeconds));
+    redis.opsForValue().set(redisHelper.timerKey(sid), "1", Duration.ofSeconds(timeLimitSeconds));
   }
 
   public Long getTimerTtlSeconds(String sid) {
@@ -138,7 +170,9 @@ public class SessionLiveStateService {
   }
 
   public void cacheParticipantName(String sid, Long participantId, String displayName) {
-    redis.opsForHash().put(redisHelper.participantNamesKey(sid), participantId.toString(), displayName);
+    redis
+        .opsForHash()
+        .put(redisHelper.participantNamesKey(sid), participantId.toString(), displayName);
     redis.expire(redisHelper.participantNamesKey(sid), SessionRedisHelper.SESSION_TTL);
   }
 
@@ -180,11 +214,15 @@ public class SessionLiveStateService {
 
   public Set<Long> getParticipantSelectionIds(String sid, Long questionId, Long participantId) {
     Set<String> raw =
-        redis.opsForSet().members(redisHelper.participantSelectionKey(sid, questionId, participantId));
+        redis
+            .opsForSet()
+            .members(redisHelper.participantSelectionKey(sid, questionId, participantId));
     if (raw == null || raw.isEmpty()) {
       return Set.of();
     }
-    return raw.stream().map(Long::parseLong).collect(java.util.LinkedHashSet::new, Set::add, Set::addAll);
+    return raw.stream()
+        .map(Long::parseLong)
+        .collect(java.util.LinkedHashSet::new, Set::add, Set::addAll);
   }
 
   public void replaceParticipantSelections(
@@ -206,7 +244,9 @@ public class SessionLiveStateService {
 
     redis.delete(selectionKey);
     if (!nextSelectionIds.isEmpty()) {
-      redis.opsForSet().add(selectionKey, nextSelectionIds.stream().map(String::valueOf).toArray(String[]::new));
+      redis
+          .opsForSet()
+          .add(selectionKey, nextSelectionIds.stream().map(String::valueOf).toArray(String[]::new));
       redis.expire(selectionKey, SessionRedisHelper.SESSION_TTL);
       redis.opsForSet().add(answeredKey, participantId.toString());
       redis.expire(answeredKey, SessionRedisHelper.SESSION_TTL);
@@ -216,10 +256,12 @@ public class SessionLiveStateService {
   }
 
   public Map<Long, Long> getQuestionCounts(String sid, Long questionId) {
-    Map<Object, Object> rawCounts = redis.opsForHash().entries(redisHelper.questionCountsKey(sid, questionId));
+    Map<Object, Object> rawCounts =
+        redis.opsForHash().entries(redisHelper.questionCountsKey(sid, questionId));
     Map<Long, Long> counts = new LinkedHashMap<>();
     rawCounts.forEach(
-        (key, value) -> counts.put(Long.parseLong(key.toString()), Long.parseLong(value.toString())));
+        (key, value) ->
+            counts.put(Long.parseLong(key.toString()), Long.parseLong(value.toString())));
     return counts;
   }
 
@@ -229,7 +271,9 @@ public class SessionLiveStateService {
   }
 
   public void markLockedIn(String sid, Long questionId, Long participantId) {
-    redis.opsForSet().add(redisHelper.questionLockedInKey(sid, questionId), participantId.toString());
+    redis
+        .opsForSet()
+        .add(redisHelper.questionLockedInKey(sid, questionId), participantId.toString());
     redis.expire(redisHelper.questionLockedInKey(sid, questionId), SessionRedisHelper.SESSION_TTL);
   }
 
@@ -241,13 +285,15 @@ public class SessionLiveStateService {
   public void cleanupSessionKeys(String sid, QuizSnapshot snapshot, String joinCode) {
     redis.delete(redisHelper.joinCodeKey(joinCode));
 
-    snapshot.questions().forEach(
-        q ->
-            redis.delete(
-                List.of(
-                    redisHelper.questionCountsKey(sid, q.id()),
-                    redisHelper.questionAnsweredKey(sid, q.id()),
-                    redisHelper.questionLockedInKey(sid, q.id()))));
+    snapshot
+        .questions()
+        .forEach(
+            q ->
+                redis.delete(
+                    List.of(
+                        redisHelper.questionCountsKey(sid, q.id()),
+                        redisHelper.questionAnsweredKey(sid, q.id()),
+                        redisHelper.questionLockedInKey(sid, q.id()))));
 
     redis.delete(
         List.of(
@@ -258,6 +304,8 @@ public class SessionLiveStateService {
             redisHelper.questionSequenceKey(sid),
             redisHelper.timerKey(sid),
             redisHelper.leaderboardKey(sid),
-            redisHelper.participantNamesKey(sid)));
+            redisHelper.participantNamesKey(sid),
+            redisHelper.questionStateKey(sid),
+            redisHelper.currentPassageKey(sid)));
   }
 }

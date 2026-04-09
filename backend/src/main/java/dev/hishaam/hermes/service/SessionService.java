@@ -5,6 +5,7 @@ import dev.hishaam.hermes.entity.Passage;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
@@ -110,10 +111,32 @@ public class SessionService {
     sessionRepository.save(session);
 
     String sid = sessionId.toString();
+
+    // Check if the first question belongs to an ENTIRE_PASSAGE passage
+    if (first.passageId() != null) {
+      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(first.passageId());
+      if (passage != null && "ENTIRE_PASSAGE".equals(passage.timerMode())) {
+        // activateSession sets ACTIVE status; clear current_question so advanceSessionInternal
+        // treats it as "no current question" and finds the first question (min orderIndex).
+        liveStateService.activateSession(sid, first.id());
+        liveStateService.clearCurrentQuestion(sid);
+        engine.advanceSessionInternal(sessionId);
+        return;
+      }
+    }
+
     liveStateService.activateSession(sid, first.id());
     liveStateService.initQuestionCounts(sid, first);
-    engine.broadcastQuestionStart(sessionId, first, snapshot);
-    engine.scheduleQuestionTimer(sessionId, first.id(), first.timeLimitSeconds());
+    liveStateService.setQuestionState(sid, QuestionLifecycleState.DISPLAYED.name());
+    engine.broadcastQuestionDisplayed(sessionId, first, snapshot);
+    // Timer is NOT started — host will call /start-timer
+  }
+
+  // ─── Start Timer (host command to begin countdown) ────────────────────────────
+
+  public void startTimer(Long sessionId, Long userId) {
+    ownershipService.requireSessionOwner(sessionId, userId);
+    engine.startTimerInternal(sessionId);
   }
 
   // ─── Advance / End (delegate to engine — cross-bean call, @Transactional works)
@@ -121,8 +144,10 @@ public class SessionService {
   public void advanceSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     String sid = sessionId.toString();
-    timerScheduler.cancelQuestionTimer(sessionId);
-    liveStateService.clearTimer(sid);
+    String questionState = liveStateService.getQuestionState(sid);
+    if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
+      throw AppException.conflict("Cannot advance: current question is not in REVIEWING state");
+    }
     liveStateService.incrementQuestionSequence(sid);
     engine.advanceSessionInternal(sessionId);
   }
@@ -166,10 +191,7 @@ public class SessionService {
                           .map(
                               o ->
                                   new QuizSnapshot.OptionSnapshot(
-                                      o.getId(),
-                                      o.getText(),
-                                      o.getPointValue(),
-                                      o.getOrderIndex()))
+                                      o.getId(), o.getText(), o.getPointValue(), o.getOrderIndex()))
                           .toList();
                   return new QuizSnapshot.QuestionSnapshot(
                       q.getId(),
@@ -183,9 +205,7 @@ public class SessionService {
                 })
             .toList();
     List<QuizSnapshot.PassageSnapshot> passages =
-        quiz.getPassages().stream()
-            .map(this::toPassageSnapshot)
-            .toList();
+        quiz.getPassages().stream().map(this::toPassageSnapshot).toList();
     return new QuizSnapshot(quiz.getId(), quiz.getTitle(), questions, passages);
   }
 
@@ -200,7 +220,8 @@ public class SessionService {
         subQuestionIds);
   }
 
-  private String resolveEffectiveDisplayMode(Quiz quiz, dev.hishaam.hermes.entity.Question question) {
+  private String resolveEffectiveDisplayMode(
+      Quiz quiz, dev.hishaam.hermes.entity.Question question) {
     return (question.getDisplayModeOverride() != null
             ? question.getDisplayModeOverride()
             : quiz.getDisplayMode())

@@ -63,6 +63,14 @@ public class SessionRedisHelper {
     return key(sid, "leaderboard");
   }
 
+  public String questionStateKey(String sid) {
+    return key(sid, "question_state");
+  }
+
+  public String currentPassageKey(String sid) {
+    return key(sid, "current_passage");
+  }
+
   public String joinCodeKey(String joinCode) {
     return "joincode:" + joinCode;
   }

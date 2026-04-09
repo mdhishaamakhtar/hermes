@@ -8,45 +8,103 @@ public final class WsPayloads {
   private WsPayloads() {}
 
   public enum EventType {
-    QUESTION_START,
-    QUESTION_END,
+    QUESTION_DISPLAYED,
+    PASSAGE_DISPLAYED,
+    TIMER_START,
+    QUESTION_FROZEN,
+    PASSAGE_FROZEN,
     SESSION_END,
     PARTICIPANT_JOINED,
     ANSWER_UPDATE,
     LEADERBOARD_UPDATE
   }
 
-  public record QuestionStart(
+  // ─── Question lifecycle events ────────────────────────────────────────────────
+
+  public record QuestionDisplayed(
       EventType event,
       Long questionId,
       String text,
+      String questionType,
       List<Option> options,
-      int timeLimitSeconds,
       int questionIndex,
-      int totalQuestions) {
-    public QuestionStart(
+      int totalQuestions,
+      PassageContext passage) {
+    public QuestionDisplayed(
         Long questionId,
         String text,
+        String questionType,
         List<Option> options,
-        int timeLimitSeconds,
+        int questionIndex,
+        int totalQuestions,
+        PassageContext passage) {
+      this(
+          EventType.QUESTION_DISPLAYED,
+          questionId,
+          text,
+          questionType,
+          options,
+          questionIndex,
+          totalQuestions,
+          passage);
+    }
+  }
+
+  /** Minimal passage context included in QUESTION_DISPLAYED for PER_SUB_QUESTION passages. */
+  public record PassageContext(Long id, String text) {}
+
+  /** Sent for ENTIRE_PASSAGE mode — all sub-questions displayed simultaneously. */
+  public record PassageDisplayed(
+      EventType event,
+      Long passageId,
+      String passageText,
+      List<SubQuestion> subQuestions,
+      int questionIndex,
+      int totalQuestions) {
+    public PassageDisplayed(
+        Long passageId,
+        String passageText,
+        List<SubQuestion> subQuestions,
         int questionIndex,
         int totalQuestions) {
       this(
-          EventType.QUESTION_START,
-          questionId,
-          text,
-          options,
-          timeLimitSeconds,
+          EventType.PASSAGE_DISPLAYED,
+          passageId,
+          passageText,
+          subQuestions,
           questionIndex,
           totalQuestions);
     }
   }
 
-  public record QuestionEnd(EventType event, Long questionId, Long correctOptionId) {
-    public QuestionEnd(Long questionId, Long correctOptionId) {
-      this(EventType.QUESTION_END, questionId, correctOptionId);
+  public record SubQuestion(
+      Long questionId, String text, String questionType, List<Option> options) {}
+
+  /**
+   * Host started the timer. {@code questionId} is set for standalone / PER_SUB_QUESTION questions;
+   * {@code passageId} is set for ENTIRE_PASSAGE mode.
+   */
+  public record TimerStart(EventType event, Long questionId, Long passageId, int timeLimitSeconds) {
+    public TimerStart(Long questionId, Long passageId, int timeLimitSeconds) {
+      this(EventType.TIMER_START, questionId, passageId, timeLimitSeconds);
     }
   }
+
+  /** Timer expired (or host ended timer early). Answers are now frozen. */
+  public record QuestionFrozen(EventType event, Long questionId) {
+    public QuestionFrozen(Long questionId) {
+      this(EventType.QUESTION_FROZEN, questionId);
+    }
+  }
+
+  /** ENTIRE_PASSAGE variant of QUESTION_FROZEN — all sub-questions freeze together. */
+  public record PassageFrozen(EventType event, Long passageId, List<Long> subQuestionIds) {
+    public PassageFrozen(Long passageId, List<Long> subQuestionIds) {
+      this(EventType.PASSAGE_FROZEN, passageId, subQuestionIds);
+    }
+  }
+
+  // ─── Session lifecycle ────────────────────────────────────────────────────────
 
   public record SessionEnd(EventType event) {
     public SessionEnd() {
@@ -63,6 +121,8 @@ public final class WsPayloads {
       this(EventType.SESSION_END, leaderboard, totalParticipants);
     }
   }
+
+  // ─── Analytics events ─────────────────────────────────────────────────────────
 
   public record ParticipantJoined(EventType event, long count) {
     public ParticipantJoined(long count) {
@@ -99,6 +159,8 @@ public final class WsPayloads {
       this(EventType.LEADERBOARD_UPDATE, leaderboard);
     }
   }
+
+  // ─── Shared ───────────────────────────────────────────────────────────────────
 
   public record Option(Long id, String text, int orderIndex) {}
 }

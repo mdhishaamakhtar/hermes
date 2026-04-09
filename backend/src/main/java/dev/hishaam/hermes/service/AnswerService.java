@@ -6,6 +6,7 @@ import dev.hishaam.hermes.dto.QuizSnapshot;
 import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import jakarta.persistence.EntityManager;
@@ -46,7 +47,8 @@ public class AnswerService {
     String sid = sessionId.toString();
     Long participantId = participantService.resolveParticipantId(request.rejoinToken());
 
-    QuizSnapshot.QuestionSnapshot question = requireMutableCurrentQuestion(sid, request.questionId());
+    QuizSnapshot.QuestionSnapshot question =
+        requireMutableCurrentQuestion(sid, request.questionId());
     Set<Long> selectedOptionIds = normalizeSelectedOptionIds(request.selectedOptionIds());
     validateSelections(question, selectedOptionIds);
 
@@ -105,17 +107,29 @@ public class AnswerService {
       throw AppException.conflict("Session is not accepting answers");
     }
 
-    String currentQuestionId = liveStateService.getCurrentQuestionId(sid);
-    if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
-      throw AppException.conflict("Question is no longer active");
+    String questionState = liveStateService.getQuestionState(sid);
+    if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
+      throw AppException.conflict("Question is not currently accepting answers");
     }
 
-    Long timerTtl = liveStateService.getTimerTtlSeconds(sid);
-    if (timerTtl == null || timerTtl <= 0) {
-      throw AppException.conflict("Question is no longer accepting answers");
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+
+    // For ENTIRE_PASSAGE mode: accept answers for any sub-question in the current passage
+    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
+    if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
+      Long passageId = Long.parseLong(currentPassageIdStr);
+      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
+      if (passage == null || !passage.subQuestionIds().contains(questionId)) {
+        throw AppException.conflict("Question does not belong to the current passage");
+      }
+    } else {
+      String currentQuestionId = liveStateService.getCurrentQuestionId(sid);
+      if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
+        throw AppException.conflict("Question is no longer active");
+      }
     }
 
-    QuizSnapshot.QuestionSnapshot question = snapshotService.loadSnapshot(sid).findQuestion(questionId);
+    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
     if (question == null) {
       throw AppException.notFound("Question not found in session snapshot");
     }
@@ -144,7 +158,8 @@ public class AnswerService {
             .map(QuizSnapshot.OptionSnapshot::id)
             .collect(LinkedHashSet::new, Set::add, Set::addAll);
     if (!validOptionIds.containsAll(selectedOptionIds)) {
-      throw AppException.badRequest("Selection contains an option that does not belong to the question");
+      throw AppException.badRequest(
+          "Selection contains an option that does not belong to the question");
     }
 
     if ("SINGLE_SELECT".equals(question.questionType()) && selectedOptionIds.size() != 1) {
@@ -158,8 +173,7 @@ public class AnswerService {
     }
   }
 
-  private Set<Long> previousSelectionIds(
-      String sid, Long participantId, ParticipantAnswer answer) {
+  private Set<Long> previousSelectionIds(String sid, Long participantId, ParticipantAnswer answer) {
     Set<Long> previousSelectionIds =
         liveStateService.getParticipantSelectionIds(sid, answer.getQuestionId(), participantId);
     if (!previousSelectionIds.isEmpty()) {
