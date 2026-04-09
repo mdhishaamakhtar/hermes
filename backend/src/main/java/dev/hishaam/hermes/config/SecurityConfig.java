@@ -63,6 +63,8 @@ public class SecurityConfig {
                         "/api/sessions/join",
                         "/api/sessions/rejoin",
                         "/api/sessions/*/my-results",
+                        "/api/sessions/*/answers",
+                        "/api/sessions/*/lock-in",
                         "/ws-hermes/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",

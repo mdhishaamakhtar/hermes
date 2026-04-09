@@ -5,6 +5,7 @@ import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.UserRepository;
 import dev.hishaam.hermes.service.ParticipantService;
+import dev.hishaam.hermes.service.AnswerService;
 import dev.hishaam.hermes.service.SessionResultsService;
 import dev.hishaam.hermes.service.SessionService;
 import jakarta.validation.Valid;
@@ -21,16 +22,19 @@ public class SessionController {
 
   private final SessionService sessionService;
   private final ParticipantService participantService;
+  private final AnswerService answerService;
   private final SessionResultsService resultsService;
   private final UserRepository userRepository;
 
   public SessionController(
       SessionService sessionService,
       ParticipantService participantService,
+      AnswerService answerService,
       SessionResultsService resultsService,
       UserRepository userRepository) {
     this.sessionService = sessionService;
     this.participantService = participantService;
+    this.answerService = answerService;
     this.resultsService = resultsService;
     this.userRepository = userRepository;
   }
@@ -112,6 +116,20 @@ public class SessionController {
   public ResponseEntity<ApiResponse<MyResultsResponse>> getMyResults(
       @PathVariable Long id, @RequestHeader("X-Rejoin-Token") String rejoinToken) {
     return ResponseEntity.ok(ApiResponse.ok(resultsService.getMyResults(id, rejoinToken)));
+  }
+
+  @PostMapping("/{id}/answers")
+  public ResponseEntity<ApiResponse<Void>> submitAnswer(
+      @PathVariable Long id, @Valid @RequestBody AnswerRequest request) {
+    answerService.submitAnswer(id, request);
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
+
+  @PostMapping("/{id}/lock-in")
+  public ResponseEntity<ApiResponse<Void>> lockIn(
+      @PathVariable Long id, @Valid @RequestBody LockInRequest request) {
+    answerService.lockInAnswer(id, request);
+    return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
   private Long resolveUserId(UserDetails userDetails) {

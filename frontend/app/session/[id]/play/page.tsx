@@ -47,8 +47,7 @@ export default function PlayPage() {
   const [sessionName, setSessionName] = useState("");
   const [participantCount, setParticipantCount] = useState(0);
   const [question, setQuestion] = useState<QuestionData | null>(null);
-  const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
-  const [answerSubmitted, setAnswerSubmitted] = useState(false);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<number[]>([]);
   const [correctOptionId, setCorrectOptionId] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [rejoinToken] = useState<string | null>(() =>
@@ -147,8 +146,7 @@ export default function PlayPage() {
         };
         setSessionState("ACTIVE");
         setQuestion(q);
-        setSelectedOptionId(null);
-        setAnswerSubmitted(false);
+        setSelectedOptionIds([]);
         setCorrectOptionId(null);
         startTimer(q.timeLimitSeconds);
       }
@@ -175,39 +173,25 @@ export default function PlayPage() {
 
   const handleAnswer = useCallback(
     (optionId: number) => {
-      if (
-        answerSubmitted ||
-        correctOptionId !== null ||
-        !question ||
-        !rejoinToken
-      )
-        return;
-      setSelectedOptionId(optionId);
-      setAnswerSubmitted(true);
+      if (correctOptionId !== null || !question || !rejoinToken) return;
+      setSelectedOptionIds([optionId]);
       publish(`/app/session/${sessionId}/answer`, {
         rejoinToken,
         questionId: question.id,
-        optionId,
+        selectedOptionIds: [optionId],
       });
     },
-    [
-      answerSubmitted,
-      correctOptionId,
-      question,
-      rejoinToken,
-      publish,
-      sessionId,
-    ],
+    [correctOptionId, question, rejoinToken, publish, sessionId],
   );
 
   const getOptionState = (optionId: number) => {
     if (correctOptionId !== null) {
       if (optionId === correctOptionId) return "correct";
-      if (optionId === selectedOptionId) return "wrong";
+      if (selectedOptionIds.includes(optionId)) return "wrong";
       return "neutral";
     }
-    if (answerSubmitted) {
-      if (optionId === selectedOptionId) return "selected";
+    if (selectedOptionIds.length > 0) {
+      if (selectedOptionIds.includes(optionId)) return "selected";
       return "faded";
     }
     return "idle";
@@ -333,8 +317,7 @@ export default function PlayPage() {
                     opacity = 0.18;
                   }
 
-                  const isInteractive =
-                    !answerSubmitted && correctOptionId === null;
+                  const isInteractive = correctOptionId === null;
 
                   return (
                     <motion.button
@@ -393,7 +376,7 @@ export default function PlayPage() {
             {/* Status message */}
             <div aria-live="polite" aria-atomic="true" className="mt-6 min-h-6">
               <AnimatePresence>
-                {answerSubmitted && correctOptionId === null && (
+                {selectedOptionIds.length > 0 && correctOptionId === null && (
                   <motion.p
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -404,7 +387,7 @@ export default function PlayPage() {
                     Answer recorded
                   </motion.p>
                 )}
-                {!answerSubmitted &&
+                {!selectedOptionIds.length &&
                   correctOptionId === null &&
                   timeLeft === 0 && (
                     <motion.p
@@ -425,12 +408,12 @@ export default function PlayPage() {
                     className="text-center label"
                     style={{
                       color:
-                        selectedOptionId === correctOptionId
+                        selectedOptionIds.includes(correctOptionId ?? -1)
                           ? "var(--color-success)"
                           : "var(--color-danger)",
                     }}
                   >
-                    {selectedOptionId === correctOptionId
+                    {selectedOptionIds.includes(correctOptionId ?? -1)
                       ? "Correct!"
                       : "Incorrect"}
                   </motion.p>

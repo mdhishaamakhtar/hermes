@@ -75,10 +75,21 @@ public final class WsPayloads {
       Long questionId,
       Map<Long, Long> counts,
       long totalAnswered,
-      long totalParticipants) {
+      long totalParticipants,
+      long totalLockedIn) {
     public AnswerUpdate(
-        Long questionId, Map<Long, Long> counts, long totalAnswered, long totalParticipants) {
-      this(EventType.ANSWER_UPDATE, questionId, counts, totalAnswered, totalParticipants);
+        Long questionId,
+        Map<Long, Long> counts,
+        long totalAnswered,
+        long totalParticipants,
+        long totalLockedIn) {
+      this(
+          EventType.ANSWER_UPDATE,
+          questionId,
+          counts,
+          totalAnswered,
+          totalParticipants,
+          totalLockedIn);
     }
   }
 

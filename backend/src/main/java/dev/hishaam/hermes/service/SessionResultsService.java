@@ -69,7 +69,13 @@ public class SessionResultsService {
     Map<Long, ParticipantAnswer> answerMap = new LinkedHashMap<>();
     answers.forEach(a -> answerMap.put(a.getQuestionId(), a));
 
-    int correctCount = (int) answers.stream().filter(ParticipantAnswer::isCorrect).count();
+    int correctCount =
+        (int)
+            answers.stream()
+                .filter(
+                    answer ->
+                        isCorrectSelection(answer, snapshot.findQuestion(answer.getQuestionId())))
+                .count();
 
     // Compute rank from all session answers
     List<ParticipantAnswer> allAnswers = answerRepository.findBySessionId(sessionId);
@@ -79,8 +85,12 @@ public class SessionResultsService {
     // Initialize all participants with 0 so zero-correct participants get ranked
     participantRepository.findBySessionId(sessionId).forEach(p -> scores.put(p.getId(), 0L));
     allAnswers.stream()
-        .filter(ParticipantAnswer::isCorrect)
-        .forEach(a -> scores.merge(a.getParticipantId(), 1L, Long::sum));
+        .forEach(
+            answer -> {
+              if (isCorrectSelection(answer, snapshot.findQuestion(answer.getQuestionId()))) {
+                scores.merge(answer.getParticipantId(), 1L, Long::sum);
+              }
+            });
 
     List<Long> sortedIds =
         scores.entrySet().stream()
@@ -96,7 +106,7 @@ public class SessionResultsService {
             .map(
                 q -> {
                   ParticipantAnswer ans = answerMap.get(q.id());
-                  Long selectedOptionId = ans != null ? ans.getOptionId() : null;
+                  Long selectedOptionId = firstSelectedOptionId(ans);
                   String selectedOptionText =
                       selectedOptionId != null
                           ? q.options().stream()
@@ -110,7 +120,7 @@ public class SessionResultsService {
                           .filter(o -> o.pointValue() > 0)
                           .findFirst()
                           .orElse(null);
-                  boolean isCorrect = ans != null && ans.isCorrect();
+                  boolean isCorrect = isCorrectSelection(ans, q);
                   return new MyResultsResponse.QuestionResult(
                       q.id(),
                       q.text(),
@@ -158,7 +168,12 @@ public class SessionResultsService {
                   q.options().forEach(o -> optionCounts.put(o.id(), 0L));
                   allAnswers.stream()
                       .filter(a -> a.getQuestionId().equals(q.id()))
-                      .forEach(a -> optionCounts.merge(a.getOptionId(), 1L, Long::sum));
+                      .forEach(
+                          answer ->
+                              answer.getSelectedOptions()
+                                  .forEach(
+                                      option ->
+                                          optionCounts.merge(option.getId(), 1L, Long::sum)));
 
                   long totalAnswers =
                       optionCounts.values().stream().mapToLong(Long::longValue).sum();
@@ -189,8 +204,12 @@ public class SessionResultsService {
     Map<Long, Long> scores = new LinkedHashMap<>();
     participants.forEach(p -> scores.put(p.getId(), 0L));
     allAnswers.stream()
-        .filter(ParticipantAnswer::isCorrect)
-        .forEach(a -> scores.merge(a.getParticipantId(), 1L, Long::sum));
+        .forEach(
+            answer -> {
+              if (isCorrectSelection(answer, snapshot.findQuestion(answer.getQuestionId()))) {
+                scores.merge(answer.getParticipantId(), 1L, Long::sum);
+              }
+            });
 
     List<SessionResultsResponse.LeaderboardEntry> leaderboard = new ArrayList<>();
     scores.entrySet().stream()
@@ -214,5 +233,35 @@ public class SessionResultsService {
         participants.size(),
         questionResults,
         leaderboard);
+  }
+
+  private Long firstSelectedOptionId(ParticipantAnswer answer) {
+    if (answer == null || answer.getSelectedOptions().isEmpty()) {
+      return null;
+    }
+    return answer.getSelectedOptions().stream()
+        .sorted(Comparator.comparingInt(option -> option.getOrderIndex()))
+        .map(option -> option.getId())
+        .findFirst()
+        .orElse(null);
+  }
+
+  private boolean isCorrectSelection(
+      ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot questionSnapshot) {
+    if (answer == null || questionSnapshot == null) {
+      return false;
+    }
+
+    Set<Long> selectedOptionIds =
+        answer.getSelectedOptions().stream()
+            .map(option -> option.getId())
+            .collect(LinkedHashSet::new, Set::add, Set::addAll);
+    Set<Long> correctOptionIds =
+        questionSnapshot.options().stream()
+            .filter(option -> option.pointValue() > 0)
+            .map(QuizSnapshot.OptionSnapshot::id)
+            .collect(LinkedHashSet::new, Set::add, Set::addAll);
+
+    return !selectedOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds);
   }
 }

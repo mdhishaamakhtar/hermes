@@ -1,7 +1,9 @@
 package dev.hishaam.hermes.repository;
 
 import dev.hishaam.hermes.entity.ParticipantAnswer;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,9 +13,19 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAnswer, Long> {
 
+  @Query(
+      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions WHERE a.sessionId = :sessionId")
   List<ParticipantAnswer> findBySessionId(Long sessionId);
 
+  @Query(
+      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions WHERE a.participantId = :participantId")
   List<ParticipantAnswer> findByParticipantId(Long participantId);
+
+  @Query(
+      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions"
+          + " WHERE a.participantId = :participantId AND a.questionId = :questionId")
+  Optional<ParticipantAnswer> findByParticipantIdAndQuestionId(
+      @Param("participantId") Long participantId, @Param("questionId") Long questionId);
 
   @Query(
       value = "SELECT question_id FROM participant_answers WHERE participant_id = :participantId",
@@ -27,15 +39,19 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
   @Modifying
   @Query(
       value =
-          "INSERT INTO participant_answers"
-              + " (session_id, participant_id, question_id, option_id, is_correct, answered_at)"
-              + " VALUES (:sessionId, :participantId, :questionId, :optionId, :isCorrect, now())"
-              + " ON CONFLICT (participant_id, question_id) DO NOTHING",
+          "DELETE FROM participant_answer_selections"
+              + " WHERE participant_answer_id IN ("
+              + "   SELECT id FROM participant_answers WHERE session_id IN (:sessionIds)"
+              + " )",
       nativeQuery = true)
-  int insertAnswerIgnoreConflict(
+  void deleteSelectionsBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
+
+  @Modifying
+  @Query(
+      "UPDATE ParticipantAnswer a SET a.frozenAt = :frozenAt"
+          + " WHERE a.sessionId = :sessionId AND a.questionId = :questionId AND a.frozenAt IS NULL")
+  int freezeAnswersForQuestion(
       @Param("sessionId") Long sessionId,
-      @Param("participantId") Long participantId,
       @Param("questionId") Long questionId,
-      @Param("optionId") Long optionId,
-      @Param("isCorrect") boolean isCorrect);
+      @Param("frozenAt") OffsetDateTime frozenAt);
 }

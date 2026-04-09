@@ -6,6 +6,7 @@ import dev.hishaam.hermes.dto.WsPayloads;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
+import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.Duration;
@@ -30,6 +31,7 @@ public class SessionEngine {
 
   private final QuizSessionRepository sessionRepository;
   private final QuestionRepository questionRepository;
+  private final ParticipantAnswerRepository answerRepository;
   private final SessionRedisHelper redisHelper;
   private final StringRedisTemplate redis;
   private final SimpMessagingTemplate messaging;
@@ -38,12 +40,14 @@ public class SessionEngine {
   public SessionEngine(
       QuizSessionRepository sessionRepository,
       QuestionRepository questionRepository,
+      ParticipantAnswerRepository answerRepository,
       SessionRedisHelper redisHelper,
       StringRedisTemplate redis,
       SimpMessagingTemplate messaging,
       SessionTimerScheduler timerScheduler) {
     this.sessionRepository = sessionRepository;
     this.questionRepository = questionRepository;
+    this.answerRepository = answerRepository;
     this.redisHelper = redisHelper;
     this.redis = redis;
     this.messaging = messaging;
@@ -65,6 +69,7 @@ public class SessionEngine {
 
     // Broadcast QUESTION_END for current question
     if (currentQId != null) {
+      answerRepository.freezeAnswersForQuestion(sessionId, currentQId, OffsetDateTime.now());
       QuizSnapshot.QuestionSnapshot currentQ = snapshot.findQuestion(currentQId);
       if (currentQ != null) {
         Long correctOptionId =
@@ -112,6 +117,11 @@ public class SessionEngine {
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
     String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
+    String currentQuestionId = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
+    if (currentQuestionId != null && !currentQuestionId.isBlank()) {
+      answerRepository.freezeAnswersForQuestion(
+          sessionId, Long.parseLong(currentQuestionId), OffsetDateTime.now());
+    }
 
     QuizSession session =
         sessionRepository
@@ -197,9 +207,11 @@ public class SessionEngine {
       Long questionId,
       Map<Long, Long> counts,
       long totalAnswered,
-      long totalParticipants) {
+      long totalParticipants,
+      long totalLockedIn) {
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".analytics",
-        new WsPayloads.AnswerUpdate(questionId, counts, totalAnswered, totalParticipants));
+        new WsPayloads.AnswerUpdate(
+            questionId, counts, totalAnswered, totalParticipants, totalLockedIn));
   }
 }

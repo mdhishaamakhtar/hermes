@@ -1,13 +1,18 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.AnswerRequest;
+import dev.hishaam.hermes.dto.LockInRequest;
 import dev.hishaam.hermes.dto.QuizSnapshot;
+import dev.hishaam.hermes.entity.AnswerOption;
+import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import java.util.LinkedHashMap;
+import jakarta.persistence.EntityManager;
+import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Set;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,89 +20,173 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnswerService {
 
-  private static final Logger log = LoggerFactory.getLogger(AnswerService.class);
-
   private final ParticipantAnswerRepository answerRepository;
+  private final ParticipantService participantService;
   private final SessionRedisHelper redisHelper;
   private final SessionEngine engine;
   private final StringRedisTemplate redis;
+  private final EntityManager entityManager;
 
   public AnswerService(
       ParticipantAnswerRepository answerRepository,
+      ParticipantService participantService,
       SessionRedisHelper redisHelper,
       SessionEngine engine,
-      StringRedisTemplate redis) {
+      StringRedisTemplate redis,
+      EntityManager entityManager) {
     this.answerRepository = answerRepository;
+    this.participantService = participantService;
     this.redisHelper = redisHelper;
     this.engine = engine;
     this.redis = redis;
+    this.entityManager = entityManager;
   }
 
   @Transactional
   public void submitAnswer(Long sessionId, AnswerRequest request) {
     String sid = sessionId.toString();
+    Long participantId = participantService.resolveParticipantId(request.rejoinToken());
 
-    // Step 1: resolve participantId from rejoin token
-    String participantIdStr = redis.opsForValue().get("participant:" + request.rejoinToken());
-    if (participantIdStr == null) {
-      log.warn("Unknown rejoin token: {}", request.rejoinToken());
-      return;
+    QuizSnapshot.QuestionSnapshot question = requireMutableCurrentQuestion(sid, request.questionId());
+    Set<Long> selectedOptionIds = normalizeSelectedOptionIds(request.selectedOptionIds());
+    validateSelections(question, selectedOptionIds);
+
+    ParticipantAnswer answer =
+        answerRepository
+            .findByParticipantIdAndQuestionId(participantId, request.questionId())
+            .orElseGet(
+                () ->
+                    ParticipantAnswer.builder()
+                        .sessionId(sessionId)
+                        .participantId(participantId)
+                        .questionId(request.questionId())
+                        .build());
+
+    ensureAnswerMutable(answer);
+
+    Set<Long> previousSelectionIds = previousSelectionIds(sid, participantId, answer);
+    answer.setSelectedOptions(toAnswerOptionReferences(selectedOptionIds));
+    answer.setAnsweredAt(OffsetDateTime.now());
+    answerRepository.save(answer);
+
+    redisHelper.replaceParticipantSelections(
+        sid, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
+    broadcastAnswerState(sessionId, request.questionId());
+  }
+
+  @Transactional
+  public void lockInAnswer(Long sessionId, LockInRequest request) {
+    String sid = sessionId.toString();
+    Long participantId = participantService.resolveParticipantId(request.rejoinToken());
+
+    requireMutableCurrentQuestion(sid, request.questionId());
+
+    ParticipantAnswer answer =
+        answerRepository
+            .findByParticipantIdAndQuestionId(participantId, request.questionId())
+            .orElseThrow(() -> AppException.conflict("Cannot lock in before submitting an answer"));
+
+    ensureAnswerMutable(answer);
+    if (answer.getSelectedOptions().isEmpty()) {
+      throw AppException.conflict("Cannot lock in without a selection");
     }
-    Long participantId = Long.parseLong(participantIdStr);
 
-    // Step 2: check session is ACTIVE
+    OffsetDateTime frozenAt = OffsetDateTime.now();
+    answer.setLockedIn(true);
+    answer.setFrozenAt(frozenAt);
+    answerRepository.save(answer);
+
+    redisHelper.markLockedIn(sid, request.questionId(), participantId);
+    broadcastAnswerState(sessionId, request.questionId());
+  }
+
+  private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(String sid, Long questionId) {
     String status = redis.opsForValue().get(redisHelper.key(sid, "status"));
-    if (!SessionStatus.ACTIVE.name().equals(status)) return;
-
-    // Step 3: check current question matches
-    String currentQIdStr = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
-    if (currentQIdStr == null || !currentQIdStr.equals(request.questionId().toString())) return;
-
-    // Step 4: load snapshot and validate option
-    QuizSnapshot snapshot = redisHelper.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(request.questionId());
-    if (question == null) return;
-
-    QuizSnapshot.OptionSnapshot option =
-        question.options().stream()
-            .filter(o -> o.id().equals(request.optionId()))
-            .findFirst()
-            .orElse(null);
-    if (option == null) return;
-
-    // Step 5: insert with ON CONFLICT DO NOTHING
-    int inserted =
-        answerRepository.insertAnswerIgnoreConflict(
-            sessionId,
-            participantId,
-            request.questionId(),
-            request.optionId(),
-            option.pointValue() > 0);
-    if (inserted == 0) return; // duplicate answer
-
-    // Step 6: update per-option counts
-    String countsKey = redisHelper.key(sid, "question:" + request.questionId() + ":counts");
-    redis.opsForHash().increment(countsKey, request.optionId().toString(), 1);
-
-    // Step 7: update leaderboard score if correct
-    if (option.pointValue() > 0) {
-      redis
-          .opsForZSet()
-          .incrementScore(redisHelper.key(sid, "leaderboard"), participantId.toString(), 1);
+    if (!SessionStatus.ACTIVE.name().equals(status)) {
+      throw AppException.conflict("Session is not accepting answers");
     }
 
-    // Step 8: broadcast ANSWER_UPDATE to organiser
-    Map<Object, Object> rawCounts = redis.opsForHash().entries(countsKey);
-    Map<Long, Long> counts = new LinkedHashMap<>();
-    rawCounts.forEach(
-        (k, v) -> counts.put(Long.parseLong(k.toString()), Long.parseLong(v.toString())));
-    long totalAnswered = counts.values().stream().mapToLong(Long::longValue).sum();
+    String currentQuestionId = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
+    if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
+      throw AppException.conflict("Question is no longer active");
+    }
+
+    Long timerTtl = redis.getExpire(redisHelper.key(sid, "timer"));
+    if (timerTtl == null || timerTtl <= 0) {
+      throw AppException.conflict("Question is no longer accepting answers");
+    }
+
+    QuizSnapshot.QuestionSnapshot question = redisHelper.loadSnapshot(sid).findQuestion(questionId);
+    if (question == null) {
+      throw AppException.notFound("Question not found in session snapshot");
+    }
+
+    return question;
+  }
+
+  private Set<Long> normalizeSelectedOptionIds(Iterable<Long> selectedOptionIds) {
+    Set<Long> normalized = new LinkedHashSet<>();
+    for (Long optionId : selectedOptionIds) {
+      if (optionId == null) {
+        throw AppException.badRequest("selectedOptionIds cannot contain null values");
+      }
+      normalized.add(optionId);
+    }
+    if (normalized.isEmpty()) {
+      throw AppException.badRequest("At least one option must be selected");
+    }
+    return normalized;
+  }
+
+  private void validateSelections(
+      QuizSnapshot.QuestionSnapshot question, Set<Long> selectedOptionIds) {
+    Set<Long> validOptionIds =
+        question.options().stream()
+            .map(QuizSnapshot.OptionSnapshot::id)
+            .collect(LinkedHashSet::new, Set::add, Set::addAll);
+    if (!validOptionIds.containsAll(selectedOptionIds)) {
+      throw AppException.badRequest("Selection contains an option that does not belong to the question");
+    }
+
+    if ("SINGLE_SELECT".equals(question.questionType()) && selectedOptionIds.size() != 1) {
+      throw AppException.badRequest("SINGLE_SELECT questions require exactly one selected option");
+    }
+  }
+
+  private void ensureAnswerMutable(ParticipantAnswer answer) {
+    if (answer.isLockedIn() || answer.getFrozenAt() != null) {
+      throw AppException.conflict("Answer is already frozen");
+    }
+  }
+
+  private Set<Long> previousSelectionIds(
+      String sid, Long participantId, ParticipantAnswer answer) {
+    Set<Long> previousSelectionIds =
+        redisHelper.getParticipantSelectionIds(sid, answer.getQuestionId(), participantId);
+    if (!previousSelectionIds.isEmpty()) {
+      return previousSelectionIds;
+    }
+
+    return answer.getSelectedOptions().stream()
+        .map(AnswerOption::getId)
+        .collect(LinkedHashSet::new, Set::add, Set::addAll);
+  }
+
+  private Set<AnswerOption> toAnswerOptionReferences(Set<Long> selectedOptionIds) {
+    Set<AnswerOption> selectedOptions = new LinkedHashSet<>();
+    selectedOptionIds.forEach(
+        optionId -> selectedOptions.add(entityManager.getReference(AnswerOption.class, optionId)));
+    return selectedOptions;
+  }
+
+  private void broadcastAnswerState(Long sessionId, Long questionId) {
+    String sid = sessionId.toString();
+    Map<Long, Long> counts = redisHelper.getQuestionCounts(sid, questionId);
+    long totalAnswered = redisHelper.getTotalAnswered(sid, questionId);
     long totalParticipants = redisHelper.getParticipantCount(sid);
+    long totalLockedIn = redisHelper.getTotalLockedIn(sid, questionId);
 
     engine.broadcastAnswerUpdate(
-        sessionId, request.questionId(), counts, totalAnswered, totalParticipants);
-
-    // Step 9: broadcast LEADERBOARD_UPDATE to organiser
-    engine.broadcastLeaderboardUpdate(sessionId, sid);
+        sessionId, questionId, counts, totalAnswered, totalParticipants, totalLockedIn);
   }
 }

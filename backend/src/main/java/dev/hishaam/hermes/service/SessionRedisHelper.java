@@ -50,6 +50,22 @@ public class SessionRedisHelper {
     return "session:" + sid + ":" + suffix;
   }
 
+  public String questionCountsKey(String sid, Long questionId) {
+    return key(sid, "question:" + questionId + ":counts");
+  }
+
+  public String questionAnsweredKey(String sid, Long questionId) {
+    return key(sid, "question:" + questionId + ":answered");
+  }
+
+  public String questionLockedInKey(String sid, Long questionId) {
+    return key(sid, "question:" + questionId + ":locked_in");
+  }
+
+  public String participantSelectionKey(String sid, Long questionId, Long participantId) {
+    return key(sid, "question:" + questionId + ":participant:" + participantId);
+  }
+
   // ─── Snapshot serialization ───────────────────────────────────────────────────
 
   public String serializeSnapshot(QuizSnapshot snapshot) {
@@ -137,11 +153,71 @@ public class SessionRedisHelper {
   // ─── Question counts ─────────────────────────────────────────────────────────
 
   public void initQuestionCounts(String sid, QuizSnapshot.QuestionSnapshot question) {
-    String countsKey = key(sid, "question:" + question.id() + ":counts");
+    String countsKey = questionCountsKey(sid, question.id());
     Map<String, String> initial = new LinkedHashMap<>();
     question.options().forEach(o -> initial.put(o.id().toString(), "0"));
     redis.opsForHash().putAll(countsKey, initial);
     redis.expire(countsKey, SESSION_TTL);
+  }
+
+  public Set<Long> getParticipantSelectionIds(String sid, Long questionId, Long participantId) {
+    Set<String> raw =
+        redis.opsForSet().members(participantSelectionKey(sid, questionId, participantId));
+    if (raw == null || raw.isEmpty()) {
+      return Set.of();
+    }
+    return raw.stream().map(Long::parseLong).collect(LinkedHashSet::new, Set::add, Set::addAll);
+  }
+
+  public void replaceParticipantSelections(
+      String sid,
+      Long questionId,
+      Long participantId,
+      Set<Long> previousSelectionIds,
+      Set<Long> nextSelectionIds) {
+    String countsKey = questionCountsKey(sid, questionId);
+    String selectionKey = participantSelectionKey(sid, questionId, participantId);
+    String answeredKey = questionAnsweredKey(sid, questionId);
+
+    previousSelectionIds.stream()
+        .filter(optionId -> !nextSelectionIds.contains(optionId))
+        .forEach(optionId -> redis.opsForHash().increment(countsKey, optionId.toString(), -1));
+    nextSelectionIds.stream()
+        .filter(optionId -> !previousSelectionIds.contains(optionId))
+        .forEach(optionId -> redis.opsForHash().increment(countsKey, optionId.toString(), 1));
+
+    redis.delete(selectionKey);
+    if (!nextSelectionIds.isEmpty()) {
+      redis.opsForSet().add(selectionKey, nextSelectionIds.stream().map(String::valueOf).toArray(String[]::new));
+      redis.expire(selectionKey, SESSION_TTL);
+      redis.opsForSet().add(answeredKey, participantId.toString());
+      redis.expire(answeredKey, SESSION_TTL);
+    } else {
+      redis.opsForSet().remove(answeredKey, participantId.toString());
+    }
+  }
+
+  public Map<Long, Long> getQuestionCounts(String sid, Long questionId) {
+    Map<Object, Object> rawCounts = redis.opsForHash().entries(questionCountsKey(sid, questionId));
+    Map<Long, Long> counts = new LinkedHashMap<>();
+    rawCounts.forEach(
+        (key, value) -> counts.put(Long.parseLong(key.toString()), Long.parseLong(value.toString())));
+    return counts;
+  }
+
+  public long getTotalAnswered(String sid, Long questionId) {
+    Long total = redis.opsForSet().size(questionAnsweredKey(sid, questionId));
+    return total != null ? total : 0L;
+  }
+
+  public void markLockedIn(String sid, Long questionId, Long participantId) {
+    redis.opsForSet().add(questionLockedInKey(sid, questionId), participantId.toString());
+    redis.expire(questionLockedInKey(sid, questionId), SESSION_TTL);
+  }
+
+  public long getTotalLockedIn(String sid, Long questionId) {
+    Long total = redis.opsForSet().size(questionLockedInKey(sid, questionId));
+    return total != null ? total : 0L;
   }
 
   // ─── Leaderboard ─────────────────────────────────────────────────────────────
@@ -184,7 +260,13 @@ public class SessionRedisHelper {
   public void cleanupSessionKeys(String sid, QuizSnapshot snapshot, String joinCode) {
     redis.delete("joincode:" + joinCode);
 
-    snapshot.questions().forEach(q -> redis.delete(key(sid, "question:" + q.id() + ":counts")));
+    snapshot.questions().forEach(
+        q ->
+            redis.delete(
+                List.of(
+                    questionCountsKey(sid, q.id()),
+                    questionAnsweredKey(sid, q.id()),
+                    questionLockedInKey(sid, q.id()))));
 
     redis.delete(
         List.of(

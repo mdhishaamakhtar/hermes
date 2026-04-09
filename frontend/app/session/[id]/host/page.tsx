@@ -32,6 +32,7 @@ interface AnswerUpdate {
   counts: Record<string, number>;
   totalAnswered: number;
   totalParticipants: number;
+  totalLockedIn: number;
 }
 interface LeaderboardEntry {
   rank: number;
@@ -70,6 +71,7 @@ export default function HostPage() {
   );
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [totalAnswered, setTotalAnswered] = useState(0);
+  const [totalLockedIn, setTotalLockedIn] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [finalLeaderboard, setFinalLeaderboard] = useState<
@@ -113,6 +115,7 @@ export default function HostPage() {
         setTimeLeft(question.timeLimitSeconds);
         setCounts({});
         setTotalAnswered(0);
+        setTotalLockedIn(0);
       } else if (data.event === "SESSION_END") {
         setSessionStatus("ENDED");
       }
@@ -124,6 +127,7 @@ export default function HostPage() {
         const answer = data as AnswerUpdate;
         setCounts(answer.counts);
         setTotalAnswered(answer.totalAnswered);
+        setTotalLockedIn(answer.totalLockedIn);
       } else if (data.event === "LEADERBOARD_UPDATE") {
         setLeaderboard((data as LeaderboardUpdate).leaderboard);
       } else if (data.event === "SESSION_END") {
@@ -394,7 +398,7 @@ export default function HostPage() {
                 <div className="flex items-center justify-between mb-5">
                   <span className="label">Responses</span>
                   <span className="text-xs tabular-nums text-muted">
-                    {totalAnswered} / {participantCount}
+                    {totalAnswered} answered / {totalLockedIn} locked
                   </span>
                 </div>
                 <div className="space-y-5 flex-1">

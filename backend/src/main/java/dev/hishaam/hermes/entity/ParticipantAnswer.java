@@ -2,6 +2,8 @@ package dev.hishaam.hermes.entity;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import lombok.*;
 
 @Entity
@@ -37,11 +39,20 @@ public class ParticipantAnswer {
   @Column(name = "question_id", nullable = false)
   private Long questionId;
 
-  @Column(name = "option_id", nullable = false)
-  private Long optionId;
+  @ManyToMany
+  @JoinTable(
+      name = "participant_answer_selections",
+      joinColumns = @JoinColumn(name = "participant_answer_id", nullable = false),
+      inverseJoinColumns = @JoinColumn(name = "option_id", nullable = false))
+  @Builder.Default
+  private Set<AnswerOption> selectedOptions = new LinkedHashSet<>();
 
-  @Column(name = "is_correct", nullable = false)
-  private boolean isCorrect;
+  @Column(name = "locked_in", nullable = false)
+  @Builder.Default
+  private boolean lockedIn = false;
+
+  @Column(name = "frozen_at")
+  private OffsetDateTime frozenAt;
 
   @Column(name = "answered_at")
   private OffsetDateTime answeredAt;
