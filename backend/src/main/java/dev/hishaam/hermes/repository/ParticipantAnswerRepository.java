@@ -28,7 +28,9 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
       @Param("participantId") Long participantId, @Param("questionId") Long questionId);
 
   @Query(
-      value = "SELECT question_id FROM participant_answers WHERE participant_id = :participantId",
+      value =
+          "SELECT question_id FROM participant_answers"
+              + " WHERE participant_id = :participantId AND answered_at IS NOT NULL",
       nativeQuery = true)
   List<Long> findAnsweredQuestionIds(@Param("participantId") Long participantId);
 

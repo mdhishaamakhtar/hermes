@@ -1,42 +1,565 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
-import { OPTION_META } from "@/lib/session-constants";
-import { colorRgb } from "@/lib/design-tokens";
+import Logo from "@/components/Logo";
 import Spinner from "@/components/Spinner";
-
-interface OptionData {
-  id: number;
-  text: string;
-  orderIndex: number;
-}
-
-interface QuestionData {
-  id: number;
-  text: string;
-  orderIndex: number;
-  totalQuestions: number;
-  timeLimitSeconds: number;
-  options: OptionData[];
-}
+import LeaderboardRow from "@/components/ui/LeaderboardRow";
+import { OPTION_META } from "@/lib/session-constants";
+import { colorRgb, enterAnimation } from "@/lib/design-tokens";
+import type {
+  DisplayMode,
+  LeaderboardEntry,
+  PassageTimerMode,
+  QuestionType,
+  RejoinCurrentPassageQuestion,
+  RejoinCurrentQuestion,
+  RejoinResponse,
+  ParticipantLeaderboardEntry,
+} from "@/lib/types";
 
 type SessionState = "LOBBY" | "ACTIVE" | "ENDED";
+type QuestionLifecycle = "DISPLAYED" | "TIMED" | "FROZEN" | "REVIEWING";
 
-interface WsMessage {
-  event: string;
-  questionId?: number;
-  text?: string;
-  options?: OptionData[];
-  timeLimitSeconds?: number;
-  questionIndex?: number;
-  totalQuestions?: number;
-  correctOptionId?: number;
-  count?: number;
+interface ParticipantOption {
+  id: number;
+  text: string;
+  orderIndex: number;
+}
+
+interface ParticipantQuestion {
+  id: number;
+  text: string;
+  questionIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number;
+  questionType: QuestionType;
+  effectiveDisplayMode: DisplayMode;
+  passageText: string | null;
+  options: ParticipantOption[];
+  selectedOptionIds: number[];
+  lockedIn: boolean;
+  counts: Record<number, number>;
+  totalAnswered: number;
+  totalLockedIn: number;
+  correctOptionIds: number[];
+  optionPoints: Record<number, number>;
+  reviewed: boolean;
+  revealed: boolean;
+}
+
+interface ParticipantPassage {
+  id: number;
+  text: string;
+  timerMode: PassageTimerMode;
+  questionIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number | null;
+  effectiveDisplayMode: DisplayMode;
+}
+
+interface SessionQuestionDisplayedMsg {
+  event: "QUESTION_DISPLAYED";
+  questionId: number;
+  text: string;
+  questionType: QuestionType;
+  options: Array<{ id: number; text: string; orderIndex: number }>;
+  timeLimitSeconds: number;
+  questionIndex: number;
+  totalQuestions: number;
+  passage: { id: number; text: string } | null;
+  effectiveDisplayMode: DisplayMode;
+}
+
+interface SessionPassageDisplayedMsg {
+  event: "PASSAGE_DISPLAYED";
+  passageId: number;
+  passageText: string;
+  timeLimitSeconds: number | null;
+  subQuestions: Array<{
+    questionId: number;
+    text: string;
+    questionType: QuestionType;
+    options: Array<{ id: number; text: string; orderIndex: number }>;
+  }>;
+  questionIndex: number;
+  totalQuestions: number;
+  effectiveDisplayMode: DisplayMode;
+}
+
+interface SessionTimerStartMsg {
+  event: "TIMER_START";
+  questionId: number | null;
+  passageId: number | null;
+  timeLimitSeconds: number;
+}
+
+interface SessionQuestionFrozenMsg {
+  event: "QUESTION_FROZEN";
+  questionId: number;
+}
+
+interface SessionPassageFrozenMsg {
+  event: "PASSAGE_FROZEN";
+  passageId: number;
+  subQuestionIds: number[];
+}
+
+interface SessionQuestionReviewedMsg {
+  event: "QUESTION_REVIEWED";
+  questionId: number;
+  correctOptionIds: number[];
+  optionPoints: Record<number, number>;
+}
+
+interface SessionScoringCorrectedMsg {
+  event: "SCORING_CORRECTED";
+  questionId: number;
+  correctOptionIds: number[];
+  optionPoints: Record<number, number>;
+}
+
+interface SessionAnswerUpdateMsg {
+  event: "ANSWER_UPDATE";
+  questionId: number;
+  counts: Record<string, number>;
+  totalAnswered: number;
+  totalParticipants: number;
+  totalLockedIn: number;
+}
+
+interface SessionAnswerRevealMsg {
+  event: "ANSWER_REVEAL";
+  questionId: number;
+  counts: Record<string, number>;
+  totalAnswered: number;
+  totalParticipants: number;
+}
+
+interface SessionLeaderboardUpdateMsg {
+  event: "LEADERBOARD_UPDATE";
+  leaderboard: LeaderboardEntry[];
+}
+
+interface SessionParticipantLeaderboardMsg {
+  event: "PARTICIPANT_LEADERBOARD";
+  leaderboard: ParticipantLeaderboardEntry[];
+  totalParticipants: number;
+}
+
+interface SessionEndMsg {
+  event: "SESSION_END";
+  leaderboard?: LeaderboardEntry[];
+  totalParticipants?: number;
+}
+
+type QuestionEventMsg =
+  | SessionQuestionDisplayedMsg
+  | SessionPassageDisplayedMsg
+  | SessionTimerStartMsg
+  | SessionQuestionFrozenMsg
+  | SessionPassageFrozenMsg
+  | SessionQuestionReviewedMsg
+  | SessionScoringCorrectedMsg
+  | SessionParticipantLeaderboardMsg
+  | SessionEndMsg;
+
+type AnalyticsEventMsg =
+  | SessionAnswerUpdateMsg
+  | SessionAnswerRevealMsg
+  | SessionLeaderboardUpdateMsg
+  | SessionEndMsg;
+
+interface QuestionCardProps {
+  question: ParticipantQuestion;
+  lifecycle: QuestionLifecycle;
+  onToggleOption: (questionId: number, optionId: number) => void;
+  onLockIn: (questionId: number) => void;
+}
+
+function formatTime(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safe / 60);
+  const remainder = safe % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}
+
+function normalizeCounts(
+  counts: Record<string, number> | Record<number, number>,
+) {
+  return Object.fromEntries(
+    Object.entries(counts).map(([key, value]) => [Number(key), Number(value)]),
+  ) as Record<number, number>;
+}
+
+function normalizePoints(points: Record<string | number, number>) {
+  return Object.fromEntries(
+    Object.entries(points).map(([key, value]) => [Number(key), Number(value)]),
+  ) as Record<number, number>;
+}
+
+function sumQuestionPoints(question: ParticipantQuestion) {
+  return Math.max(
+    0,
+    question.selectedOptionIds.reduce(
+      (total, optionId) => total + (question.optionPoints[optionId] ?? 0),
+      0,
+    ),
+  );
+}
+
+function optionLabel(index: number) {
+  return OPTION_META[index % OPTION_META.length];
+}
+
+function buildQuestionFromDisplayed(
+  question: SessionQuestionDisplayedMsg,
+): ParticipantQuestion {
+  return {
+    id: question.questionId,
+    text: question.text,
+    questionIndex: question.questionIndex,
+    totalQuestions: question.totalQuestions,
+    timeLimitSeconds: question.timeLimitSeconds,
+    questionType: question.questionType,
+    effectiveDisplayMode: question.effectiveDisplayMode,
+    passageText: question.passage?.text ?? null,
+    options: question.options.toSorted((a, b) => a.orderIndex - b.orderIndex),
+    selectedOptionIds: [],
+    lockedIn: false,
+    counts: {},
+    totalAnswered: 0,
+    totalLockedIn: 0,
+    correctOptionIds: [],
+    optionPoints: {},
+    reviewed: false,
+    revealed: false,
+  };
+}
+
+function buildQuestionFromPassageSubQuestion(
+  question: SessionPassageDisplayedMsg["subQuestions"][number],
+  questionIndex: number,
+  totalQuestions: number,
+  passageText: string,
+  timeLimitSeconds: number,
+  effectiveDisplayMode: DisplayMode,
+): ParticipantQuestion {
+  return {
+    id: question.questionId,
+    text: question.text,
+    questionIndex,
+    totalQuestions,
+    timeLimitSeconds,
+    questionType: question.questionType,
+    effectiveDisplayMode,
+    passageText,
+    options: question.options.toSorted((a, b) => a.orderIndex - b.orderIndex),
+    selectedOptionIds: [],
+    lockedIn: false,
+    counts: {},
+    totalAnswered: 0,
+    totalLockedIn: 0,
+    correctOptionIds: [],
+    optionPoints: {},
+    reviewed: false,
+    revealed: false,
+  };
+}
+
+function buildQuestionFromRejoin(
+  question: RejoinCurrentQuestion | RejoinCurrentPassageQuestion,
+  totalQuestions: number,
+  passageText: string | null,
+  effectiveDisplayMode: DisplayMode,
+  timeLimitSecondsOverride?: number,
+): ParticipantQuestion {
+  return {
+    id: question.id,
+    text: question.text,
+    questionIndex: question.orderIndex,
+    totalQuestions,
+    timeLimitSeconds: timeLimitSecondsOverride ?? question.timeLimitSeconds,
+    questionType: question.questionType,
+    effectiveDisplayMode,
+    passageText,
+    options: question.options.toSorted((a, b) => a.orderIndex - b.orderIndex),
+    selectedOptionIds: question.selectedOptionIds,
+    lockedIn: question.lockedIn,
+    counts: {},
+    totalAnswered: 0,
+    totalLockedIn: 0,
+    correctOptionIds: [],
+    optionPoints: {},
+    reviewed: false,
+    revealed: false,
+  };
+}
+
+function updateQuestion(
+  prev: ParticipantQuestion[],
+  questionId: number,
+  patch: Partial<ParticipantQuestion>,
+) {
+  return prev.map((question) =>
+    question.id === questionId ? { ...question, ...patch } : question,
+  );
+}
+
+function setQuestionSelection(
+  questions: ParticipantQuestion[],
+  questionId: number,
+  nextSelection: number[],
+) {
+  return questions.map((question) =>
+    question.id === questionId
+      ? { ...question, selectedOptionIds: nextSelection }
+      : question,
+  );
+}
+
+function currentQuestionLabel(
+  question: ParticipantQuestion,
+  lifecycle: QuestionLifecycle,
+) {
+  if (question.questionType === "MULTI_SELECT") {
+    return lifecycle === "TIMED"
+      ? `${question.selectedOptionIds.length} selected`
+      : "Select all that apply";
+  }
+  return lifecycle === "TIMED"
+    ? "Tap another option to change"
+    : "Single choice";
+}
+
+function QuestionCard({
+  question,
+  lifecycle,
+  onToggleOption,
+  onLockIn,
+}: QuestionCardProps) {
+  const resolved = lifecycle === "REVIEWING" || question.reviewed;
+  const interactive = lifecycle === "TIMED" && !question.lockedIn;
+  const maxCount = Math.max(
+    1,
+    ...question.options.map((option) => question.counts[option.id] ?? 0),
+  );
+  const questionScore = resolved ? sumQuestionPoints(question) : null;
+
+  return (
+    <article className="border border-border bg-surface p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <p className="label tabular-nums">Q{question.questionIndex}</p>
+            <span className="text-xs text-muted/40">·</span>
+            <span className="text-xs text-muted tabular-nums">
+              {question.timeLimitSeconds || 0}s
+            </span>
+            {question.questionType === "MULTI_SELECT" ? (
+              <>
+                <span className="text-xs text-muted/40">·</span>
+                <span className="label text-accent">Multi-select</span>
+              </>
+            ) : null}
+            {question.passageText ? (
+              <>
+                <span className="text-xs text-muted/40">·</span>
+                <span className="label text-warning">Passage</span>
+              </>
+            ) : null}
+          </div>
+          <h2 className="max-w-3xl text-2xl font-bold leading-snug text-foreground">
+            {question.text}
+          </h2>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-2 text-right">
+          <span className="text-sm tabular-nums text-foreground">
+            {question.totalAnswered} answered
+          </span>
+          {question.totalLockedIn > 0 ? (
+            <span className="text-xs tabular-nums text-muted">
+              {question.totalLockedIn} locked in
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        {question.options.map((option, index) => {
+          const meta = optionLabel(index);
+          const count = question.counts[option.id] ?? 0;
+          const isSelected = question.selectedOptionIds.includes(option.id);
+          const isCorrect = question.correctOptionIds.includes(option.id);
+          const isWrongSelected = resolved && isSelected && !isCorrect;
+          const pointValue = question.optionPoints[option.id] ?? 0;
+          const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+
+          const bgStyle =
+            resolved && isCorrect
+              ? `rgba(${colorRgb.success},0.12)`
+              : isWrongSelected
+                ? `rgba(${colorRgb.danger},0.1)`
+                : isSelected
+                  ? `rgba(${meta.rgb},0.14)`
+                  : "var(--color-background)";
+
+          const borderColor =
+            resolved && isCorrect
+              ? "rgba(34,197,94,0.72)"
+              : isWrongSelected
+                ? "rgba(239,68,68,0.6)"
+                : isSelected
+                  ? meta.color
+                  : "var(--color-border)";
+
+          const content = (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex items-center gap-3">
+                  <span
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
+                    style={{
+                      borderColor: borderColor,
+                      color:
+                        resolved && isCorrect
+                          ? "var(--color-success)"
+                          : isWrongSelected
+                            ? "var(--color-danger)"
+                            : isSelected
+                              ? meta.color
+                              : "var(--color-muted)",
+                    }}
+                  >
+                    {meta.letter}
+                  </span>
+                  <span className="min-w-0 truncate text-sm text-foreground">
+                    {option.text}
+                  </span>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
+                  {interactive || resolved ? (
+                    <span className="text-muted">{count}</span>
+                  ) : null}
+                  {resolved ? (
+                    <span
+                      className={`border px-2 py-1 ${
+                        pointValue > 0
+                          ? "border-success/25 text-success"
+                          : pointValue < 0
+                            ? "border-danger/25 text-danger"
+                            : "border-border text-muted"
+                      }`}
+                    >
+                      {pointValue > 0 ? `+${pointValue}` : pointValue}
+                    </span>
+                  ) : null}
+                  {resolved && isCorrect ? (
+                    <span className="text-success">✓</span>
+                  ) : resolved && isWrongSelected ? (
+                    <span className="text-danger">✕</span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-3 h-1.5 overflow-hidden border border-border bg-background">
+                <motion.div
+                  className="h-full origin-left"
+                  animate={{ scaleX: barWidth / 100 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                  style={{
+                    backgroundColor:
+                      resolved && isCorrect
+                        ? "var(--color-success)"
+                        : meta.color,
+                    willChange: "transform",
+                  }}
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted">
+                <span>{interactive ? "Tap to change" : "Locked"}</span>
+                {resolved && isSelected && questionScore !== null ? (
+                  <span className="tabular-nums text-foreground">
+                    {questionScore > 0 ? `+${questionScore} pts` : "0 pts"}
+                  </span>
+                ) : null}
+              </div>
+            </>
+          );
+
+          const sharedClasses =
+            "w-full border px-4 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+
+          if (interactive) {
+            return (
+              <motion.button
+                key={option.id}
+                type="button"
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onToggleOption(question.id, option.id)}
+                className={sharedClasses}
+                style={{
+                  backgroundColor: bgStyle,
+                  borderColor,
+                }}
+              >
+                {content}
+              </motion.button>
+            );
+          }
+
+          return (
+            <div
+              key={option.id}
+              className={`${sharedClasses} cursor-default`}
+              style={{
+                backgroundColor: bgStyle,
+                borderColor,
+                opacity: lifecycle === "DISPLAYED" ? 0.82 : 1,
+              }}
+            >
+              {content}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+        <p className="text-xs text-muted">
+          {lifecycle === "DISPLAYED"
+            ? "Waiting for host to start the timer."
+            : lifecycle === "TIMED"
+              ? currentQuestionLabel(question, lifecycle)
+              : lifecycle === "FROZEN"
+                ? "Time's up. Grading in progress."
+                : resolved
+                  ? `You scored ${questionScore ?? 0} points.`
+                  : "Results loading..."}
+        </p>
+
+        {lifecycle === "TIMED" && !question.lockedIn ? (
+          <button
+            type="button"
+            onClick={() => onLockIn(question.id)}
+            disabled={question.selectedOptionIds.length === 0}
+            className="border border-border px-4 py-2 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Lock In
+          </button>
+        ) : question.lockedIn ? (
+          <span className="label text-success">Locked</span>
+        ) : null}
+      </div>
+    </article>
+  );
 }
 
 export default function PlayPage() {
@@ -44,390 +567,857 @@ export default function PlayPage() {
   const router = useRouter();
 
   const [sessionState, setSessionState] = useState<SessionState>("LOBBY");
-  const [sessionName, setSessionName] = useState("");
+  const [questionLifecycle, setQuestionLifecycle] =
+    useState<QuestionLifecycle>("DISPLAYED");
+  const [sessionTitle, setSessionTitle] = useState("Live Session");
   const [participantCount, setParticipantCount] = useState(0);
-  const [question, setQuestion] = useState<QuestionData | null>(null);
-  const [selectedOptionIds, setSelectedOptionIds] = useState<number[]>([]);
-  const [correctOptionId, setCorrectOptionId] = useState<number | null>(null);
+  const [participantId, setParticipantId] = useState<number | null>(null);
+  const [questions, setQuestions] = useState<ParticipantQuestion[]>([]);
+  const [passage, setPassage] = useState<ParticipantPassage | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [rejoinToken] = useState<string | null>(() =>
-    typeof window !== "undefined"
-      ? localStorage.getItem(`hermes_rejoin_${sessionId}`)
-      : null,
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [participantLeaderboard, setParticipantLeaderboard] = useState<
+    ParticipantLeaderboardEntry[]
+  >([]);
+  const [finalLeaderboard, setFinalLeaderboard] = useState<LeaderboardEntry[]>(
+    [],
   );
-
+  const [rejoinToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(`hermes_rejoin_${sessionId}`);
+  });
+  const [hydrated, setHydrated] = useState(() => rejoinToken === null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const redirectRef = useRef(false);
 
   const authToken = getStoredAuthToken();
-  const { subscribe, publish, unsubscribe } = useStompClient({
+  const { subscribe, unsubscribe, publish } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
   });
 
-  const startTimer = useCallback((seconds: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setTimeLeft(seconds);
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   }, []);
 
-  useEffect(() => {
-    api
-      .post<{
-        status: string;
-        sessionTitle: string;
-        participantCount: number;
-        currentQuestion?: QuestionData;
-        timeLeftSeconds?: number;
-      }>(`/api/sessions/rejoin`, {
-        sessionId: Number(sessionId),
-        rejoinToken,
-      })
-      .then((res) => {
-        if (!res.success) return;
-        const d = res.data;
-        setSessionName(d.sessionTitle || "Quiz Session");
-        setParticipantCount(d.participantCount || 0);
-        if (d.status === "ACTIVE") {
-          setSessionState("ACTIVE");
-          if (d.currentQuestion) {
-            setQuestion(d.currentQuestion);
-            if (d.timeLeftSeconds != null) startTimer(d.timeLeftSeconds);
+  const startTimer = useCallback(
+    (seconds: number) => {
+      stopTimer();
+      setTimeLeft(seconds);
+      timerRef.current = window.setInterval(() => {
+        setTimeLeft((current) => {
+          if (current === null || current <= 1) {
+            stopTimer();
+            return 0;
           }
-        } else if (d.status === "ENDED") {
-          router.replace(`/session/${sessionId}/results`);
-        }
-      })
-      .catch(() => {});
+          return current - 1;
+        });
+      }, 1000);
+    },
+    [stopTimer],
+  );
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [sessionId, rejoinToken, router, startTimer]);
+  const replaceQuestions = useCallback(
+    (nextQuestions: ParticipantQuestion[]) => {
+      setQuestions(nextQuestions);
+    },
+    [],
+  );
 
-  // Block back navigation during active quiz
-  useEffect(() => {
-    if (sessionState !== "ACTIVE") return;
-    window.history.pushState(null, "", window.location.href);
-    const onPopState = () =>
-      window.history.pushState(null, "", window.location.href);
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("popstate", onPopState);
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => {
-      window.removeEventListener("popstate", onPopState);
-      window.removeEventListener("beforeunload", onBeforeUnload);
-    };
-  }, [sessionState]);
+  const applyQuestionPatch = useCallback(
+    (questionId: number, patch: Partial<ParticipantQuestion>) => {
+      setQuestions((current) => updateQuestion(current, questionId, patch));
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!sessionId) return;
 
-    const dest = `/topic/session.${sessionId}.question`;
-    subscribe(dest, (msg) => {
-      const message = msg as WsMessage;
+    if (!rejoinToken) {
+      return;
+    }
 
-      if (message.event === "QUESTION_START") {
-        const q: QuestionData = {
-          id: message.questionId!,
-          text: message.text!,
-          orderIndex: message.questionIndex!,
-          totalQuestions: message.totalQuestions!,
-          timeLimitSeconds: message.timeLimitSeconds!,
-          options: message.options!,
-        };
+    let cancelled = false;
+    void (async () => {
+      const response = await api.post<RejoinResponse>("/api/sessions/rejoin", {
+        rejoinToken,
+        sessionId: Number(sessionId),
+      });
+
+      if (cancelled) return;
+
+      if (!response.success) {
+        setHydrated(true);
+        return;
+      }
+
+      const data = response.data;
+      setParticipantId(data.participantId);
+      setSessionTitle(data.sessionTitle || "Live Session");
+      setParticipantCount(data.participantCount || 0);
+      setSessionState((data.status as SessionState) || "LOBBY");
+      setQuestionLifecycle(
+        (data.questionLifecycle as QuestionLifecycle) || "DISPLAYED",
+      );
+      setTimeLeft(data.timeLeftSeconds ?? null);
+      setLeaderboard([]);
+      setParticipantLeaderboard([]);
+      setFinalLeaderboard([]);
+
+      if (data.currentPassage) {
+        const currentPassage = data.currentPassage;
+        setPassage({
+          id: currentPassage.id,
+          text: currentPassage.text,
+          timerMode: currentPassage.timerMode,
+          questionIndex: currentPassage.questionIndex,
+          totalQuestions: currentPassage.totalQuestions,
+          timeLimitSeconds: currentPassage.timeLimitSeconds,
+          effectiveDisplayMode: currentPassage.effectiveDisplayMode,
+        });
+        replaceQuestions(
+          currentPassage.subQuestions.map((subQuestion) =>
+            buildQuestionFromRejoin(
+              subQuestion,
+              currentPassage.totalQuestions,
+              currentPassage.text,
+              currentPassage.effectiveDisplayMode,
+              currentPassage.timeLimitSeconds ?? subQuestion.timeLimitSeconds,
+            ),
+          ),
+        );
+      } else if (data.currentQuestion) {
+        setPassage(null);
+        replaceQuestions([
+          buildQuestionFromRejoin(
+            data.currentQuestion,
+            data.currentQuestion.totalQuestions,
+            data.currentQuestion.passage?.text ?? null,
+            data.currentQuestion.effectiveDisplayMode,
+          ),
+        ]);
+      }
+
+      setHydrated(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rejoinToken, replaceQuestions, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const questionDestination = `/topic/session.${sessionId}.question`;
+    const analyticsDestination = `/topic/session.${sessionId}.analytics`;
+    const controlDestination = `/topic/session.${sessionId}.control`;
+
+    subscribe(questionDestination, (msg) => {
+      const data = msg as QuestionEventMsg;
+
+      if (data.event === "QUESTION_DISPLAYED") {
+        stopTimer();
         setSessionState("ACTIVE");
-        setQuestion(q);
-        setSelectedOptionIds([]);
-        setCorrectOptionId(null);
-        startTimer(q.timeLimitSeconds);
-      }
-
-      if (message.event === "QUESTION_END") {
-        setCorrectOptionId(message.correctOptionId!);
-        if (timerRef.current) clearInterval(timerRef.current);
+        setQuestionLifecycle("DISPLAYED");
+        setLeaderboard([]);
+        setParticipantLeaderboard([]);
+        setFinalLeaderboard([]);
+        setPassage(
+          data.passage
+            ? {
+                id: data.passage.id,
+                text: data.passage.text,
+                timerMode: "PER_SUB_QUESTION",
+                questionIndex: data.questionIndex,
+                totalQuestions: data.totalQuestions,
+                timeLimitSeconds: data.timeLimitSeconds,
+                effectiveDisplayMode: data.effectiveDisplayMode,
+              }
+            : null,
+        );
+        replaceQuestions([buildQuestionFromDisplayed(data)]);
         setTimeLeft(0);
+        return;
       }
 
-      if (message.event === "SESSION_END") {
-        router.replace(`/session/${sessionId}/results`);
+      if (data.event === "PASSAGE_DISPLAYED") {
+        stopTimer();
+        setSessionState("ACTIVE");
+        setQuestionLifecycle("DISPLAYED");
+        setLeaderboard([]);
+        setParticipantLeaderboard([]);
+        setFinalLeaderboard([]);
+        setPassage({
+          id: data.passageId,
+          text: data.passageText,
+          timerMode: "ENTIRE_PASSAGE",
+          questionIndex: data.questionIndex,
+          totalQuestions: data.totalQuestions,
+          timeLimitSeconds: null,
+          effectiveDisplayMode: data.effectiveDisplayMode,
+        });
+
+        const nextQuestions = data.subQuestions.map((question, index) =>
+          buildQuestionFromPassageSubQuestion(
+            question,
+            data.questionIndex + index,
+            data.totalQuestions,
+            data.passageText,
+            data.timeLimitSeconds ?? 0,
+            data.effectiveDisplayMode,
+          ),
+        );
+        replaceQuestions(nextQuestions);
+        setTimeLeft(0);
+        return;
       }
 
-      if (message.event === "PARTICIPANT_JOINED") {
-        setParticipantCount(message.count ?? 0);
+      if (data.event === "TIMER_START") {
+        setSessionState("ACTIVE");
+        setQuestionLifecycle("TIMED");
+        startTimer(data.timeLimitSeconds);
+        return;
+      }
+
+      if (data.event === "QUESTION_FROZEN" || data.event === "PASSAGE_FROZEN") {
+        stopTimer();
+        setQuestionLifecycle("FROZEN");
+        setTimeLeft(0);
+        setQuestions((current) =>
+          current.map((question) => ({ ...question, lockedIn: true })),
+        );
+        return;
+      }
+
+      if (
+        data.event === "QUESTION_REVIEWED" ||
+        data.event === "SCORING_CORRECTED"
+      ) {
+        setQuestionLifecycle("REVIEWING");
+        applyQuestionPatch(data.questionId, {
+          correctOptionIds: data.correctOptionIds,
+          optionPoints: normalizePoints(data.optionPoints),
+          reviewed: true,
+          lockedIn: true,
+        });
+        return;
+      }
+
+      if (data.event === "PARTICIPANT_LEADERBOARD") {
+        setParticipantLeaderboard(data.leaderboard);
+        return;
+      }
+
+      if (data.event === "SESSION_END") {
+        stopTimer();
+        setSessionState("ENDED");
+        if (data.leaderboard) {
+          setFinalLeaderboard(data.leaderboard);
+        }
+      }
+    });
+
+    subscribe(analyticsDestination, (msg) => {
+      const data = msg as AnalyticsEventMsg;
+
+      if (data.event === "ANSWER_UPDATE") {
+        applyQuestionPatch(data.questionId, {
+          counts: normalizeCounts(data.counts),
+          totalAnswered: data.totalAnswered,
+          totalLockedIn: data.totalLockedIn,
+        });
+        return;
+      }
+
+      if (data.event === "ANSWER_REVEAL") {
+        applyQuestionPatch(data.questionId, {
+          counts: normalizeCounts(data.counts),
+          totalAnswered: data.totalAnswered,
+          revealed: true,
+        });
+        return;
+      }
+
+      if (data.event === "LEADERBOARD_UPDATE") {
+        setLeaderboard(data.leaderboard);
+        return;
+      }
+
+      if (data.event === "SESSION_END") {
+        stopTimer();
+        setSessionState("ENDED");
+        if (data.leaderboard) {
+          setFinalLeaderboard(data.leaderboard);
+        }
+      }
+    });
+
+    subscribe(controlDestination, (msg) => {
+      const data = msg as { event: "PARTICIPANT_JOINED"; count: number };
+      if (data.event === "PARTICIPANT_JOINED") {
+        setParticipantCount(data.count);
       }
     });
 
     return () => {
-      unsubscribe(dest);
+      unsubscribe(questionDestination);
+      unsubscribe(analyticsDestination);
+      unsubscribe(controlDestination);
     };
-  }, [sessionId, subscribe, unsubscribe, router, startTimer]);
+  }, [
+    applyQuestionPatch,
+    replaceQuestions,
+    sessionId,
+    startTimer,
+    stopTimer,
+    subscribe,
+    unsubscribe,
+  ]);
 
-  const handleAnswer = useCallback(
-    (optionId: number) => {
-      if (correctOptionId !== null || !question || !rejoinToken) return;
-      setSelectedOptionIds([optionId]);
-      publish(`/app/session/${sessionId}/answer`, {
-        rejoinToken,
-        questionId: question.id,
-        selectedOptionIds: [optionId],
-      });
-    },
-    [correctOptionId, question, rejoinToken, publish, sessionId],
+  useEffect(() => {
+    if (sessionState !== "ENDED" || redirectRef.current) {
+      return;
+    }
+
+    redirectRef.current = true;
+    router.replace(`/session/${sessionId}/results`);
+  }, [router, sessionId, sessionState]);
+
+  const activeQuestions = questions;
+  const activePassage = passage;
+  const isPassage = Boolean(activePassage);
+  const maxQuestionIndex =
+    activeQuestions[activeQuestions.length - 1]?.questionIndex ?? 0;
+  const timerColour =
+    timeLeft !== null && timeLeft <= 5
+      ? "var(--color-danger)"
+      : timeLeft !== null && timeLeft <= 10
+        ? "var(--color-warning)"
+        : "var(--color-foreground)";
+
+  const leaderboardRows = useMemo(() => {
+    const source = finalLeaderboard.length ? finalLeaderboard : leaderboard;
+    return source.toSorted((a, b) => a.rank - b.rank);
+  }, [finalLeaderboard, leaderboard]);
+
+  const myLeaderboardEntry = useMemo(
+    () =>
+      participantId != null
+        ? participantLeaderboard.find(
+            (entry) => entry.participantId === participantId,
+          )
+        : null,
+    [participantId, participantLeaderboard],
   );
 
-  const getOptionState = (optionId: number) => {
-    if (correctOptionId !== null) {
-      if (optionId === correctOptionId) return "correct";
-      if (selectedOptionIds.includes(optionId)) return "wrong";
-      return "neutral";
-    }
-    if (selectedOptionIds.length > 0) {
-      if (selectedOptionIds.includes(optionId)) return "selected";
-      return "faded";
-    }
-    return "idle";
-  };
+  const topFive = leaderboardRows.slice(0, 5);
+  const selectedQuestionCount = activeQuestions.reduce(
+    (count, question) =>
+      count + (question.selectedOptionIds.length > 0 ? 1 : 0),
+    0,
+  );
+
+  const lockableQuestions = activeQuestions.filter(
+    (question) =>
+      questionLifecycle === "TIMED" &&
+      !question.lockedIn &&
+      question.selectedOptionIds.length > 0,
+  );
+
+  const canLockAll = lockableQuestions.length > 0;
+
+  const handleToggleOption = useCallback(
+    (questionId: number, optionId: number) => {
+      if (questionLifecycle !== "TIMED" || !rejoinToken) return;
+
+      let didUpdate = false;
+      let nextSelection: number[] = [];
+      setQuestions((current) => {
+        const question = current.find((entry) => entry.id === questionId);
+        if (!question || question.lockedIn) return current;
+
+        didUpdate = true;
+        nextSelection =
+          question.questionType === "MULTI_SELECT"
+            ? question.selectedOptionIds.includes(optionId)
+              ? question.selectedOptionIds.filter((id) => id !== optionId)
+              : [...question.selectedOptionIds, optionId]
+            : question.selectedOptionIds.includes(optionId)
+              ? question.selectedOptionIds
+              : [optionId];
+        return setQuestionSelection(current, questionId, nextSelection);
+      });
+      if (!didUpdate) return;
+
+      publish(`/app/session/${sessionId}/answer`, {
+        rejoinToken,
+        questionId,
+        selectedOptionIds: nextSelection,
+      });
+    },
+    [publish, questionLifecycle, rejoinToken, sessionId],
+  );
+
+  const handleLockIn = useCallback(
+    (questionId: number) => {
+      if (!rejoinToken) return;
+
+      publish(`/app/session/${sessionId}/lock-in`, {
+        rejoinToken,
+        questionId,
+      });
+
+      setQuestions((current) =>
+        current.map((question) =>
+          question.id === questionId
+            ? { ...question, lockedIn: true }
+            : question,
+        ),
+      );
+    },
+    [publish, rejoinToken, sessionId],
+  );
+
+  const handleLockAll = useCallback(() => {
+    lockableQuestions.forEach((question) => handleLockIn(question.id));
+  }, [handleLockIn, lockableQuestions]);
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Spinner />
+      </div>
+    );
+  }
 
   if (sessionState === "LOBBY") {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="text-center px-6"
-        >
-          <p className="label mb-6">{sessionName || "Live Session"}</p>
-
-          <div className="mb-12">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={participantCount}
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                transition={{ duration: 0.2 }}
-                className="font-bold text-foreground tabular-nums"
-                style={{ fontSize: "clamp(3rem, 10vw, 5rem)", lineHeight: 1 }}
-              >
-                {participantCount}
-              </motion.div>
-            </AnimatePresence>
-            <p className="label mt-3">
-              {participantCount === 1 ? "Participant" : "Participants"} joined
-            </p>
-          </div>
-
-          <div className="flex items-center justify-center gap-3 text-muted">
-            <span
-              aria-hidden
-              className="live-dot inline-block w-2 h-2 rounded-full bg-success"
-            />
-            <p className="text-sm tracking-wide">Waiting for host to start…</p>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (sessionState === "ACTIVE" && question) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b border-border">
-          <div className="flex items-center justify-between max-w-2xl mx-auto">
-            <p className="label tabular-nums">
-              Question {question.orderIndex} of {question.totalQuestions}
-            </p>
-            <div
-              className="font-bold tabular-nums transition-all duration-300"
-              style={{
-                fontSize:
-                  timeLeft !== null && timeLeft <= 5 ? "1.5rem" : "1rem",
-                color:
-                  timeLeft !== null && timeLeft <= 5
-                    ? "var(--color-danger)"
-                    : timeLeft !== null && timeLeft <= 10
-                      ? "var(--color-warning)"
-                      : "var(--color-foreground)",
-                textShadow:
-                  timeLeft !== null && timeLeft <= 5
-                    ? `0 0 12px rgba(${colorRgb.danger},0.6)`
-                    : "none",
-              }}
-            >
-              {timeLeft ?? "—"}s
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border px-6 py-4">
+          <div className="mx-auto flex max-w-7xl items-center justify-between">
+            <Logo size="sm" />
+            <div className="flex items-center gap-3">
+              <span className="label text-warning">Lobby</span>
+              <span className="text-xs text-muted tabular-nums">
+                {participantCount} participants
+              </span>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Question + options */}
-        <AnimatePresence mode="wait">
+        <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl items-center justify-center px-6 py-10">
           <motion.div
-            key={question.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="flex-1 flex flex-col px-6 py-8 max-w-2xl mx-auto w-full"
+            {...enterAnimation}
+            className="w-full border border-border bg-surface px-8 py-10 text-center"
           >
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground text-center mb-8 leading-snug">
-              {question.text}
+            <p className="label mb-4">{sessionTitle}</p>
+            <h1 className="text-3xl font-bold text-foreground">
+              Waiting for the host
             </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted">
+              The room is open and your connection is ready. When the host
+              starts the timer, the first question will slide into place here.
+            </p>
 
-            {/* Options 2×2 grid */}
-            <div className="grid grid-cols-2 gap-2 flex-1">
-              {question.options
-                .toSorted((a, b) => a.orderIndex - b.orderIndex)
-                .map((opt, i) => {
-                  const meta = OPTION_META[i % OPTION_META.length];
-                  const state = getOptionState(opt.id);
-
-                  // Dormant: pure neutral. Color only appears on selection.
-                  let bgStyle = "var(--color-surface)";
-                  let borderStyle = "var(--color-border)";
-                  let letterColor = "var(--color-muted-dark)";
-                  let opacity = 1;
-
-                  if (state === "selected") {
-                    bgStyle = `rgba(${meta.rgb}, 0.16)`;
-                    borderStyle = meta.color;
-                    letterColor = meta.color;
-                  } else if (state === "faded") {
-                    opacity = 0.3;
-                  } else if (state === "correct") {
-                    bgStyle = `rgba(${colorRgb.success},0.16)`;
-                    borderStyle = `rgba(${colorRgb.success},0.7)`;
-                    letterColor = "var(--color-success)";
-                  } else if (state === "wrong") {
-                    bgStyle = `rgba(${colorRgb.danger},0.08)`;
-                    borderStyle = `rgba(${colorRgb.danger},0.25)`;
-                    letterColor = "var(--color-danger)";
-                    opacity = 0.5;
-                  } else if (state === "neutral" && correctOptionId !== null) {
-                    opacity = 0.18;
-                  }
-
-                  const isInteractive = correctOptionId === null;
-
-                  return (
-                    <motion.button
-                      key={opt.id}
-                      onClick={() => handleAnswer(opt.id)}
-                      disabled={!isInteractive}
-                      whileHover={isInteractive ? { scale: 1.015 } : {}}
-                      whileTap={isInteractive ? { scale: 0.97 } : {}}
-                      animate={{
-                        opacity,
-                        background: bgStyle,
-                        borderColor: borderStyle,
-                      }}
-                      transition={{ duration: 0.2 }}
-                      className="relative flex flex-col justify-between p-5 text-left border cursor-pointer disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      style={{ minHeight: 108 }}
-                    >
-                      {/* Top row: letter + result indicator */}
-                      <div className="flex items-center justify-between mb-3">
-                        <motion.span
-                          animate={{ color: letterColor }}
-                          transition={{ duration: 0.2 }}
-                          className="font-mono font-black text-xs tracking-widest"
-                          aria-hidden
-                        >
-                          {meta.letter}
-                        </motion.span>
-                        {state === "correct" && (
-                          <motion.span
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="text-success text-sm font-bold"
-                          >
-                            ✓
-                          </motion.span>
-                        )}
-                        {state === "wrong" && (
-                          <motion.span
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="text-danger text-sm"
-                          >
-                            ✗
-                          </motion.span>
-                        )}
-                      </div>
-                      {/* Option text */}
-                      <p className="text-base md:text-lg lg:text-xl font-medium text-foreground leading-snug">
-                        {opt.text}
-                      </p>
-                    </motion.button>
-                  );
-                })}
-            </div>
-
-            {/* Status message */}
-            <div aria-live="polite" aria-atomic="true" className="mt-6 min-h-6">
-              <AnimatePresence>
-                {selectedOptionIds.length > 0 && correctOptionId === null && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    role="status"
-                    className="text-center label text-success"
-                  >
-                    Answer recorded
-                  </motion.p>
-                )}
-                {!selectedOptionIds.length &&
-                  correctOptionId === null &&
-                  timeLeft === 0 && (
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      role="status"
-                      className="text-center label"
-                    >
-                      Time&apos;s up
-                    </motion.p>
-                  )}
-                {correctOptionId !== null && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-center label"
-                    style={{
-                      color: selectedOptionIds.includes(correctOptionId ?? -1)
-                        ? "var(--color-success)"
-                        : "var(--color-danger)",
-                    }}
-                  >
-                    {selectedOptionIds.includes(correctOptionId ?? -1)
-                      ? "Correct!"
-                      : "Incorrect"}
-                  </motion.p>
-                )}
-              </AnimatePresence>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs text-muted">
+              <span className="label">Live session</span>
+              <span className="text-muted/40">·</span>
+              <span className="tabular-nums">{participantCount} joined</span>
             </div>
           </motion.div>
-        </AnimatePresence>
+        </main>
       </div>
     );
   }
 
+  if (sessionState === "ENDED") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const currentQuestionsLabel =
+    activeQuestions.length > 1 && activePassage?.timerMode === "ENTIRE_PASSAGE"
+      ? `Q${activeQuestions[0].questionIndex}-${maxQuestionIndex} / ${
+          activeQuestions[0].totalQuestions
+        }`
+      : activeQuestions[0]
+        ? `Q${activeQuestions[0].questionIndex} / ${activeQuestions[0].totalQuestions}`
+        : "Waiting";
+
+  const headerStatus =
+    questionLifecycle === "DISPLAYED"
+      ? "Read-only"
+      : questionLifecycle === "TIMED"
+        ? "Answer now"
+        : questionLifecycle === "FROZEN"
+          ? "Frozen"
+          : "Review";
+
+  const focusedScore =
+    questionLifecycle === "REVIEWING" && activeQuestions.length === 1
+      ? sumQuestionPoints(activeQuestions[0])
+      : null;
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <Spinner />
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+          <Logo size="sm" />
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <span className="label">{headerStatus}</span>
+            <span className="text-xs text-muted tabular-nums">
+              {participantCount} participants
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto grid w-full max-w-7xl gap-6 px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+        <div className="space-y-6">
+          <motion.section
+            {...enterAnimation}
+            className="border border-border bg-surface p-6"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="label tabular-nums">
+                {currentQuestionsLabel}
+              </span>
+              <span className="text-xs text-muted/40">·</span>
+              <span className="label text-accent">{headerStatus}</span>
+              {isPassage ? (
+                <>
+                  <span className="text-xs text-muted/40">·</span>
+                  <span className="label text-warning">Passage</span>
+                </>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
+              <div>
+                <p className="label mb-2">Timer</p>
+                <div
+                  className="font-black tabular-nums"
+                  style={{
+                    fontSize: "clamp(2.2rem, 8vw, 4.5rem)",
+                    lineHeight: 1,
+                    color: timerColour,
+                    textShadow:
+                      timeLeft !== null && timeLeft <= 5
+                        ? `0 0 16px rgba(${colorRgb.danger},0.4)`
+                        : "none",
+                  }}
+                >
+                  {formatTime(timeLeft ?? 0)}
+                </div>
+              </div>
+
+              <div className="w-full max-w-sm">
+                <div className="h-1 bg-border">
+                  <motion.div
+                    className="h-full origin-left"
+                    animate={{
+                      scaleX:
+                        timeLeft !== null &&
+                        activeQuestions[0]?.timeLimitSeconds
+                          ? Math.max(
+                              0,
+                              timeLeft / activeQuestions[0].timeLimitSeconds,
+                            )
+                          : 0,
+                    }}
+                    transition={{ duration: 0.25 }}
+                    style={{
+                      backgroundColor: timerColour,
+                      willChange: "transform",
+                    }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-muted">
+                  <span>{activePassage?.timerMode ?? "single question"}</span>
+                  <span className="tabular-nums">
+                    {formatTime(timeLeft ?? 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          {activePassage ? (
+            <motion.section
+              {...enterAnimation}
+              className="border border-border bg-surface p-6"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="label mb-2">Passage</p>
+                  <h2 className="max-w-3xl text-xl font-bold leading-snug text-foreground">
+                    {activePassage.text}
+                  </h2>
+                </div>
+                <div className="text-right text-xs text-muted">
+                  <p className="tabular-nums">
+                    {activePassage.questionIndex} - {maxQuestionIndex} of{" "}
+                    {activePassage.totalQuestions}
+                  </p>
+                  <p>{activePassage.timerMode.replace("_", " ")}</p>
+                </div>
+              </div>
+
+              <p className="mt-4 max-w-4xl text-sm leading-7 text-muted">
+                {activePassage.timerMode === "ENTIRE_PASSAGE"
+                  ? "All sub-questions are live together. Answer in any order and lock them individually or all at once."
+                  : "The passage stays on screen while the sub-question below changes."}
+              </p>
+            </motion.section>
+          ) : null}
+
+          {activeQuestions.length > 1 &&
+          activePassage?.timerMode === "ENTIRE_PASSAGE" ? (
+            <div className="grid gap-4">
+              {activeQuestions.map((question, index) => (
+                <motion.div
+                  key={question.id}
+                  {...enterAnimation}
+                  transition={{
+                    ...enterAnimation.transition,
+                    delay: index * 0.03,
+                  }}
+                >
+                  <QuestionCard
+                    question={question}
+                    lifecycle={questionLifecycle}
+                    onToggleOption={handleToggleOption}
+                    onLockIn={handleLockIn}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          ) : activeQuestions[0] ? (
+            <motion.div {...enterAnimation}>
+              <QuestionCard
+                question={activeQuestions[0]}
+                lifecycle={questionLifecycle}
+                onToggleOption={handleToggleOption}
+                onLockIn={handleLockIn}
+              />
+            </motion.div>
+          ) : (
+            <motion.section
+              {...enterAnimation}
+              className="border border-border bg-surface p-8"
+            >
+              <p className="label mb-3">Waiting</p>
+              <h2 className="text-2xl font-bold text-foreground">
+                Waiting for the next question
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
+                The session is live, but the next question has not been
+                delivered yet.
+              </p>
+            </motion.section>
+          )}
+
+          <motion.section
+            {...enterAnimation}
+            className="border border-border bg-surface p-6"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="label mb-2">Answer state</p>
+                <h3 className="text-xl font-bold text-foreground">
+                  {questionLifecycle === "DISPLAYED"
+                    ? "Read the question"
+                    : questionLifecycle === "TIMED"
+                      ? "Change your answer freely"
+                      : questionLifecycle === "FROZEN"
+                        ? "Answers locked"
+                        : "Results revealed"}
+                </h3>
+              </div>
+              <div className="text-right text-xs text-muted">
+                <p className="tabular-nums">{selectedQuestionCount} answered</p>
+                <p>{activeQuestions.length} on screen</p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {questionLifecycle === "TIMED" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleLockAll}
+                    disabled={!canLockAll}
+                    className="btn-primary"
+                  >
+                    {activePassage?.timerMode === "ENTIRE_PASSAGE"
+                      ? "Lock In All"
+                      : "Lock In"}
+                  </button>
+                  <p className="text-xs text-muted">
+                    {activePassage?.timerMode === "ENTIRE_PASSAGE"
+                      ? `${lockableQuestions.length} question(s) ready to freeze`
+                      : "You can keep changing your choice until you lock it."}
+                  </p>
+                </>
+              ) : questionLifecycle === "REVIEWING" ? (
+                <p className="text-xs text-muted">
+                  {focusedScore !== null
+                    ? `You scored ${focusedScore} points on the current question.`
+                    : "Scores are being recalculated."}
+                </p>
+              ) : (
+                <p className="text-xs text-muted">
+                  {questionLifecycle === "DISPLAYED"
+                    ? "The host has not started the timer yet."
+                    : "The timer expired and grading is underway."}
+                </p>
+              )}
+            </div>
+          </motion.section>
+        </div>
+
+        <aside className="space-y-6">
+          <motion.section
+            {...enterAnimation}
+            className="border border-border bg-surface p-6"
+          >
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="label mb-2">Leaderboard</p>
+                <h3 className="text-lg font-bold text-foreground">
+                  Top 5 and your rank
+                </h3>
+              </div>
+              <span className="text-xs text-muted tabular-nums">
+                {leaderboardRows.length
+                  ? `${leaderboardRows.length} shown`
+                  : "Waiting"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {topFive.length === 0 ? (
+                <p className="text-sm text-muted">
+                  Leaderboard will appear after review.
+                </p>
+              ) : (
+                topFive.map((entry, index) => (
+                  <LeaderboardRow
+                    key={`${entry.rank}-${entry.displayName}`}
+                    rank={entry.rank}
+                    displayName={entry.displayName}
+                    score={entry.score}
+                    variant="review"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                  />
+                ))
+              )}
+            </div>
+
+            {myLeaderboardEntry ? (
+              <div className="mt-4 border border-border bg-background p-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="label">You</span>
+                  <span className="text-xs text-muted tabular-nums">
+                    #{myLeaderboardEntry.rank}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted">
+                    {myLeaderboardEntry.displayName}
+                  </span>
+                  <span className="font-bold tabular-nums text-foreground">
+                    {myLeaderboardEntry.score.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 border border-border bg-background p-4 text-sm text-muted">
+                Your rank will appear after the current question is reviewed.
+              </div>
+            )}
+          </motion.section>
+
+          <motion.section
+            {...enterAnimation}
+            className="border border-border bg-surface p-6"
+          >
+            <p className="label mb-4">Session details</p>
+            <div className="space-y-3 text-sm text-muted">
+              <div className="flex items-center justify-between gap-4">
+                <span>Status</span>
+                <span className="text-foreground">{sessionState}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span>Lifecycle</span>
+                <span className="text-foreground">{questionLifecycle}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span>Question set</span>
+                <span className="text-foreground tabular-nums">
+                  {activeQuestions.length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span>Timer</span>
+                <span className="text-foreground tabular-nums">
+                  {formatTime(timeLeft ?? 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span>Participants</span>
+                <span className="text-foreground tabular-nums">
+                  {participantCount}
+                </span>
+              </div>
+            </div>
+          </motion.section>
+
+          {questionLifecycle === "REVIEWING" && activeQuestions[0] ? (
+            <motion.section
+              {...enterAnimation}
+              className="border border-border bg-surface p-6"
+            >
+              <p className="label mb-4">Question score</p>
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <div
+                    className="font-black tabular-nums text-foreground"
+                    style={{
+                      fontSize: "clamp(2.25rem, 8vw, 3.75rem)",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {sumQuestionPoints(activeQuestions[0]).toLocaleString()}
+                  </div>
+                  <p className="mt-2 text-xs text-muted">Points earned</p>
+                </div>
+                <span className="label text-success">
+                  {activeQuestions[0].reviewed ? "Reviewed" : "Pending"}
+                </span>
+              </div>
+            </motion.section>
+          ) : null}
+
+          <div className="flex gap-3">
+            <Link
+              href="/"
+              className="w-full border border-border px-5 py-3 text-center text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Leave session
+            </Link>
+          </div>
+        </aside>
+      </main>
     </div>
   );
 }

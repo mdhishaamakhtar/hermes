@@ -67,7 +67,7 @@ public class AnswerService {
 
     Set<Long> previousSelectionIds = previousSelectionIds(sid, participantId, answer);
     answer.setSelectedOptions(toAnswerOptionReferences(selectedOptionIds));
-    answer.setAnsweredAt(OffsetDateTime.now());
+    answer.setAnsweredAt(selectedOptionIds.isEmpty() ? null : OffsetDateTime.now());
     answerRepository.save(answer);
 
     liveStateService.replaceParticipantSelections(
@@ -145,9 +145,6 @@ public class AnswerService {
       }
       normalized.add(optionId);
     }
-    if (normalized.isEmpty()) {
-      throw AppException.badRequest("At least one option must be selected");
-    }
     return normalized;
   }
 
@@ -162,7 +159,7 @@ public class AnswerService {
           "Selection contains an option that does not belong to the question");
     }
 
-    if ("SINGLE_SELECT".equals(question.questionType()) && selectedOptionIds.size() != 1) {
+    if ("SINGLE_SELECT".equals(question.questionType()) && selectedOptionIds.size() > 1) {
       throw AppException.badRequest("SINGLE_SELECT questions require exactly one selected option");
     }
   }

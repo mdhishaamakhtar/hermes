@@ -1,11 +1,10 @@
 package dev.hishaam.hermes.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public record AnswerRequest(
     @NotBlank String rejoinToken,
     @NotNull Long questionId,
-    @NotEmpty List<@NotNull Long> selectedOptionIds) {}
+    @NotNull List<@NotNull Long> selectedOptionIds) {}

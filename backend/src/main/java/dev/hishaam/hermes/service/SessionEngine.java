@@ -380,6 +380,7 @@ public class SessionEngine {
         new WsPayloads.PassageDisplayed(
             passage.id(),
             passage.text(),
+            passage.timeLimitSeconds(),
             wsSubQuestions,
             questionIndex,
             totalQuestions,

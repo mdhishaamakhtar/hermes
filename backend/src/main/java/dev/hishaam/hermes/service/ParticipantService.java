@@ -2,6 +2,7 @@ package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.*;
 import dev.hishaam.hermes.entity.Participant;
+import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
@@ -126,10 +127,16 @@ public class ParticipantService {
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
     SessionStatus status = session.getStatus();
+    String questionLifecycle = liveStateService.getQuestionState(sid);
 
     String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
     Long currentQId =
         (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
+    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
+    Long currentPassageId =
+        (currentPassageIdStr != null && !currentPassageIdStr.isEmpty())
+            ? Long.parseLong(currentPassageIdStr)
+            : null;
 
     List<Long> answered = answerRepository.findAnsweredQuestionIds(participantId);
 
@@ -137,26 +144,40 @@ public class ParticipantService {
     int participantCount = (int) liveStateService.getParticipantCount(sid);
 
     RejoinResponse.CurrentQuestion currentQuestion = null;
+    RejoinResponse.CurrentPassage currentPassage = null;
     Integer timeLeftSeconds = null;
     if (SessionStatus.ACTIVE == status && currentQId != null) {
-      QuizSnapshot.QuestionSnapshot qSnap = snapshot.findQuestion(currentQId);
-      if (qSnap != null) {
-        List<RejoinResponse.OptionInfo> options =
-            qSnap.options().stream()
-                .map(o -> new RejoinResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
-                .toList();
-        int questionIndex = snapshot.questionPosition(currentQId);
-        currentQuestion =
-            new RejoinResponse.CurrentQuestion(
-                qSnap.id(),
-                qSnap.text(),
-                questionIndex,
-                snapshot.questions().size(),
-                qSnap.timeLimitSeconds(),
-                options);
-        Long ttl = redis.getExpire(redisHelper.timerKey(sid), TimeUnit.SECONDS);
-        if (ttl != null && ttl > 0) {
-          timeLeftSeconds = ttl.intValue();
+      Long ttl = redis.getExpire(redisHelper.timerKey(sid), TimeUnit.SECONDS);
+      if (ttl != null && ttl > 0) {
+        timeLeftSeconds = ttl.intValue();
+      }
+
+      if (currentPassageId != null) {
+        QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(currentPassageId);
+        if (passage != null) {
+          List<RejoinResponse.QuestionInfo> subQuestions =
+              passage.subQuestionIds().stream()
+                  .map(snapshot::findQuestion)
+                  .filter(java.util.Objects::nonNull)
+                  .sorted(java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+                  .map(qSnap -> buildQuestionInfo(participantId, qSnap))
+                  .toList();
+
+          currentPassage =
+              new RejoinResponse.CurrentPassage(
+                  passage.id(),
+                  passage.text(),
+                  passage.timerMode(),
+                  snapshot.questionPosition(subQuestions.isEmpty() ? currentQId : subQuestions.get(0).id()),
+                  snapshot.questions().size(),
+                  passage.timeLimitSeconds(),
+                  subQuestions.isEmpty() ? null : subQuestions.get(0).effectiveDisplayMode(),
+                  subQuestions);
+        }
+      } else {
+        QuizSnapshot.QuestionSnapshot qSnap = snapshot.findQuestion(currentQId);
+        if (qSnap != null) {
+          currentQuestion = buildCurrentQuestion(participantId, qSnap, snapshot);
         }
       }
     }
@@ -165,11 +186,14 @@ public class ParticipantService {
         participantId,
         sessionId,
         status.name(),
+        questionLifecycle,
         snapshot.title(),
         participantCount,
         currentQId,
+        currentPassageId,
         answered,
         currentQuestion,
+        currentPassage,
         timeLeftSeconds);
   }
 
@@ -186,9 +210,73 @@ public class ParticipantService {
     redis
         .opsForValue()
         .set(
-            redisHelper.participantTokenKey(rejoinToken),
-            p.getId().toString(),
-            SessionRedisHelper.REJOIN_TTL);
+        redisHelper.participantTokenKey(rejoinToken),
+        p.getId().toString(),
+        SessionRedisHelper.REJOIN_TTL);
     return p.getId();
+  }
+
+  private RejoinResponse.CurrentQuestion buildCurrentQuestion(
+      Long participantId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
+    List<RejoinResponse.OptionInfo> options =
+        question.options().stream()
+            .map(o -> new RejoinResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
+            .toList();
+    ParticipantAnswer answer = currentAnswer(participantId, question.id());
+    List<Long> selectedOptionIds = selectedOptionIds(answer);
+    RejoinResponse.PassageInfo passageInfo =
+        question.passageId() == null
+            ? null
+            : snapshot.findPassage(question.passageId()) == null
+                ? null
+                : new RejoinResponse.PassageInfo(
+                    question.passageId(),
+                    snapshot.findPassage(question.passageId()).text(),
+                    snapshot.findPassage(question.passageId()).timerMode());
+
+    return new RejoinResponse.CurrentQuestion(
+        question.id(),
+        question.text(),
+        question.orderIndex(),
+        snapshot.questions().size(),
+        question.timeLimitSeconds(),
+        question.questionType(),
+        question.effectiveDisplayMode(),
+        passageInfo,
+        options,
+        selectedOptionIds,
+        answer != null && answer.isLockedIn());
+  }
+
+  private RejoinResponse.QuestionInfo buildQuestionInfo(
+      Long participantId, QuizSnapshot.QuestionSnapshot question) {
+    ParticipantAnswer answer = currentAnswer(participantId, question.id());
+    List<RejoinResponse.OptionInfo> options =
+        question.options().stream()
+            .map(o -> new RejoinResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
+            .toList();
+    return new RejoinResponse.QuestionInfo(
+        question.id(),
+        question.text(),
+        question.orderIndex(),
+        question.timeLimitSeconds(),
+        question.questionType(),
+        options,
+        selectedOptionIds(answer),
+        answer != null && answer.isLockedIn());
+  }
+
+  private ParticipantAnswer currentAnswer(Long participantId, Long questionId) {
+    return answerRepository.findByParticipantIdAndQuestionId(participantId, questionId).orElse(null);
+  }
+
+  private List<Long> selectedOptionIds(ParticipantAnswer answer) {
+    if (answer == null || answer.getSelectedOptions().isEmpty()) {
+      return List.of();
+    }
+    return answer.getSelectedOptions().stream()
+        .sorted(java.util.Comparator.comparingInt(option -> option.getOrderIndex()))
+        .map(option -> option.getId())
+        .toList();
   }
 }

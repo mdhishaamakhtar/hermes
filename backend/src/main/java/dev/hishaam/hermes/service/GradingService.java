@@ -265,18 +265,16 @@ public class GradingService {
         "/topic/session." + sessionId + ".analytics",
         new WsPayloads.LeaderboardUpdate(leaderboard));
 
-    List<WsPayloads.ParticipantLeaderboardEntry> top5 =
-        leaderboard.stream()
-            .limit(5)
-            .map(
-                e ->
-                    new WsPayloads.ParticipantLeaderboardEntry(
-                        e.rank(), e.displayName(), e.score()))
-            .toList();
-
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".question",
-        new WsPayloads.ParticipantLeaderboard(top5, totalParticipants));
+        new WsPayloads.ParticipantLeaderboard(
+            leaderboard.stream()
+                .map(
+                    e ->
+                        new WsPayloads.ParticipantLeaderboardEntry(
+                            e.rank(), e.displayName(), e.score()))
+                .toList(),
+            totalParticipants));
   }
 
   private void broadcastLeaderboardUpdates(Long sessionId, String sid) {
@@ -289,19 +287,16 @@ public class GradingService {
         "/topic/session." + sessionId + ".analytics",
         new WsPayloads.LeaderboardUpdate(leaderboard));
 
-    // Top 5 to all participants
-    List<WsPayloads.ParticipantLeaderboardEntry> top5 =
-        leaderboard.stream()
-            .sorted(Comparator.comparingInt(SessionResultsResponse.LeaderboardEntry::rank))
-            .limit(5)
-            .map(
-                e ->
-                    new WsPayloads.ParticipantLeaderboardEntry(
-                        e.rank(), e.displayName(), e.score()))
-            .toList();
-
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".question",
-        new WsPayloads.ParticipantLeaderboard(top5, totalParticipants));
+        new WsPayloads.ParticipantLeaderboard(
+            leaderboard.stream()
+                .sorted(Comparator.comparingInt(SessionResultsResponse.LeaderboardEntry::rank))
+                .map(
+                    e ->
+                        new WsPayloads.ParticipantLeaderboardEntry(
+                            e.rank(), e.displayName(), e.score()))
+                .toList(),
+            totalParticipants));
   }
 }

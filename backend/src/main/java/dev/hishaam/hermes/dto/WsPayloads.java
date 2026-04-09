@@ -65,6 +65,7 @@ public final class WsPayloads {
       EventType event,
       Long passageId,
       String passageText,
+      Integer timeLimitSeconds,
       List<SubQuestion> subQuestions,
       int questionIndex,
       int totalQuestions,
@@ -72,6 +73,7 @@ public final class WsPayloads {
     public PassageDisplayed(
         Long passageId,
         String passageText,
+        Integer timeLimitSeconds,
         List<SubQuestion> subQuestions,
         int questionIndex,
         int totalQuestions,
@@ -80,6 +82,7 @@ public final class WsPayloads {
           EventType.PASSAGE_DISPLAYED,
           passageId,
           passageText,
+          timeLimitSeconds,
           subQuestions,
           questionIndex,
           totalQuestions,
@@ -133,9 +136,10 @@ public final class WsPayloads {
 
   /** Top-5 leaderboard broadcast to all participants after each question is reviewed. */
   public record ParticipantLeaderboard(
-      EventType event, List<ParticipantLeaderboardEntry> top, long totalParticipants) {
-    public ParticipantLeaderboard(List<ParticipantLeaderboardEntry> top, long totalParticipants) {
-      this(EventType.PARTICIPANT_LEADERBOARD, top, totalParticipants);
+      EventType event, List<ParticipantLeaderboardEntry> leaderboard, long totalParticipants) {
+    public ParticipantLeaderboard(
+        List<ParticipantLeaderboardEntry> leaderboard, long totalParticipants) {
+      this(EventType.PARTICIPANT_LEADERBOARD, leaderboard, totalParticipants);
     }
   }
 

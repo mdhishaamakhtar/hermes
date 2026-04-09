@@ -16,10 +16,14 @@ public record MyResultsResponse(
       Long questionId,
       String questionText,
       int orderIndex,
-      Long selectedOptionId,
-      String selectedOptionText,
-      Long correctOptionId,
-      String correctOptionText,
+      String questionType,
+      String passageText,
+      List<Long> selectedOptionIds,
+      List<Long> correctOptionIds,
+      List<OptionInfo> options,
       boolean isCorrect,
       int pointsEarned) {}
+
+  public record OptionInfo(
+      Long id, String text, int orderIndex, boolean isCorrect, int pointValue) {}
 }

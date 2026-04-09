@@ -74,6 +74,71 @@ export interface LeaderboardEntry {
   score: number;
 }
 
+export interface ParticipantLeaderboardEntry extends LeaderboardEntry {
+  participantId: number;
+}
+
+export interface RejoinOptionInfo {
+  id: number;
+  text: string;
+  orderIndex: number;
+}
+
+export interface RejoinCurrentQuestion {
+  id: number;
+  text: string;
+  orderIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number;
+  questionType: QuestionType;
+  effectiveDisplayMode: DisplayMode;
+  passage: {
+    id: number;
+    text: string;
+    timerMode: PassageTimerMode;
+  } | null;
+  options: RejoinOptionInfo[];
+  selectedOptionIds: number[];
+  lockedIn: boolean;
+}
+
+export interface RejoinCurrentPassageQuestion {
+  id: number;
+  text: string;
+  orderIndex: number;
+  timeLimitSeconds: number;
+  questionType: QuestionType;
+  options: RejoinOptionInfo[];
+  selectedOptionIds: number[];
+  lockedIn: boolean;
+}
+
+export interface RejoinCurrentPassage {
+  id: number;
+  text: string;
+  timerMode: PassageTimerMode;
+  questionIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number | null;
+  effectiveDisplayMode: DisplayMode;
+  subQuestions: RejoinCurrentPassageQuestion[];
+}
+
+export interface RejoinResponse {
+  participantId: number;
+  sessionId: number;
+  status: string;
+  questionLifecycle: string | null;
+  sessionTitle: string;
+  participantCount: number;
+  currentQuestionId: number | null;
+  currentPassageId: number | null;
+  alreadyAnswered: number[];
+  currentQuestion: RejoinCurrentQuestion | null;
+  currentPassage: RejoinCurrentPassage | null;
+  timeLeftSeconds: number | null;
+}
+
 export interface ResultOption {
   id: number;
   text: string;
@@ -102,4 +167,36 @@ export interface SessionResults {
   participantCount: number;
   leaderboard: LeaderboardEntry[];
   questions: QuestionResult[];
+}
+
+export interface MyResultsOptionInfo {
+  id: number;
+  text: string;
+  orderIndex: number;
+  isCorrect: boolean;
+  pointValue: number;
+}
+
+export interface MyResultsQuestionResult {
+  questionId: number;
+  questionText: string;
+  orderIndex: number;
+  questionType: QuestionType;
+  passageText: string | null;
+  selectedOptionIds: number[];
+  correctOptionIds: number[];
+  options: MyResultsOptionInfo[];
+  isCorrect: boolean;
+  pointsEarned: number;
+}
+
+export interface MyResults {
+  participantId: number;
+  displayName: string;
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  rank: number;
+  totalParticipants: number;
+  questions: MyResultsQuestionResult[];
 }
