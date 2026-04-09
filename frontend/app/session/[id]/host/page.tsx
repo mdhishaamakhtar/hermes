@@ -9,13 +9,14 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { sessionsApi } from "@/lib/apiClient";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { OPTION_META } from "@/lib/session-constants";
 import { colorRgb, enterAnimation } from "@/lib/design-tokens";
 import type {
@@ -192,7 +193,7 @@ interface CorrectionDraftOption {
   optionId: number;
   text: string;
   orderIndex: number;
-  pointValue: string;
+  pointValue: number | string;
 }
 
 const DEFAULT_STATS = (): QuestionStats => ({
@@ -357,9 +358,11 @@ function QuestionCard({
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <p className="label tabular-nums">Q{question.orderIndex}</p>
             <span className="text-xs text-muted/50">·</span>
-            <span className="text-xs text-muted tabular-nums">
-              {question.timeLimitSeconds}s time limit
-            </span>
+            {question.timeLimitSeconds > 0 && (
+              <span className="text-xs text-muted tabular-nums">
+                {question.timeLimitSeconds}s time limit
+              </span>
+            )}
             {question.passageText ? (
               <CardBadge tone="accent">Passage</CardBadge>
             ) : null}
@@ -578,13 +581,12 @@ function ScoringDrawer({
                         </span>
                       </div>
                       <input
-                        type="number"
-                        inputMode="numeric"
+                        type="text"
                         value={option.pointValue}
                         onChange={(event) =>
                           onChange(index, event.target.value)
                         }
-                        className="input-field"
+                        className="input-field font-mono tabular-nums"
                       />
                     </label>
                   ))}
@@ -621,6 +623,7 @@ function ScoringDrawer({
 export default function HostPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const router = useRouter();
 
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("LOBBY");
   const [questionLifecycle, setQuestionLifecycle] =
@@ -653,13 +656,15 @@ export default function HostPage() {
     null,
   );
   const [copied, setCopied] = useState(false);
+  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
   const [loadingAction, setLoadingAction] = useState<
+    | null
     | "start-session"
     | "start-timer"
     | "end-timer"
     | "next"
     | "end-session"
-    | null
+    | "abandon"
   >(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [scoringQuestionId, setScoringQuestionId] = useState<number | null>(
@@ -932,20 +937,22 @@ export default function HostPage() {
   }, [id, loadResults, subscribe, unsubscribe]);
 
   useEffect(() => {
-    if (
-      sessionStatus !== "ACTIVE" ||
-      questionLifecycle !== "TIMED" ||
-      timeLeft <= 0
-    ) {
+    if (sessionStatus !== "ACTIVE" || questionLifecycle !== "TIMED") {
       return undefined;
     }
 
     const interval = window.setInterval(() => {
-      setTimeLeft((current) => Math.max(0, current - 1));
+      setTimeLeft((current) => {
+        if (current <= 0) {
+          window.clearInterval(interval);
+          return 0;
+        }
+        return current - 1;
+      });
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [questionLifecycle, sessionStatus, timeLeft]);
+  }, [questionLifecycle, sessionStatus]);
 
   const currentQuestions = useMemo(() => {
     if (activePassage?.subQuestions.length) {
@@ -1046,10 +1053,23 @@ export default function HostPage() {
   const handleForceEnd = useCallback(async () => {
     if (!id) return;
     setLoadingAction("end-session");
-    await sessionsApi.end(id);
+    const res = await sessionsApi.end(id);
     setLoadingAction(null);
-    setSessionStatus("ENDED");
+    if (res.success) {
+      setSessionStatus((prev) => (prev === "ENDED" ? prev : "ENDED"));
+    }
   }, [id]);
+
+  const handleAbandon = useCallback(async () => {
+    if (!id) return;
+    setLoadingAction("abandon");
+    const res = await api.delete(`/api/sessions/${id}`);
+    if (res.success) {
+      router.push("/dashboard");
+    }
+    setLoadingAction(null);
+    setShowAbandonConfirm(false);
+  }, [id, router]);
 
   const handleCopyCode = useCallback(() => {
     if (!joinCode) return;
@@ -1184,7 +1204,7 @@ export default function HostPage() {
   }
 
   if (sessionStatus === "ENDED") {
-    const leaderboardRows = (finalLeaderboard ?? leaderboard).slice(0, 10);
+    const leaderboardRows = finalLeaderboard ?? leaderboard;
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border px-6 py-4">
@@ -1293,6 +1313,7 @@ export default function HostPage() {
             <div className="flex gap-3">
               <Link
                 href={`/session/${id}/review`}
+                prefetch
                 className="btn-primary flex-1 text-center"
               >
                 Full Review
@@ -1398,7 +1419,7 @@ export default function HostPage() {
                     lineHeight: 1,
                     color: timerColour,
                     textShadow:
-                      timeLeft <= 5
+                      timeLeft !== null && timeLeft > 0 && timeLeft <= 5
                         ? `0 0 16px rgba(${colorRgb.danger},0.45)`
                         : "none",
                   }}
@@ -1425,52 +1446,47 @@ export default function HostPage() {
           {isCodeDisplay ? (
             <motion.section
               {...enterAnimation}
-              className="border border-border bg-surface p-8"
+              className="border border-border bg-surface p-6"
             >
-              <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.8fr)]">
-                <div>
-                  <p className="label mb-4">Join code</p>
-                  <div
-                    className="select-all border border-primary/30 bg-background px-8 py-6 font-black tracking-[0.35em] text-foreground"
-                    style={{
-                      fontSize: "clamp(2.5rem, 8vw, 5.5rem)",
-                      letterSpacing: "0.35em",
-                      paddingLeft: "calc(2rem + 0.35em)",
-                    }}
-                  >
-                    {joinCode || "------"}
-                  </div>
-                </div>
+              {/* Join code — compact inline bar */}
+              <div className="mb-5 flex items-center gap-4 border border-primary/20 bg-background px-5 py-3">
+                <span className="label shrink-0">Join</span>
+                <span
+                  className="select-all font-black tracking-[0.3em] text-foreground"
+                  style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}
+                >
+                  {joinCode || "------"}
+                </span>
+              </div>
 
-                <div className="space-y-4">
-                  <div className="border border-border bg-background p-4">
-                    <p className="label mb-2">Prompt</p>
-                    <h2 className="text-2xl font-bold leading-snug text-foreground">
-                      {activePassage?.timerMode === "ENTIRE_PASSAGE"
-                        ? activePassage.text
-                        : primaryQuestion?.text || "Waiting for question..."}
+              {/* Question / passage text — full width, scrollable */}
+              <div className="border border-border bg-background p-5">
+                {activePassage?.timerMode === "ENTIRE_PASSAGE" ? (
+                  <>
+                    <p className="label mb-3 text-warning">Passage</p>
+                    <div className="max-h-[40vh] overflow-y-auto pr-2">
+                      <p className="whitespace-pre-wrap text-base leading-relaxed text-muted">
+                        {activePassage.text}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="label mb-3">Prompt</p>
+                    <h2 className="text-xl font-bold leading-snug text-foreground">
+                      {primaryQuestion?.text || "Waiting for question\u2026"}
                     </h2>
                     {passageBannerText ? (
-                      <p className="mt-3 text-sm text-muted">
+                      <p className="mt-3 max-h-[30vh] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-muted">
                         {passageBannerText}
                       </p>
                     ) : null}
-                  </div>
-
-                  <div className="border border-border bg-background p-4">
-                    <p className="label mb-2">Status</p>
-                    <div className="space-y-2 text-sm text-muted">
-                      <p>{questionLifecycle}</p>
-                      <p className="tabular-nums">
-                        {formatTime(timeLeft)} remaining
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
 
               {currentQuestions.length > 0 ? (
-                <div className="mt-6 space-y-4">
+                <div className="mt-5 space-y-4">
                   {currentQuestions.map((question) => {
                     const card = buildActiveQuestionCard(
                       question,
@@ -1592,20 +1608,18 @@ export default function HostPage() {
               {activeLeaderboard.length === 0 ? (
                 <p className="text-sm text-muted">No leaderboard data yet.</p>
               ) : (
-                activeLeaderboard
-                  .slice(0, 10)
-                  .map((entry, index) => (
-                    <LeaderboardRow
-                      key={`${entry.rank}-${entry.displayName}`}
-                      rank={entry.rank}
-                      displayName={entry.displayName}
-                      score={entry.score}
-                      variant="compact"
-                      initial={{ opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.15, delay: index * 0.04 }}
-                    />
-                  ))
+                activeLeaderboard.map((entry, index) => (
+                  <LeaderboardRow
+                    key={`${entry.rank}-${entry.displayName}`}
+                    rank={entry.rank}
+                    displayName={entry.displayName}
+                    score={entry.score}
+                    variant="compact"
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                  />
+                ))
               )}
             </div>
           </section>
@@ -1660,6 +1674,16 @@ export default function HostPage() {
                   ? "Ending..."
                   : "Force End Session"}
               </button>
+
+              <button
+                onClick={() => setShowAbandonConfirm(true)}
+                disabled={loadingAction === "abandon"}
+                className="w-full border border-border px-5 py-3 text-xs tracking-widest uppercase text-danger transition-colors hover:bg-danger/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {loadingAction === "abandon"
+                  ? "Deleting..."
+                  : "Abandon Session"}
+              </button>
             </div>
           </section>
 
@@ -1709,15 +1733,32 @@ export default function HostPage() {
         draftOptions={scoringDraft}
         saving={drawerSaving}
         onClose={closeDrawer}
-        onChange={(index, value) =>
+        onChange={(index, value) => {
           setScoringDraft((current) =>
-            current.map((option, optionIndex) =>
-              optionIndex === index ? { ...option, pointValue: value } : option,
-            ),
-          )
-        }
+            current.map((option, optionIndex) => {
+              if (optionIndex !== index) return option;
+
+              if (value === "-" || value === "")
+                return { ...option, pointValue: value };
+              const parsed = parseInt(value, 10);
+              return isNaN(parsed) ? option : { ...option, pointValue: parsed };
+            }),
+          );
+        }}
         onSave={handleSaveScoring}
       />
+
+      {showAbandonConfirm && (
+        <ConfirmDialog
+          message="Are you sure you want to abandon and DELETE this session? This cannot be undone."
+          confirmLabel={
+            loadingAction === "abandon" ? "Deleting..." : "Abandon Session"
+          }
+          variant="danger"
+          onConfirm={handleAbandon}
+          onCancel={() => setShowAbandonConfirm(false)}
+        />
+      )}
     </div>
   );
 }

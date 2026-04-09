@@ -122,7 +122,8 @@ public class GradingService {
     List<ParticipantAnswer> allGraded = answerRepository.findGradedBySessionId(sessionId);
     Map<Long, Long> participantTotals = new HashMap<>();
     for (ParticipantAnswer a : allGraded) {
-      participantTotals.merge(a.getParticipantId(), (long) a.getScore(), Long::sum);
+      participantTotals.merge(
+          a.getParticipantId(), Long.valueOf(a.getScore() != null ? a.getScore() : 0), Long::sum);
     }
 
     // Update Redis ZSet (best-effort — no-op if Redis state was already cleaned up)
@@ -272,7 +273,7 @@ public class GradingService {
                 .map(
                     e ->
                         new WsPayloads.ParticipantLeaderboardEntry(
-                            e.rank(), e.displayName(), e.score()))
+                            e.participantId(), e.rank(), e.displayName(), e.score()))
                 .toList(),
             totalParticipants));
   }
@@ -295,7 +296,7 @@ public class GradingService {
                 .map(
                     e ->
                         new WsPayloads.ParticipantLeaderboardEntry(
-                            e.rank(), e.displayName(), e.score()))
+                            e.participantId(), e.rank(), e.displayName(), e.score()))
                 .toList(),
             totalParticipants));
   }

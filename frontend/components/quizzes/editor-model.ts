@@ -6,13 +6,20 @@ import type {
   QuestionType,
 } from "@/lib/types";
 
+export interface QuestionDraftOption extends Omit<
+  QuestionOptionInput,
+  "pointValue"
+> {
+  pointValue: number | string;
+}
+
 export interface QuestionDraft {
   text: string;
-  orderIndex: number;
-  timeLimitSeconds: number;
+  orderIndex: number | string;
+  timeLimitSeconds: number | string;
   questionType: QuestionType;
   displayModeOverride: DisplayMode | null;
-  options: QuestionOptionInput[];
+  options: QuestionDraftOption[];
 }
 
 export const DISPLAY_MODE_OPTIONS: Array<{
@@ -73,15 +80,15 @@ export const PASSAGE_TIMER_MODE_OPTIONS: Array<{
 
 export function createOptionInput(
   text = "",
-  pointValue = 0,
+  pointValue: number | string = 0,
   orderIndex?: number,
-): QuestionOptionInput {
+): QuestionDraftOption {
   return { text, pointValue, orderIndex };
 }
 
 export function createDefaultOptions(
   questionType: QuestionType,
-): QuestionOptionInput[] {
+): QuestionDraftOption[] {
   if (questionType === "MULTI_SELECT") {
     return [
       createOptionInput("", 10, 0),
@@ -99,14 +106,22 @@ export function createDefaultOptions(
   ];
 }
 
-export function isPositiveOption(pointValue: number): boolean {
-  return pointValue > 0;
+export function isPositiveOption(pointValue: number | string): boolean {
+  const parsed =
+    typeof pointValue === "string" ? parseInt(pointValue, 10) : pointValue;
+  return !isNaN(parsed) && parsed > 0;
+}
+
+export function isNegativeOption(pointValue: number | string): boolean {
+  const parsed =
+    typeof pointValue === "string" ? parseInt(pointValue, 10) : pointValue;
+  return !isNaN(parsed) && parsed < 0;
 }
 
 export function normalizeOptionsForQuestionType(
   questionType: QuestionType,
-  options: QuestionOptionInput[],
-): QuestionOptionInput[] {
+  options: QuestionDraftOption[],
+): QuestionDraftOption[] {
   if (!options.length) {
     return createDefaultOptions(questionType);
   }
@@ -115,22 +130,30 @@ export function normalizeOptionsForQuestionType(
     return options.map((option, index) => ({ ...option, orderIndex: index }));
   }
 
-  let positiveAssigned = false;
+  // For SINGLE_SELECT, identify which option should be the lone positive one
+  const firstPositiveIndex = options.findIndex((opt) =>
+    isPositiveOption(opt.pointValue),
+  );
+  const targetIndex = firstPositiveIndex === -1 ? 0 : firstPositiveIndex;
 
   return options.map((option, index) => {
-    if (option.pointValue > 0 && !positiveAssigned) {
-      positiveAssigned = true;
-      return { ...option, pointValue: 10, orderIndex: index };
-    }
+    const rawVal =
+      typeof option.pointValue === "string"
+        ? parseInt(option.pointValue, 10)
+        : option.pointValue;
+    const pVal = isNaN(rawVal) ? 0 : rawVal;
 
-    if (!positiveAssigned && index === 0) {
-      positiveAssigned = true;
-      return { ...option, pointValue: 10, orderIndex: index };
+    if (index === targetIndex) {
+      return {
+        ...option,
+        pointValue: pVal > 0 ? option.pointValue : 10,
+        orderIndex: index,
+      };
     }
 
     return {
       ...option,
-      pointValue: Math.min(option.pointValue, 0),
+      pointValue: Math.min(pVal, 0),
       orderIndex: index,
     };
   });
@@ -150,7 +173,13 @@ export function validateQuestionDraft(
   } = {},
 ): string | null {
   if (!draft.text.trim()) return "Question text is required.";
-  if (requirePositiveTimer && draft.timeLimitSeconds < 5) {
+
+  const timeVal =
+    typeof draft.timeLimitSeconds === "string"
+      ? parseInt(draft.timeLimitSeconds, 10)
+      : draft.timeLimitSeconds;
+
+  if (requirePositiveTimer && (isNaN(timeVal) || timeVal < 5)) {
     return "Question time must be at least 5 seconds.";
   }
   if (draft.options.length < minimumOptionCount) {

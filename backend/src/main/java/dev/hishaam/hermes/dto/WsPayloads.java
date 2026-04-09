@@ -143,7 +143,8 @@ public final class WsPayloads {
     }
   }
 
-  public record ParticipantLeaderboardEntry(int rank, String displayName, long score) {}
+  public record ParticipantLeaderboardEntry(
+      long participantId, int rank, String displayName, long score) {}
 
   // ─── Session lifecycle ────────────────────────────────────────────────────────
 

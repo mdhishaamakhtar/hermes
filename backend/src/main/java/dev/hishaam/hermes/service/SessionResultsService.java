@@ -57,7 +57,7 @@ public class SessionResultsService {
       throw AppException.conflict("Session has not ended yet");
     }
 
-    Long participantId = participantService.resolveParticipantId(rejoinToken);
+    Long participantId = participantService.resolveParticipantId(rejoinToken, sessionId);
     Participant participant =
         participantRepository
             .findById(participantId)
@@ -77,7 +77,9 @@ public class SessionResultsService {
                         isCorrectSelection(answer, snapshot.findQuestion(answer.getQuestionId())))
                 .count();
     int totalScore =
-        answers.stream().mapToInt(answer -> answer.getScore() != null ? answer.getScore() : 0).sum();
+        answers.stream()
+            .mapToInt(answer -> answer.getScore() != null ? answer.getScore() : 0)
+            .sum();
 
     // Compute rank from all session answers
     List<ParticipantAnswer> allAnswers = answerRepository.findBySessionId(sessionId);
@@ -224,7 +226,7 @@ public class SessionResultsService {
             answer -> {
               scores.merge(
                   answer.getParticipantId(),
-                  (long) (answer.getScore() != null ? answer.getScore() : 0),
+                  Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
                   Long::sum);
             });
 

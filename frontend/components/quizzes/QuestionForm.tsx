@@ -1,20 +1,20 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { motion } from "framer-motion";
 import { quizzesApi } from "@/lib/apiClient";
 import {
   createDefaultOptions,
   DISPLAY_MODE_OPTIONS,
+  isNegativeOption,
+  isPositiveOption,
+  normalizeOptionsForQuestionType,
   QUESTION_TYPE_OPTIONS,
   validateQuestionDraft,
+  type QuestionDraftOption,
 } from "@/components/quizzes/editor-model";
-import type {
-  DisplayMode,
-  Question,
-  QuestionOptionInput,
-  QuestionType,
-} from "@/lib/types";
+import CustomSelect from "@/components/ui/CustomSelect";
+import type { DisplayMode, Question, QuestionType } from "@/lib/types";
 
 interface Props {
   quizId: string;
@@ -32,21 +32,17 @@ export default function QuestionForm({
   onCancel,
 }: Props) {
   const [qText, setQText] = useState("");
-  const [qTime, setQTime] = useState(30);
+  const [qTime, setQTime] = useState<number | string>(30);
   const [questionType, setQuestionType] =
     useState<QuestionType>("SINGLE_SELECT");
   const [displayModeOverride, setDisplayModeOverride] = useState<
     DisplayMode | "INHERIT"
   >("INHERIT");
-  const [options, setOptions] = useState<QuestionOptionInput[]>(
+  const [options, setOptions] = useState<QuestionDraftOption[]>(
     createDefaultOptions("SINGLE_SELECT"),
   );
   const [creating, setCreating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setOptions(createDefaultOptions(questionType));
-  }, [questionType]);
 
   const setOptionText = (index: number, text: string) =>
     setOptions((current) =>
@@ -55,7 +51,7 @@ export default function QuestionForm({
       ),
     );
 
-  const setOptionPoints = (index: number, pointValue: number) =>
+  const setOptionPoints = (index: number, pointValue: number | string) =>
     setOptions((current) =>
       current.map((option, currentIndex) =>
         currentIndex === index ? { ...option, pointValue } : option,
@@ -101,12 +97,15 @@ export default function QuestionForm({
       text: qText.trim(),
       questionType,
       orderIndex: nextOrderIndex,
-      timeLimitSeconds: qTime,
+      timeLimitSeconds: typeof qTime === "string" ? parseInt(qTime, 10) : qTime,
       displayModeOverride:
         displayModeOverride === "INHERIT" ? null : displayModeOverride,
       options: options.map((option, index) => ({
         text: option.text.trim(),
-        pointValue: option.pointValue,
+        pointValue:
+          typeof option.pointValue === "string"
+            ? parseInt(option.pointValue, 10) || 0
+            : option.pointValue,
         orderIndex: index,
       })),
     });
@@ -134,121 +133,101 @@ export default function QuestionForm({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       action={formAction}
-      className="mb-8 border border-primary/35 bg-surface px-5 py-5 md:px-6 md:py-6"
+      className="mb-8 border-t border-border bg-surface/50 px-5 py-5 md:px-6 md:py-8"
     >
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <p className="label mb-2 text-accent">Add Standalone Question</p>
-          <h3 className="text-xl font-bold tracking-tight text-foreground">
-            Fast prompt, tuned scoring, stage-ready defaults
-          </h3>
-        </div>
-        <div className="grid min-w-[16rem] gap-3 text-right md:grid-cols-2 md:text-left">
-          <label className="block">
-            <span className="field-label mb-2 block">Question Type</span>
-            <select
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <p className="label text-accent">New Question</p>
+        <div className="flex items-center gap-3">
+          <div className="w-40">
+            <CustomSelect
               value={questionType}
-              onChange={(event) =>
-                setQuestionType(event.target.value as QuestionType)
-              }
-              className="input-field"
-            >
-              {QUESTION_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="field-label mb-2 block">Display Mode</span>
-            <select
+              onChange={(v) => {
+                const nextType = v as QuestionType;
+                setQuestionType(nextType);
+                setOptions((current) =>
+                  normalizeOptionsForQuestionType(nextType, current),
+                );
+              }}
+              options={QUESTION_TYPE_OPTIONS}
+            />
+          </div>
+          <div className="w-40">
+            <CustomSelect
               value={displayModeOverride}
-              onChange={(event) =>
-                setDisplayModeOverride(
-                  event.target.value as DisplayMode | "INHERIT",
-                )
+              onChange={(v) =>
+                setDisplayModeOverride(v as DisplayMode | "INHERIT")
               }
-              className="input-field"
+              options={[
+                { value: "INHERIT", label: "Inherit" },
+                ...DISPLAY_MODE_OPTIONS,
+              ]}
               title={`Inherit uses quiz default: ${quizDisplayMode}`}
-            >
-              <option value="INHERIT">Inherit quiz default</option>
-              {DISPLAY_MODE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_7rem]">
         <label className="block">
-          <span className="field-label mb-2 block">Question Text</span>
+          <span className="field-label mb-2 block">Question</span>
           <textarea
             value={qText}
             onChange={(event) => setQText(event.target.value)}
-            rows={3}
-            className="input-field min-h-[7rem] resize-y"
-            placeholder="Select all prime numbers with confidence."
+            rows={2}
+            className="input-field min-h-[5rem] resize-y"
+            placeholder="Enter your question text…"
           />
         </label>
         <label className="block">
-          <span className="field-label mb-2 block">Timer</span>
+          <span className="field-label mb-2 block">Timer (s)</span>
           <input
-            type="number"
-            min={5}
+            type="text"
+            inputMode="numeric"
             value={qTime}
-            onChange={(event) => setQTime(Number(event.target.value))}
+            onChange={(event) => {
+              const val = event.target.value.replace(/[^0-9]/g, "");
+              setQTime(val === "" ? 0 : parseInt(val, 10));
+            }}
             className="input-field font-mono tabular-nums"
           />
-          <p className="mt-2 text-xs text-muted">Seconds per question.</p>
         </label>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5">
         <div className="mb-3 flex items-center justify-between gap-4">
-          <div>
-            <p className="label text-muted">Options + scoring</p>
-            <p className="mt-1 text-sm text-muted">
-              Positive scores reveal the right path. Zero stays neutral.
-              Negative values punish trap picks.
-            </p>
-          </div>
+          <p className="label text-muted">Options</p>
           <button
             type="button"
             onClick={addOption}
             className="label text-accent transition-colors hover:text-accent-hover"
           >
-            + Add option
+            + Add
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {options.map((option, index) => {
-            const tone =
-              option.pointValue > 0
-                ? "border-success/35 text-success"
-                : option.pointValue < 0
-                  ? "border-danger/35 text-danger"
-                  : "border-border text-muted";
+            const tone = isPositiveOption(option.pointValue)
+              ? "border-success/35 text-success"
+              : isNegativeOption(option.pointValue)
+                ? "border-danger/35 text-danger"
+                : "border-border text-muted";
 
             return (
               <div
                 key={index}
-                className="grid gap-3 border border-border px-4 py-3 md:grid-cols-[3rem_minmax(0,1fr)_7rem_auto]"
+                className="grid items-center gap-3 border-b border-border/50 py-3 md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_auto]"
               >
                 <div className="flex items-center justify-between md:block">
                   <span className="label text-foreground/80">
                     {String.fromCharCode(65 + index)}
                   </span>
-                  <span className={`text-xs font-medium ${tone}`}>
-                    {option.pointValue > 0
-                      ? "Positive"
-                      : option.pointValue < 0
-                        ? "Penalty"
-                        : "Neutral"}
+                  <span className={`text-[10px] font-medium ${tone}`}>
+                    {isPositiveOption(option.pointValue)
+                      ? "✓"
+                      : isNegativeOption(option.pointValue)
+                        ? "–"
+                        : "○"}
                   </span>
                 </div>
                 <input
@@ -257,26 +236,30 @@ export default function QuestionForm({
                   placeholder={`Option ${index + 1}`}
                   className="input-field"
                 />
-                <label className="block">
-                  <span className="field-label mb-2 block md:hidden">
-                    Points
-                  </span>
-                  <input
-                    type="number"
-                    value={option.pointValue}
-                    onChange={(event) =>
-                      setOptionPoints(index, Number(event.target.value))
+                <input
+                  type="text"
+                  value={option.pointValue}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    // Allow negative sign while typing
+                    if (raw === "-" || raw === "") {
+                      setOptionPoints(index, raw);
+                      return;
                     }
-                    className="input-field font-mono tabular-nums"
-                  />
-                </label>
+                    const parsed = parseInt(raw, 10);
+                    if (!isNaN(parsed)) {
+                      setOptionPoints(index, parsed);
+                    }
+                  }}
+                  className="input-field font-mono tabular-nums"
+                />
                 <button
                   type="button"
                   onClick={() => removeOption(index)}
                   disabled={options.length <= 2}
                   className="label self-center text-muted transition-colors hover:text-danger disabled:opacity-30"
                 >
-                  Remove
+                  ✕
                 </button>
               </div>
             );
@@ -288,13 +271,13 @@ export default function QuestionForm({
         <p className="mt-4 text-sm text-danger">{validationError}</p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={creating}
           className="btn-primary px-5 py-3"
         >
-          {creating ? "Adding..." : "Add Question"}
+          {creating ? "Adding…" : "Add Question"}
         </button>
         <button
           type="button"

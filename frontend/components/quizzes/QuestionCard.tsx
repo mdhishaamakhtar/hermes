@@ -11,13 +11,10 @@ import {
   QUESTION_TYPE_OPTIONS,
   questionTypeLabel,
   validateQuestionDraft,
+  type QuestionDraftOption,
 } from "@/components/quizzes/editor-model";
-import type {
-  DisplayMode,
-  Question,
-  QuestionOptionInput,
-  QuestionType,
-} from "@/lib/types";
+import CustomSelect from "@/components/ui/CustomSelect";
+import type { DisplayMode, Question, QuestionType } from "@/lib/types";
 
 interface Props {
   question: Question;
@@ -40,13 +37,13 @@ export default function QuestionCard({
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
-  const [editTime, setEditTime] = useState(30);
+  const [editTime, setEditTime] = useState<number | string>(30);
   const [editQuestionType, setEditQuestionType] =
     useState<QuestionType>("SINGLE_SELECT");
   const [editDisplayModeOverride, setEditDisplayModeOverride] = useState<
     DisplayMode | "INHERIT"
   >("INHERIT");
-  const [editOptions, setEditOptions] = useState<QuestionOptionInput[]>([]);
+  const [editOptions, setEditOptions] = useState<QuestionDraftOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -74,7 +71,7 @@ export default function QuestionCard({
       ),
     );
 
-  const setOptionPoints = (targetIndex: number, pointValue: number) =>
+  const setOptionPoints = (targetIndex: number, pointValue: number | string) =>
     setEditOptions((current) =>
       current.map((option, index) =>
         index === targetIndex ? { ...option, pointValue } : option,
@@ -130,12 +127,19 @@ export default function QuestionCard({
       questionType: editQuestionType,
       orderIndex: question.orderIndex,
       timeLimitSeconds:
-        nested && question.timeLimitSeconds === 0 ? 0 : editTime,
+        nested && question.timeLimitSeconds === 0
+          ? 0
+          : typeof editTime === "string"
+            ? parseInt(editTime, 10)
+            : editTime,
       displayModeOverride:
         editDisplayModeOverride === "INHERIT" ? null : editDisplayModeOverride,
       options: editOptions.map((option, index) => ({
         text: option.text.trim(),
-        pointValue: option.pointValue,
+        pointValue:
+          typeof option.pointValue === "string"
+            ? parseInt(option.pointValue, 10) || 0
+            : option.pointValue,
         orderIndex: index,
       })),
     });
@@ -153,7 +157,7 @@ export default function QuestionCard({
 
   const [, saveFormAction] = useActionState(saveEditAction, null);
   const shellClass = nested
-    ? "border border-border/70 bg-background/35 px-4 py-4"
+    ? "border-b border-border/50 py-5"
     : "border border-border bg-surface px-5 py-5 md:px-6 md:py-6";
 
   return (
@@ -254,51 +258,30 @@ export default function QuestionCard({
           action={saveFormAction}
           className={shellClass}
         >
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
-            <div>
-              <p className="label mb-2 text-warning">
-                Editing {nested ? "Sub-question" : "Question"}
-              </p>
-              <h3 className="text-lg font-bold text-foreground">
-                Tight scoring, clear stage behavior
-              </h3>
-            </div>
-            <div className="grid min-w-[16rem] gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="field-label mb-2 block">Question Type</span>
-                <select
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+            <p className="label text-warning">
+              Editing {nested ? "Sub-question" : "Question"}
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="w-40">
+                <CustomSelect
                   value={editQuestionType}
-                  onChange={(event) =>
-                    resetOptionsForType(event.target.value as QuestionType)
-                  }
-                  className="input-field"
-                >
-                  {QUESTION_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="field-label mb-2 block">Display Mode</span>
-                <select
+                  onChange={(v) => resetOptionsForType(v as QuestionType)}
+                  options={QUESTION_TYPE_OPTIONS}
+                />
+              </div>
+              <div className="w-40">
+                <CustomSelect
                   value={editDisplayModeOverride}
-                  onChange={(event) =>
-                    setEditDisplayModeOverride(
-                      event.target.value as DisplayMode | "INHERIT",
-                    )
+                  onChange={(v) =>
+                    setEditDisplayModeOverride(v as DisplayMode | "INHERIT")
                   }
-                  className="input-field"
-                >
-                  <option value="INHERIT">Inherit from quiz</option>
-                  {DISPLAY_MODE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  options={[
+                    { value: "INHERIT", label: "Inherit from quiz" },
+                    ...DISPLAY_MODE_OPTIONS,
+                  ]}
+                />
+              </div>
             </div>
           </div>
 
@@ -308,51 +291,46 @@ export default function QuestionCard({
               <textarea
                 value={editText}
                 onChange={(event) => setEditText(event.target.value)}
-                rows={3}
-                className="input-field min-h-[7rem] resize-y"
+                rows={2}
+                className="input-field min-h-[5rem] resize-y"
               />
             </label>
             <label className="block">
               <span className="field-label mb-2 block">Timer</span>
               <input
-                type="number"
-                min={nested ? 0 : 5}
+                type="text"
+                inputMode="numeric"
                 value={editTime}
-                onChange={(event) => setEditTime(Number(event.target.value))}
+                onChange={(event) => {
+                  const val = event.target.value.replace(/[^0-9]/g, "");
+                  setEditTime(val === "" ? 0 : parseInt(val, 10));
+                }}
                 className="input-field font-mono tabular-nums"
                 disabled={nested && question.timeLimitSeconds === 0}
               />
-              <p className="mt-2 text-xs text-muted">
-                {nested && question.timeLimitSeconds === 0
-                  ? "Shared with the parent passage."
-                  : "Seconds per prompt."}
-              </p>
+              {nested && question.timeLimitSeconds === 0 ? (
+                <p className="mt-1 text-[11px] text-muted">Passage timer</p>
+              ) : null}
             </label>
           </div>
 
-          <div className="mt-5">
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <div>
-                <p className="label text-muted">Option matrix</p>
-                <p className="mt-1 text-sm text-muted">
-                  Edit scores directly. Positive values reward, negatives
-                  punish, zero stays quiet.
-                </p>
-              </div>
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between gap-4">
+              <p className="label text-muted">Options</p>
               <button
                 type="button"
                 onClick={addOption}
                 className="label text-accent transition-colors hover:text-accent-hover"
               >
-                + Add option
+                + Add
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {editOptions.map((option, optionIndex) => (
                 <div
                   key={optionIndex}
-                  className="grid gap-3 border border-border px-4 py-3 md:grid-cols-[3rem_minmax(0,1fr)_7rem_auto]"
+                  className="grid items-center gap-3 border border-border px-3 py-2 md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_auto]"
                 >
                   <span className="label self-center text-foreground/80">
                     {String.fromCharCode(65 + optionIndex)}
@@ -366,11 +344,19 @@ export default function QuestionCard({
                     placeholder={`Option ${optionIndex + 1}`}
                   />
                   <input
-                    type="number"
+                    type="text"
                     value={option.pointValue}
-                    onChange={(event) =>
-                      setOptionPoints(optionIndex, Number(event.target.value))
-                    }
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (raw === "-" || raw === "") {
+                        setOptionPoints(optionIndex, raw);
+                        return;
+                      }
+                      const parsed = parseInt(raw, 10);
+                      if (!isNaN(parsed)) {
+                        setOptionPoints(optionIndex, parsed);
+                      }
+                    }}
                     className="input-field font-mono tabular-nums"
                   />
                   <button
@@ -379,7 +365,7 @@ export default function QuestionCard({
                     disabled={editOptions.length <= 2}
                     className="label self-center text-muted transition-colors hover:text-danger disabled:opacity-30"
                   >
-                    Remove
+                    ✕
                   </button>
                 </div>
               ))}
@@ -390,13 +376,13 @@ export default function QuestionCard({
             <p className="mt-4 text-sm text-danger">{validationError}</p>
           )}
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
               type="submit"
               disabled={saving}
               className="bg-warning px-5 py-3 text-sm font-medium tracking-[0.12em] text-white uppercase transition-colors hover:bg-warning-hover disabled:opacity-40"
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving…" : "Save Changes"}
             </button>
             <button
               type="button"

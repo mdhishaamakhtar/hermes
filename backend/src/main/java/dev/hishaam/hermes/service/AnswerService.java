@@ -45,7 +45,7 @@ public class AnswerService {
   @Transactional
   public void submitAnswer(Long sessionId, AnswerRequest request) {
     String sid = sessionId.toString();
-    Long participantId = participantService.resolveParticipantId(request.rejoinToken());
+    Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);
 
     QuizSnapshot.QuestionSnapshot question =
         requireMutableCurrentQuestion(sid, request.questionId());
@@ -78,7 +78,7 @@ public class AnswerService {
   @Transactional
   public void lockInAnswer(Long sessionId, LockInRequest request) {
     String sid = sessionId.toString();
-    Long participantId = participantService.resolveParticipantId(request.rejoinToken());
+    Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);
 
     requireMutableCurrentQuestion(sid, request.questionId());
 

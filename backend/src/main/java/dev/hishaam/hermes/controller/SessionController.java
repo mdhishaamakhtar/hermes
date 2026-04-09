@@ -83,6 +83,14 @@ public class SessionController {
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
+  @DeleteMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<Void>> abandonSession(
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.abandonSession(id, user.getId());
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
+
   @GetMapping("/{id}/status")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionStatus>> getSessionStatus(

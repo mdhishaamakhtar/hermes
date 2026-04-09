@@ -70,13 +70,12 @@ export interface SessionItem {
 
 export interface LeaderboardEntry {
   rank: number;
+  participantId: number;
   displayName: string;
   score: number;
 }
 
-export interface ParticipantLeaderboardEntry extends LeaderboardEntry {
-  participantId: number;
-}
+export type ParticipantLeaderboardEntry = LeaderboardEntry;
 
 export interface RejoinOptionInfo {
   id: number;

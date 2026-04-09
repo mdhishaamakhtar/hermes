@@ -94,7 +94,7 @@ public class ParticipantService {
             SessionRedisHelper.REJOIN_TTL);
 
     // Increment participant count
-    liveStateService.incrementParticipantCount(sid);
+    long count = liveStateService.incrementParticipantCount(sid);
 
     // Cache display name in Redis for leaderboard building
     liveStateService.cacheParticipantName(sid, participant.getId(), request.displayName());
@@ -103,7 +103,6 @@ public class ParticipantService {
     liveStateService.initLeaderboardEntry(sid, participant.getId());
 
     // Broadcast PARTICIPANT_JOINED
-    long count = liveStateService.getParticipantCount(sid);
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".control", new WsPayloads.ParticipantJoined(count));
 
@@ -112,14 +111,9 @@ public class ParticipantService {
 
   @Transactional(readOnly = true)
   public RejoinResponse rejoinSession(RejoinRequest request) {
-    Long participantId = resolveParticipantId(request.rejoinToken());
+    Long sessionId = request.sessionId();
+    Long participantId = resolveParticipantId(request.rejoinToken(), sessionId);
 
-    Participant participant =
-        participantRepository
-            .findById(participantId)
-            .orElseThrow(() -> AppException.notFound("Participant not found"));
-
-    Long sessionId = participant.getSession().getId();
     String sid = sessionId.toString();
 
     QuizSession session =
@@ -159,7 +153,8 @@ public class ParticipantService {
               passage.subQuestionIds().stream()
                   .map(snapshot::findQuestion)
                   .filter(java.util.Objects::nonNull)
-                  .sorted(java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+                  .sorted(
+                      java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
                   .map(qSnap -> buildQuestionInfo(participantId, qSnap))
                   .toList();
 
@@ -168,7 +163,8 @@ public class ParticipantService {
                   passage.id(),
                   passage.text(),
                   passage.timerMode(),
-                  snapshot.questionPosition(subQuestions.isEmpty() ? currentQId : subQuestions.get(0).id()),
+                  snapshot.questionPosition(
+                      subQuestions.isEmpty() ? currentQId : subQuestions.get(0).id()),
                   snapshot.questions().size(),
                   passage.timeLimitSeconds(),
                   subQuestions.isEmpty() ? null : subQuestions.get(0).effectiveDisplayMode(),
@@ -198,22 +194,37 @@ public class ParticipantService {
   }
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
-  public Long resolveParticipantId(String rejoinToken) {
+  public Long resolveParticipantId(String rejoinToken, Long sessionId) {
     String participantIdStr = redis.opsForValue().get(redisHelper.participantTokenKey(rejoinToken));
+    Long participantId = null;
+
     if (participantIdStr != null) {
-      return Long.parseLong(participantIdStr);
+      participantId = Long.parseLong(participantIdStr);
+    } else {
+      Participant p =
+          participantRepository
+              .findByRejoinToken(rejoinToken)
+              .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
+      participantId = p.getId();
+      redis
+          .opsForValue()
+          .set(
+              redisHelper.participantTokenKey(rejoinToken),
+              participantId.toString(),
+              SessionRedisHelper.REJOIN_TTL);
     }
+
+    // Security: Verify that this participant actually belongs to the sessionId from the request
     Participant p =
         participantRepository
-            .findByRejoinToken(rejoinToken)
-            .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
-    redis
-        .opsForValue()
-        .set(
-        redisHelper.participantTokenKey(rejoinToken),
-        p.getId().toString(),
-        SessionRedisHelper.REJOIN_TTL);
-    return p.getId();
+            .findById(participantId)
+            .orElseThrow(() -> AppException.notFound("Participant not found"));
+
+    if (!p.getSession().getId().equals(sessionId)) {
+      throw AppException.notFound("Invalid rejoin token for this session");
+    }
+
+    return participantId;
   }
 
   private RejoinResponse.CurrentQuestion buildCurrentQuestion(
@@ -268,7 +279,9 @@ public class ParticipantService {
   }
 
   private ParticipantAnswer currentAnswer(Long participantId, Long questionId) {
-    return answerRepository.findByParticipantIdAndQuestionId(participantId, questionId).orElse(null);
+    return answerRepository
+        .findByParticipantIdAndQuestionId(participantId, questionId)
+        .orElse(null);
   }
 
   private List<Long> selectedOptionIds(ParticipantAnswer answer) {

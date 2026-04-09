@@ -3,6 +3,7 @@
 import { AnimatePresence } from "framer-motion";
 import { QuizEditorSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import CustomSelect from "@/components/ui/CustomSelect";
 import BackLink from "@/components/ui/BackLink";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -105,7 +106,7 @@ export default function QuizEditorClient({
       <PageHeader
         label="Quiz Editor"
         title={quiz.title}
-        description="Build a stage-ready sequence with standalone prompts and timed passage blocks."
+        description="Standalone questions and passage blocks, in order."
         meta={
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted">
             <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
@@ -136,34 +137,17 @@ export default function QuizEditorClient({
       />
 
       <section className="mb-8 border border-border bg-surface">
-        <div className="grid gap-5 px-5 py-5 md:grid-cols-[minmax(0,1fr)_auto] md:px-6 md:py-6">
-          <div>
-            <p className="label text-accent">Stage Defaults</p>
-            <p className="mt-2 max-w-[58ch] text-sm text-muted">
-              Set the default reveal behavior once. Individual questions can
-              still override it when the round needs a different stage
-              treatment.
-            </p>
-          </div>
-
-          <div className="grid gap-3 md:min-w-[18rem]">
-            <label className="block">
-              <span className="field-label mb-2 block">Quiz Display Mode</span>
-              <select
+        <div className="flex flex-wrap items-center gap-5 px-5 py-5 md:px-6 md:py-5">
+          <p className="label text-accent">Display Mode</p>
+          <div className="flex items-center gap-3">
+            <div className="w-44">
+              <CustomSelect
                 value={quizDisplayModeDraft ?? quiz.displayMode}
-                onChange={(event) =>
-                  setQuizDisplayModeDraft(event.target.value as DisplayMode)
-                }
+                onChange={(v) => setQuizDisplayModeDraft(v as DisplayMode)}
                 disabled={hasBlockingSession}
-                className="input-field"
-              >
-                {DISPLAY_MODE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={DISPLAY_MODE_OPTIONS}
+              />
+            </div>
             <button
               type="button"
               onClick={handleSaveQuizSettings}
@@ -174,23 +158,18 @@ export default function QuizEditorClient({
               }
               className="btn-primary px-5 py-3 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {savingQuizSettings ? "Saving..." : "Save Defaults"}
+              {savingQuizSettings ? "Saving…" : "Save"}
             </button>
-            {settingsError ? (
-              <p className="text-sm text-danger">{settingsError}</p>
-            ) : null}
           </div>
+          {settingsError ? (
+            <p className="text-sm text-danger">{settingsError}</p>
+          ) : null}
         </div>
       </section>
 
       <section className="mb-6 border border-border bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-4 md:px-6">
-          <div>
-            <p className="label text-foreground/75">Canvas</p>
-            <p className="mt-1 text-sm text-muted">
-              Order the round as standalone prompts or grouped reading blocks.
-            </p>
-          </div>
+          <p className="label text-foreground/75">Canvas</p>
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"

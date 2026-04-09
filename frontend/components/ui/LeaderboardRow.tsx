@@ -9,6 +9,7 @@ interface LeaderboardRowProps extends HTMLMotionProps<"div"> {
   displayName: string;
   score: number;
   variant?: Variant;
+  isMe?: boolean;
 }
 
 function rankColor(rank: number, variant: Variant): string {
@@ -27,6 +28,7 @@ export default function LeaderboardRow({
   displayName,
   score,
   variant = "default",
+  isMe = false,
   ...motionProps
 }: LeaderboardRowProps) {
   const isCompact = variant === "compact";
@@ -45,18 +47,22 @@ export default function LeaderboardRow({
       : "text-sm w-6";
   const nameStyle = isCompact
     ? "text-sm text-foreground truncate"
-    : isReview
-      ? `text-sm font-medium ${rank === 1 ? "text-foreground" : "text-muted"}`
+    : isReview || isMe
+      ? `text-sm font-medium ${rank === 1 || isMe ? "text-foreground" : "text-muted"}`
       : "text-foreground";
   const scoreStyle = isReview
     ? "font-bold tabular-nums text-foreground"
     : `${isCompact ? "text-sm shrink-0 ml-2" : ""} tabular-nums text-success font-bold`;
-  const border = isReview && rank === 1 ? "border-primary/40" : "border-border";
+  const border = isMe
+    ? "border-primary"
+    : isReview && rank === 1
+      ? "border-primary/40"
+      : "border-border";
 
   return (
     <motion.div
       {...motionProps}
-      className={`flex items-center justify-between ${padding} border ${border} bg-surface`}
+      className={`flex items-center justify-between ${padding} border ${border} ${isMe ? "bg-primary/5" : "bg-surface"}`}
     >
       <div className={`flex items-center ${gap} min-w-0`}>
         <span

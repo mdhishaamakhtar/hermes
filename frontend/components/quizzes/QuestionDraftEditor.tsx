@@ -5,6 +5,7 @@ import {
   normalizeOptionsForQuestionType,
   QUESTION_TYPE_OPTIONS,
 } from "@/components/quizzes/editor-model";
+import CustomSelect from "@/components/ui/CustomSelect";
 import type { DisplayMode } from "@/lib/types";
 import type { QuestionDraft } from "@/components/quizzes/editor-model";
 
@@ -54,14 +55,9 @@ export default function QuestionDraftEditor({
     });
 
   return (
-    <div className="border border-border/80 bg-background/40 px-4 py-4">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="label text-accent">{title}</p>
-          <p className="mt-1 text-xs text-muted">
-            Shape the prompt, then tune the scoring grid.
-          </p>
-        </div>
+    <div className="py-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="label text-accent">{title}</p>
         {onRemove ? (
           <button
             type="button"
@@ -81,104 +77,90 @@ export default function QuestionDraftEditor({
             onChange={(event) =>
               onChange({ ...draft, text: event.target.value })
             }
-            rows={3}
-            className="input-field min-h-[6rem] resize-y"
+            rows={2}
+            className="input-field min-h-[5rem] resize-y"
           />
         </label>
         <label className="block">
           <span className="field-label mb-2 block">Timer</span>
           <input
-            type="number"
-            min={timerLocked ? 0 : 5}
+            type="text"
+            inputMode="numeric"
             disabled={timerLocked}
             value={draft.timeLimitSeconds}
-            onChange={(event) =>
+            onChange={(event) => {
+              const val = event.target.value.replace(/[^0-9]/g, "");
               onChange({
                 ...draft,
-                timeLimitSeconds: Number(event.target.value),
-              })
-            }
+                timeLimitSeconds: val === "" ? 0 : parseInt(val, 10),
+              });
+            }}
             className="input-field font-mono tabular-nums disabled:opacity-40"
           />
-          <p className="mt-2 text-xs text-muted">
-            {timerLocked
-              ? "Shared with the passage timer."
-              : "Seconds for this sub-question."}
-          </p>
+          {timerLocked ? (
+            <p className="mt-1 text-[11px] text-muted">Passage timer</p>
+          ) : null}
         </label>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="field-label mb-2 block">Question Type</span>
-          <select
+          <span className="field-label mb-2 block">Type</span>
+          <CustomSelect
             value={draft.questionType}
-            onChange={(event) =>
+            onChange={(v) =>
               onChange({
                 ...draft,
-                questionType: event.target
-                  .value as QuestionDraft["questionType"],
+                questionType: v as QuestionDraft["questionType"],
                 options: normalizeOptionsForQuestionType(
-                  event.target.value as QuestionDraft["questionType"],
+                  v as QuestionDraft["questionType"],
                   draft.options,
                 ),
               })
             }
-            className="input-field"
-          >
-            {QUESTION_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={QUESTION_TYPE_OPTIONS}
+          />
         </label>
         {showDisplayMode ? (
           <label className="block">
             <span className="field-label mb-2 block">Display Mode</span>
-            <select
+            <CustomSelect
               value={draft.displayModeOverride ?? "INHERIT"}
-              onChange={(event) =>
+              onChange={(v) =>
                 onChange({
                   ...draft,
                   displayModeOverride:
-                    event.target.value === "INHERIT"
-                      ? null
-                      : (event.target.value as DisplayMode),
+                    v === "INHERIT" ? null : (v as DisplayMode),
                 })
               }
-              className="input-field"
-            >
-              <option value="INHERIT">Inherit from quiz</option>
-              {DISPLAY_MODE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "INHERIT", label: "Inherit from quiz" },
+                ...DISPLAY_MODE_OPTIONS,
+              ]}
+            />
           </label>
         ) : null}
       </div>
 
-      <div className="mt-5">
-        <div className="mb-3 flex items-center justify-between">
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between">
           <p className="label text-muted">Options</p>
           <button
             type="button"
             onClick={addOption}
             className="label text-accent transition-colors hover:text-accent-hover"
           >
-            + Add option
+            + Add
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {draft.options.map((option, optionIndex) => (
             <div
               key={optionIndex}
-              className="grid gap-3 border border-border px-4 py-3 md:grid-cols-[3rem_minmax(0,1fr)_7rem_auto]"
+              className="grid items-center gap-3 border border-border px-3 py-2 md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_auto]"
             >
-              <span className="label self-center text-foreground/80">
+              <span className="label text-foreground/80">
                 {String.fromCharCode(65 + optionIndex)}
               </span>
               <input
@@ -190,13 +172,19 @@ export default function QuestionDraftEditor({
                 placeholder={`Option ${optionIndex + 1}`}
               />
               <input
-                type="number"
+                type="text"
                 value={option.pointValue}
-                onChange={(event) =>
-                  updateOption(optionIndex, {
-                    pointValue: Number(event.target.value),
-                  })
-                }
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  if (raw === "-" || raw === "") {
+                    updateOption(optionIndex, { pointValue: raw });
+                    return;
+                  }
+                  const parsed = parseInt(raw, 10);
+                  if (!isNaN(parsed)) {
+                    updateOption(optionIndex, { pointValue: parsed });
+                  }
+                }}
                 className="input-field font-mono tabular-nums"
               />
               <button
@@ -205,7 +193,7 @@ export default function QuestionDraftEditor({
                 disabled={draft.options.length <= 2}
                 className="label self-center text-muted transition-colors hover:text-danger disabled:opacity-30"
               >
-                Remove
+                ✕
               </button>
             </div>
           ))}

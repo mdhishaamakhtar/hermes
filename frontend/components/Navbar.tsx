@@ -1,18 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { clearStoredAuthToken } from "@/lib/auth-storage";
 import Logo from "./Logo";
 
 export default function Navbar() {
-  const router = useRouter();
   const { data: user } = useSWR<{ displayName: string }>("/api/auth/me");
 
   const handleLogout = () => {
     clearStoredAuthToken();
-    router.replace("/");
   };
 
   return (
@@ -30,12 +27,14 @@ export default function Navbar() {
               <span className="text-sm text-muted tracking-wide select-none">
                 {user.displayName}
               </span>
-              <button
+              <Link
+                href="/"
+                prefetch
                 onClick={handleLogout}
                 className="label hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 Sign Out
-              </button>
+              </Link>
             </>
           )}
         </div>

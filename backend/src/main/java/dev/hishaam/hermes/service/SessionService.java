@@ -13,7 +13,6 @@ import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.OffsetDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -106,10 +105,10 @@ public class SessionService {
     }
 
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
-    QuizSnapshot.QuestionSnapshot first =
-        snapshot.questions().stream()
-            .min(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-            .orElseThrow(() -> AppException.badRequest("No questions in snapshot"));
+    QuizSnapshot.QuestionSnapshot first = snapshot.findNextQuestion(null);
+    if (first == null) {
+      throw AppException.badRequest("No questions in snapshot");
+    }
 
     session.setStatus(SessionStatus.ACTIVE);
     session.setStartedAt(OffsetDateTime.now());
@@ -178,6 +177,24 @@ public class SessionService {
     liveStateService.clearTimer(sid);
     liveStateService.incrementQuestionSequence(sid);
     engine.doEndSession(sessionId);
+  }
+
+  @Transactional
+  public void abandonSession(Long sessionId, Long userId) {
+    ownershipService.requireSessionOwner(sessionId, userId);
+    String sid = sessionId.toString();
+    timerScheduler.cancelQuestionTimer(sessionId);
+    liveStateService.clearTimer(sid);
+
+    // Attempt best-effort cleanup of Redis keys
+    try {
+      QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+      liveStateService.cleanupSessionKeys(sid, snapshot, null);
+    } catch (Exception e) {
+      // Ignore if already gone or invalid
+    }
+
+    sessionRepository.deleteById(sessionId);
   }
 
   // ─── Status / Lobby ────────────────────────────────────────────────────────────

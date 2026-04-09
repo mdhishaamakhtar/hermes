@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { passagesApi } from "@/lib/apiClient";
 import QuestionCard from "@/components/quizzes/QuestionCard";
 import QuestionDraftEditor from "@/components/quizzes/QuestionDraftEditor";
+import CustomSelect from "@/components/ui/CustomSelect";
 import {
   createQuestionDraft,
   passageTimerModeLabel,
@@ -50,9 +51,9 @@ export default function PassageCard({
   const [editTimerMode, setEditTimerMode] = useState<PassageTimerMode>(
     passage.timerMode,
   );
-  const [editTimeLimitSeconds, setEditTimeLimitSeconds] = useState(
-    passage.timeLimitSeconds ?? 120,
-  );
+  const [editTimeLimitSeconds, setEditTimeLimitSeconds] = useState<
+    number | string
+  >(passage.timeLimitSeconds ?? 120);
   const [saving, setSaving] = useState(false);
   const [showSubQuestionForm, setShowSubQuestionForm] = useState(false);
   const [subQuestionDraft, setSubQuestionDraft] = useState<QuestionDraft>(
@@ -77,10 +78,11 @@ export default function PassageCard({
 
   const validatePassage = () => {
     if (!editText.trim()) return "Passage text is required.";
-    if (
-      editTimerMode === "ENTIRE_PASSAGE" &&
-      (!Number.isFinite(editTimeLimitSeconds) || editTimeLimitSeconds < 5)
-    ) {
+    const timeVal =
+      typeof editTimeLimitSeconds === "string"
+        ? parseInt(editTimeLimitSeconds, 10)
+        : editTimeLimitSeconds;
+    if (editTimerMode === "ENTIRE_PASSAGE" && (isNaN(timeVal) || timeVal < 5)) {
       return "Shared passage timing must be at least 5 seconds.";
     }
 
@@ -102,7 +104,11 @@ export default function PassageCard({
       orderIndex: passage.orderIndex,
       timerMode: editTimerMode,
       timeLimitSeconds:
-        editTimerMode === "ENTIRE_PASSAGE" ? editTimeLimitSeconds : null,
+        editTimerMode === "ENTIRE_PASSAGE"
+          ? typeof editTimeLimitSeconds === "string"
+            ? parseInt(editTimeLimitSeconds, 10)
+            : editTimeLimitSeconds
+          : null,
     });
 
     if (response.success) {
@@ -133,13 +139,18 @@ export default function PassageCard({
       orderIndex: passage.subQuestions.length,
       timeLimitSeconds:
         passage.timerMode === "PER_SUB_QUESTION"
-          ? subQuestionDraft.timeLimitSeconds
+          ? typeof subQuestionDraft.timeLimitSeconds === "string"
+            ? parseInt(subQuestionDraft.timeLimitSeconds, 10)
+            : subQuestionDraft.timeLimitSeconds
           : undefined,
       questionType: subQuestionDraft.questionType,
       displayModeOverride: subQuestionDraft.displayModeOverride,
       options: subQuestionDraft.options.map((option, index) => ({
         text: option.text.trim(),
-        pointValue: option.pointValue,
+        pointValue:
+          typeof option.pointValue === "string"
+            ? parseInt(option.pointValue, 10) || 0
+            : option.pointValue,
         orderIndex: index,
       })),
     });
@@ -232,11 +243,7 @@ export default function PassageCard({
           <div className="px-5 py-5 md:px-6 md:py-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="label text-muted">Nested prompts</p>
-                <p className="mt-1 text-sm text-muted">
-                  The passage stays on stage while these prompts cycle beneath
-                  it.
-                </p>
+                <p className="label text-muted">Sub-questions</p>
               </div>
               <span className="font-mono text-xs text-muted tabular-nums">
                 {sortedSubQuestions.length} total
@@ -253,10 +260,7 @@ export default function PassageCard({
               >
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-4">
                   <div>
-                    <p className="label text-accent">Add Sub-question</p>
-                    <p className="mt-1 text-sm text-muted">
-                      Attach one more prompt to this reading block.
-                    </p>
+                    <p className="label text-accent">New Sub-question</p>
                   </div>
                   <button
                     type="button"
@@ -285,7 +289,7 @@ export default function PassageCard({
                     disabled={creatingSubQuestion}
                     className="btn-primary px-5 py-3"
                   >
-                    {creatingSubQuestion ? "Adding..." : "Save Sub-question"}
+                    {creatingSubQuestion ? "Adding…" : "Add Sub-question"}
                   </button>
                 </div>
               </motion.form>
@@ -319,9 +323,6 @@ export default function PassageCard({
           <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
             <div>
               <p className="label mb-2 text-warning">Editing Passage</p>
-              <h3 className="text-xl font-bold tracking-tight text-foreground">
-                Keep the reading block intact, then tune pacing.
-              </h3>
             </div>
             <button
               type="button"
@@ -345,47 +346,30 @@ export default function PassageCard({
           <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_9rem]">
             <label className="block">
               <span className="field-label mb-2 block">Timer Mode</span>
-              <select
+              <CustomSelect
                 value={editTimerMode}
-                onChange={(event) =>
-                  setEditTimerMode(event.target.value as PassageTimerMode)
-                }
-                className="input-field"
-              >
-                {PASSAGE_TIMER_MODE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-muted">
-                {
-                  PASSAGE_TIMER_MODE_OPTIONS.find(
-                    (option) => option.value === editTimerMode,
-                  )?.description
-                }
-              </p>
+                onChange={(v) => setEditTimerMode(v as PassageTimerMode)}
+                options={PASSAGE_TIMER_MODE_OPTIONS}
+              />
             </label>
 
             {editTimerMode === "ENTIRE_PASSAGE" ? (
               <label className="block">
                 <span className="field-label mb-2 block">Shared Timer</span>
                 <input
-                  type="number"
-                  min={5}
+                  type="text"
+                  inputMode="numeric"
                   value={editTimeLimitSeconds}
-                  onChange={(event) =>
-                    setEditTimeLimitSeconds(Number(event.target.value))
-                  }
+                  onChange={(event) => {
+                    const val = event.target.value.replace(/[^0-9]/g, "");
+                    setEditTimeLimitSeconds(val === "" ? 0 : parseInt(val, 10));
+                  }}
                   className="input-field font-mono tabular-nums"
                 />
               </label>
             ) : (
-              <div className="border border-border px-4 py-3">
-                <p className="label text-muted">Timing</p>
-                <p className="mt-2 text-sm text-muted">
-                  Existing sub-question timers stay in control.
-                </p>
+              <div className="flex items-end pb-3">
+                <p className="text-xs text-muted">Sub-question timers active</p>
               </div>
             )}
           </div>
@@ -400,7 +384,7 @@ export default function PassageCard({
               disabled={saving}
               className="bg-warning px-5 py-3 text-sm font-medium tracking-[0.12em] text-white uppercase transition-colors hover:bg-warning-hover disabled:opacity-40"
             >
-              {saving ? "Saving..." : "Save Passage"}
+              {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </motion.form>

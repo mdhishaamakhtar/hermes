@@ -220,12 +220,17 @@ public class SessionEngine {
     String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
 
-    // Freeze any outstanding answers
+    // Freeze and GRADE any outstanding answers before ending
     String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
     String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
+    String qState = liveStateService.getQuestionState(sid);
+    boolean shouldGrade =
+        QuestionLifecycleState.TIMED.name().equals(qState)
+            || QuestionLifecycleState.FROZEN.name().equals(qState);
+
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
-      QuizSnapshot.PassageSnapshot passage =
-          snapshot.findPassage(Long.parseLong(currentPassageIdStr));
+      Long passageId = Long.parseLong(currentPassageIdStr);
+      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
       if (passage != null) {
         passage
             .subQuestionIds()
@@ -233,10 +238,16 @@ public class SessionEngine {
                 qid ->
                     answerRepository.freezeAnswersForQuestion(
                         sessionId, qid, OffsetDateTime.now()));
+        if (shouldGrade) {
+          gradingService.gradePassage(sessionId, passageId);
+        }
       }
     } else if (currentQIdStr != null && !currentQIdStr.isBlank()) {
-      answerRepository.freezeAnswersForQuestion(
-          sessionId, Long.parseLong(currentQIdStr), OffsetDateTime.now());
+      Long questionId = Long.parseLong(currentQIdStr);
+      answerRepository.freezeAnswersForQuestion(sessionId, questionId, OffsetDateTime.now());
+      if (shouldGrade) {
+        gradingService.gradeQuestion(sessionId, questionId);
+      }
     }
 
     QuizSession session =

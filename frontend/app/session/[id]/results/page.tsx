@@ -198,6 +198,7 @@ export default function ResultsPage() {
         </p>
         <Link
           href="/"
+          prefetch
           className="label transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           Go Home

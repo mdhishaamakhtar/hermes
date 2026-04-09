@@ -48,9 +48,18 @@ interface ParticipantQuestion {
   totalAnswered: number;
   totalLockedIn: number;
   correctOptionIds: number[];
+  passageId: number | null;
   optionPoints: Record<number, number>;
   reviewed: boolean;
   revealed: boolean;
+  reviewedAt: string | null;
+}
+
+interface SubQuestion {
+  questionId: number;
+  text: string;
+  questionType: QuestionType;
+  options: ParticipantOption[];
 }
 
 interface ParticipantPassage {
@@ -141,15 +150,20 @@ interface SessionAnswerRevealMsg {
   totalParticipants: number;
 }
 
-interface SessionLeaderboardUpdateMsg {
-  event: "LEADERBOARD_UPDATE";
-  leaderboard: LeaderboardEntry[];
-}
-
 interface SessionParticipantLeaderboardMsg {
   event: "PARTICIPANT_LEADERBOARD";
   leaderboard: ParticipantLeaderboardEntry[];
   totalParticipants: number;
+}
+
+interface ParticipantJoinedMsg {
+  event: "PARTICIPANT_JOINED";
+  count: number;
+}
+
+interface SessionLeaderboardUpdateMsg {
+  event: "LEADERBOARD_UPDATE";
+  leaderboard: LeaderboardEntry[];
 }
 
 interface SessionEndMsg {
@@ -167,7 +181,8 @@ type QuestionEventMsg =
   | SessionQuestionReviewedMsg
   | SessionScoringCorrectedMsg
   | SessionParticipantLeaderboardMsg
-  | SessionEndMsg;
+  | SessionEndMsg
+  | ParticipantJoinedMsg;
 
 type AnalyticsEventMsg =
   | SessionAnswerUpdateMsg
@@ -228,8 +243,12 @@ function buildQuestionFromDisplayed(
     timeLimitSeconds: question.timeLimitSeconds,
     questionType: question.questionType,
     effectiveDisplayMode: question.effectiveDisplayMode,
+    passageId: question.passage?.id ?? null,
     passageText: question.passage?.text ?? null,
-    options: question.options.toSorted((a, b) => a.orderIndex - b.orderIndex),
+    options: question.options.toSorted(
+      (a: { orderIndex: number }, b: { orderIndex: number }) =>
+        a.orderIndex - b.orderIndex,
+    ),
     selectedOptionIds: [],
     lockedIn: false,
     counts: {},
@@ -239,16 +258,18 @@ function buildQuestionFromDisplayed(
     optionPoints: {},
     reviewed: false,
     revealed: false,
+    reviewedAt: null,
   };
 }
 
 function buildQuestionFromPassageSubQuestion(
-  question: SessionPassageDisplayedMsg["subQuestions"][number],
+  question: SubQuestion,
   questionIndex: number,
   totalQuestions: number,
-  passageText: string,
+  passageText: string | null,
   timeLimitSeconds: number,
   effectiveDisplayMode: DisplayMode,
+  passageId: number,
 ): ParticipantQuestion {
   return {
     id: question.questionId,
@@ -258,8 +279,12 @@ function buildQuestionFromPassageSubQuestion(
     timeLimitSeconds,
     questionType: question.questionType,
     effectiveDisplayMode,
+    passageId: passageId,
     passageText,
-    options: question.options.toSorted((a, b) => a.orderIndex - b.orderIndex),
+    options: question.options.toSorted(
+      (a: ParticipantOption, b: ParticipantOption) =>
+        a.orderIndex - b.orderIndex,
+    ),
     selectedOptionIds: [],
     lockedIn: false,
     counts: {},
@@ -269,6 +294,7 @@ function buildQuestionFromPassageSubQuestion(
     optionPoints: {},
     reviewed: false,
     revealed: false,
+    reviewedAt: null,
   };
 }
 
@@ -277,8 +303,13 @@ function buildQuestionFromRejoin(
   totalQuestions: number,
   passageText: string | null,
   effectiveDisplayMode: DisplayMode,
+  passageIdFromContext: number | null = null,
   timeLimitSecondsOverride?: number,
 ): ParticipantQuestion {
+  const pId =
+    passageIdFromContext ??
+    ("passage" in question ? (question.passage?.id ?? null) : null);
+
   return {
     id: question.id,
     text: question.text,
@@ -287,17 +318,22 @@ function buildQuestionFromRejoin(
     timeLimitSeconds: timeLimitSecondsOverride ?? question.timeLimitSeconds,
     questionType: question.questionType,
     effectiveDisplayMode,
+    passageId: pId,
     passageText,
-    options: question.options.toSorted((a, b) => a.orderIndex - b.orderIndex),
+    options: question.options.toSorted(
+      (a: { orderIndex: number }, b: { orderIndex: number }) =>
+        a.orderIndex - b.orderIndex,
+    ),
     selectedOptionIds: question.selectedOptionIds,
     lockedIn: question.lockedIn,
     counts: {},
     totalAnswered: 0,
-    totalLockedIn: 0,
+    totalLockedIn: question.lockedIn ? 1 : 0,
     correctOptionIds: [],
     optionPoints: {},
     reviewed: false,
     revealed: false,
+    reviewedAt: null,
   };
 }
 
@@ -439,7 +475,7 @@ function QuestionCard({
                   >
                     {meta.letter}
                   </span>
-                  <span className="min-w-0 truncate text-sm text-foreground">
+                  <span className="min-w-0 text-sm text-foreground">
                     {option.text}
                   </span>
                 </div>
@@ -591,9 +627,6 @@ export default function PlayPage() {
   const redirectRef = useRef(false);
 
   const authToken = getStoredAuthToken();
-  const { subscribe, unsubscribe, publish } = useStompClient({
-    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-  });
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -632,24 +665,19 @@ export default function PlayPage() {
     },
     [],
   );
+  const loadSessionContext = useCallback(async () => {
+    if (!sessionId || !rejoinToken) return;
 
-  useEffect(() => {
-    if (!sessionId) return;
-
-    if (!rejoinToken) {
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
+    try {
       const response = await api.post<RejoinResponse>("/api/sessions/rejoin", {
         rejoinToken,
         sessionId: Number(sessionId),
       });
 
-      if (cancelled) return;
-
       if (!response.success) {
+        if (response.error?.code === "NOT_FOUND") {
+          localStorage.removeItem(`hermes_rejoin_${sessionId}`);
+        }
         setHydrated(true);
         return;
       }
@@ -679,18 +707,32 @@ export default function PlayPage() {
           effectiveDisplayMode: currentPassage.effectiveDisplayMode,
         });
         replaceQuestions(
-          currentPassage.subQuestions.map((subQuestion) =>
-            buildQuestionFromRejoin(
-              subQuestion,
-              currentPassage.totalQuestions,
-              currentPassage.text,
-              currentPassage.effectiveDisplayMode,
-              currentPassage.timeLimitSeconds ?? subQuestion.timeLimitSeconds,
-            ),
+          currentPassage.subQuestions.map(
+            (subQuestion: RejoinCurrentPassageQuestion) =>
+              buildQuestionFromRejoin(
+                subQuestion,
+                currentPassage.totalQuestions,
+                currentPassage.text,
+                currentPassage.effectiveDisplayMode,
+                currentPassage.id,
+                currentPassage.timeLimitSeconds ?? subQuestion.timeLimitSeconds,
+              ),
           ),
         );
       } else if (data.currentQuestion) {
-        setPassage(null);
+        if (data.currentQuestion.passage) {
+          setPassage({
+            id: data.currentQuestion.passage.id,
+            text: data.currentQuestion.passage.text,
+            timerMode: data.currentQuestion.passage.timerMode,
+            questionIndex: data.currentQuestion.orderIndex,
+            totalQuestions: data.currentQuestion.totalQuestions,
+            timeLimitSeconds: data.currentQuestion.timeLimitSeconds,
+            effectiveDisplayMode: data.currentQuestion.effectiveDisplayMode,
+          });
+        } else {
+          setPassage(null);
+        }
         replaceQuestions([
           buildQuestionFromRejoin(
             data.currentQuestion,
@@ -702,12 +744,26 @@ export default function PlayPage() {
       }
 
       setHydrated(true);
-    })();
+    } catch (_e) {
+      // ignore
+    }
+  }, [sessionId, rejoinToken, replaceQuestions]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [rejoinToken, replaceQuestions, sessionId]);
+  const { subscribe, unsubscribe, publish } = useStompClient({
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    onConnect: () => {
+      void loadSessionContext();
+    },
+  });
+
+  useEffect(() => {
+    if (!hydrated && rejoinToken) {
+      const init = async () => {
+        await loadSessionContext();
+      };
+      void init();
+    }
+  }, [hydrated, rejoinToken, loadSessionContext]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -739,7 +795,9 @@ export default function PlayPage() {
               }
             : null,
         );
-        replaceQuestions([buildQuestionFromDisplayed(data)]);
+        const rejointQuestion = buildQuestionFromDisplayed(data);
+        replaceQuestions([rejointQuestion]);
+        // Participant count is not in this event, but it's handled by PARTICIPANT_JOINED
         setTimeLeft(0);
         return;
       }
@@ -761,18 +819,36 @@ export default function PlayPage() {
           effectiveDisplayMode: data.effectiveDisplayMode,
         });
 
-        const nextQuestions = data.subQuestions.map((question, index) =>
-          buildQuestionFromPassageSubQuestion(
-            question,
-            data.questionIndex + index,
-            data.totalQuestions,
-            data.passageText,
-            data.timeLimitSeconds ?? 0,
-            data.effectiveDisplayMode,
-          ),
+        const nextQuestions = data.subQuestions.map(
+          (
+            question: {
+              questionId: number;
+              text: string;
+              questionType: QuestionType;
+              options: Array<{ id: number; text: string; orderIndex: number }>;
+            },
+            index: number,
+          ) =>
+            buildQuestionFromPassageSubQuestion(
+              question,
+              data.questionIndex + index,
+              data.totalQuestions,
+              data.passageText,
+              data.timeLimitSeconds ?? 0,
+              data.effectiveDisplayMode,
+              data.passageId,
+            ),
         );
         replaceQuestions(nextQuestions);
         setTimeLeft(0);
+        return;
+      }
+
+      if (data.event === "SESSION_END") {
+        setSessionState("ENDED");
+        if ((data as SessionEndMsg).leaderboard) {
+          setFinalLeaderboard((data as SessionEndMsg).leaderboard!);
+        }
         return;
       }
 
@@ -788,7 +864,12 @@ export default function PlayPage() {
         setQuestionLifecycle("FROZEN");
         setTimeLeft(0);
         setQuestions((current) =>
-          current.map((question) => ({ ...question, lockedIn: true })),
+          current.map((question) => {
+            const shouldFreeze =
+              data.event === "PASSAGE_FROZEN" ||
+              question.id === (data as SessionQuestionFrozenMsg).questionId;
+            return shouldFreeze ? { ...question, lockedIn: true } : question;
+          }),
         );
         return;
       }
@@ -807,17 +888,20 @@ export default function PlayPage() {
         return;
       }
 
+      // ... moved to controlDestination ...
+
       if (data.event === "PARTICIPANT_LEADERBOARD") {
         setParticipantLeaderboard(data.leaderboard);
+        setLeaderboard(data.leaderboard);
+        setParticipantCount(data.totalParticipants);
         return;
       }
+    });
 
-      if (data.event === "SESSION_END") {
-        stopTimer();
-        setSessionState("ENDED");
-        if (data.leaderboard) {
-          setFinalLeaderboard(data.leaderboard);
-        }
+    subscribe(controlDestination, (msg) => {
+      const data = msg as QuestionEventMsg;
+      if (data.event === "PARTICIPANT_JOINED") {
+        setParticipantCount(data.count);
       }
     });
 
@@ -850,9 +934,11 @@ export default function PlayPage() {
       if (data.event === "SESSION_END") {
         stopTimer();
         setSessionState("ENDED");
-        if (data.leaderboard) {
-          setFinalLeaderboard(data.leaderboard);
+        const sessionEndData = data as SessionEndMsg;
+        if (sessionEndData.leaderboard) {
+          setFinalLeaderboard(sessionEndData.leaderboard);
         }
+        return;
       }
     });
 
@@ -887,15 +973,28 @@ export default function PlayPage() {
     router.replace(`/session/${sessionId}/results`);
   }, [router, sessionId, sessionState]);
 
-  const activeQuestions = questions;
   const activePassage = passage;
+  const activeQuestions = useMemo(
+    () =>
+      questions.filter((q) => {
+        if (!activePassage) return !q.passageId;
+        return q.passageId === activePassage.id;
+      }),
+    [questions, activePassage],
+  );
+
   const isPassage = Boolean(activePassage);
   const maxQuestionIndex =
     activeQuestions[activeQuestions.length - 1]?.questionIndex ?? 0;
+  const selectedQuestionCount = activeQuestions.reduce(
+    (total, q) =>
+      total + (q.lockedIn || q.selectedOptionIds.length > 0 ? 1 : 0),
+    0,
+  );
   const timerColour =
-    timeLeft !== null && timeLeft <= 5
+    timeLeft !== null && timeLeft > 0 && timeLeft <= 5
       ? "var(--color-danger)"
-      : timeLeft !== null && timeLeft <= 10
+      : timeLeft !== null && timeLeft > 0 && timeLeft <= 10
         ? "var(--color-warning)"
         : "var(--color-foreground)";
 
@@ -914,18 +1013,16 @@ export default function PlayPage() {
     [participantId, participantLeaderboard],
   );
 
-  const topFive = leaderboardRows.slice(0, 5);
-  const selectedQuestionCount = activeQuestions.reduce(
-    (count, question) =>
-      count + (question.selectedOptionIds.length > 0 ? 1 : 0),
-    0,
-  );
-
-  const lockableQuestions = activeQuestions.filter(
-    (question) =>
-      questionLifecycle === "TIMED" &&
-      !question.lockedIn &&
-      question.selectedOptionIds.length > 0,
+  const topFive = leaderboardRows;
+  const lockableQuestions = useMemo(
+    () =>
+      activeQuestions.filter(
+        (q) =>
+          questionLifecycle === "TIMED" &&
+          !q.lockedIn &&
+          q.selectedOptionIds.length > 0,
+      ),
+    [activeQuestions, questionLifecycle],
   );
 
   const canLockAll = lockableQuestions.length > 0;
@@ -985,6 +1082,10 @@ export default function PlayPage() {
   const handleLockAll = useCallback(() => {
     lockableQuestions.forEach((question) => handleLockIn(question.id));
   }, [handleLockIn, lockableQuestions]);
+
+  const handleLeave = useCallback(() => {
+    localStorage.removeItem(`hermes_rejoin_${sessionId}`);
+  }, [sessionId]);
 
   if (!hydrated) {
     return (
@@ -1109,8 +1210,8 @@ export default function PlayPage() {
                     lineHeight: 1,
                     color: timerColour,
                     textShadow:
-                      timeLeft !== null && timeLeft <= 5
-                        ? `0 0 16px rgba(${colorRgb.danger},0.4)`
+                      timeLeft !== null && timeLeft > 0 && timeLeft <= 5
+                        ? `0 0 16px rgba(${colorRgb.danger},0.45)`
                         : "none",
                   }}
                 >
@@ -1142,7 +1243,7 @@ export default function PlayPage() {
                 <div className="mt-2 flex items-center justify-between text-xs text-muted">
                   <span>{activePassage?.timerMode ?? "single question"}</span>
                   <span className="tabular-nums">
-                    {formatTime(timeLeft ?? 0)}
+                    {activeQuestions[0].timeLimitSeconds || 0}s
                   </span>
                 </div>
               </div>
@@ -1157,9 +1258,10 @@ export default function PlayPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="label mb-2">Passage</p>
-                  <h2 className="max-w-3xl text-xl font-bold leading-snug text-foreground">
-                    {activePassage.text}
-                  </h2>
+                  <div
+                    className="max-w-4xl text-lg leading-relaxed text-foreground prose prose-invert"
+                    dangerouslySetInnerHTML={{ __html: activePassage.text }}
+                  />
                 </div>
                 <div className="text-right text-xs text-muted">
                   <p className="tabular-nums">
@@ -1315,6 +1417,7 @@ export default function PlayPage() {
                     displayName={entry.displayName}
                     score={entry.score}
                     variant="review"
+                    isMe={entry.participantId === participantId}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.15, delay: index * 0.04 }}
@@ -1411,7 +1514,9 @@ export default function PlayPage() {
           <div className="flex gap-3">
             <Link
               href="/"
-              className="w-full border border-border px-5 py-3 text-center text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              prefetch
+              onClick={handleLeave}
+              className="block w-full border border-border px-5 py-3 text-center text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               Leave session
             </Link>

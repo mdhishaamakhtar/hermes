@@ -32,6 +32,7 @@ export function useStompClient(options: UseStompOptions = {}) {
       },
       reconnectDelay: 3000,
       onConnect: () => {
+        subscriptionsRef.current.clear();
         desiredSubscriptionsRef.current.forEach((callback, destination) => {
           if (!subscriptionsRef.current.has(destination)) {
             const subscription = client.subscribe(destination, (msg) => {
@@ -49,6 +50,9 @@ export function useStompClient(options: UseStompOptions = {}) {
       onDisconnect: () => {
         subscriptionsRef.current.clear();
         optionsRef.current.onDisconnect?.();
+      },
+      onWebSocketClose: () => {
+        subscriptionsRef.current.clear();
       },
       onStompError: (frame) => {
         console.error("STOMP error:", frame);

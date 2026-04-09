@@ -33,7 +33,12 @@ export default function EventClient({ eventId }: { eventId: string }) {
 
   const handleCreateQuiz = async (_prev: null, formData: FormData) => {
     const title = formData.get("quizTitle") as string;
-    const order = Number(formData.get("orderIndex"));
+    const orderStr = formData.get("orderIndex") as string;
+    const order = parseInt(orderStr, 10);
+
+    if (!title.trim()) return null;
+    if (isNaN(order) || order < 0) return null;
+
     const res = await eventsApi.createQuiz(eventId, {
       title,
       orderIndex: order,
@@ -114,10 +119,10 @@ export default function EventClient({ eventId }: { eventId: string }) {
               <div className="w-24">
                 <label className="field-label block mb-2">Order</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="orderIndex"
                   defaultValue={orderIndex}
-                  min={1}
                   className="input-field font-mono"
                 />
               </div>

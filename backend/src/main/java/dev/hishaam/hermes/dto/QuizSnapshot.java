@@ -37,17 +37,26 @@ public record QuizSnapshot(
     return passages.stream().filter(p -> p.id().equals(passageId)).findFirst().orElse(null);
   }
 
+  public double globalSortKey(QuestionSnapshot q) {
+    if (q.passageId() != null) {
+      PassageSnapshot p = findPassage(q.passageId());
+      if (p != null) {
+        return p.orderIndex() + (q.orderIndex() / 1000.0);
+      }
+    }
+    return (double) q.orderIndex();
+  }
+
   public QuestionSnapshot findNextQuestion(Long currentQuestionId) {
     if (currentQuestionId == null) {
-      return questions.stream()
-          .min(Comparator.comparingInt(QuestionSnapshot::orderIndex))
-          .orElse(null);
+      return questions.stream().min(Comparator.comparingDouble(this::globalSortKey)).orElse(null);
     }
     QuestionSnapshot current = findQuestion(currentQuestionId);
     if (current == null) return null;
+    double currentKey = globalSortKey(current);
     return questions.stream()
-        .filter(q -> q.orderIndex() > current.orderIndex())
-        .min(Comparator.comparingInt(QuestionSnapshot::orderIndex))
+        .filter(q -> globalSortKey(q) > currentKey)
+        .min(Comparator.comparingDouble(this::globalSortKey))
         .orElse(null);
   }
 
@@ -56,23 +65,24 @@ public record QuizSnapshot(
    * sub-question in the given passage. Used to advance past an ENTIRE_PASSAGE unit.
    */
   public QuestionSnapshot findNextAfterPassage(Long passageId) {
-    int maxPassageOrderIndex =
-        questions.stream()
-            .filter(q -> passageId.equals(q.passageId()))
-            .mapToInt(QuestionSnapshot::orderIndex)
-            .max()
-            .orElse(0);
+    PassageSnapshot passage = findPassage(passageId);
+    if (passage == null) return null;
+    double targetKey = passage.orderIndex() + 0.999;
     return questions.stream()
-        .filter(q -> q.orderIndex() > maxPassageOrderIndex)
-        .min(Comparator.comparingInt(QuestionSnapshot::orderIndex))
+        .filter(q -> globalSortKey(q) > targetKey)
+        .min(Comparator.comparingDouble(this::globalSortKey))
         .orElse(null);
   }
 
   /** Returns the 1-based position of the question among all questions sorted by orderIndex. */
   public int questionPosition(Long questionId) {
-    QuestionSnapshot target = findQuestion(questionId);
-    if (target == null) return -1;
-    return (int) questions.stream().filter(q -> q.orderIndex() <= target.orderIndex()).count();
+    List<Long> sortedIds =
+        questions.stream()
+            .sorted(Comparator.comparingDouble(this::globalSortKey))
+            .map(QuestionSnapshot::id)
+            .toList();
+    int idx = sortedIds.indexOf(questionId);
+    return idx == -1 ? -1 : idx + 1;
   }
 
   /**
