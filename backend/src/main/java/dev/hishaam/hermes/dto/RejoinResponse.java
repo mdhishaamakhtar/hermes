@@ -45,6 +45,7 @@ public record RejoinResponse(
       int orderIndex,
       int timeLimitSeconds,
       String questionType,
+      String effectiveDisplayMode,
       List<OptionInfo> options,
       List<Long> selectedOptionIds,
       boolean lockedIn) {}

@@ -647,7 +647,7 @@ export default function HostPage() {
   >({});
   const [leaderboard, setLeaderboard] = useState<LiveLeaderboardEntry[]>([]);
   const [finalLeaderboard, setFinalLeaderboard] = useState<
-    LiveLeaderboardEntry[] | null
+    { rank: number; displayName: string; score: number }[] | null
   >(null);
   const [sessionResults, setSessionResults] = useState<SessionResults | null>(
     null,
@@ -1256,7 +1256,7 @@ export default function HostPage() {
                 ) : (
                   leaderboardRows.map((entry, index) => (
                     <LeaderboardRow
-                      key={`${entry.rank}-${entry.participantId}`}
+                      key={`${entry.rank}-${entry.displayName}`}
                       rank={entry.rank}
                       displayName={entry.displayName}
                       score={entry.score}
@@ -1596,7 +1596,7 @@ export default function HostPage() {
                   .slice(0, 10)
                   .map((entry, index) => (
                     <LeaderboardRow
-                      key={`${entry.rank}-${entry.participantId}`}
+                      key={`${entry.rank}-${entry.displayName}`}
                       rank={entry.rank}
                       displayName={entry.displayName}
                       score={entry.score}

@@ -261,6 +261,7 @@ public class ParticipantService {
         question.orderIndex(),
         question.timeLimitSeconds(),
         question.questionType(),
+        question.effectiveDisplayMode(),
         options,
         selectedOptionIds(answer),
         answer != null && answer.isLockedIn());

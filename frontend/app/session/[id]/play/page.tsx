@@ -587,7 +587,7 @@ export default function PlayPage() {
     return localStorage.getItem(`hermes_rejoin_${sessionId}`);
   });
   const [hydrated, setHydrated] = useState(() => rejoinToken === null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<number | null>(null);
   const redirectRef = useRef(false);
 
   const authToken = getStoredAuthToken();
