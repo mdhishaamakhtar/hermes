@@ -10,4 +10,5 @@ public record QuizResponse(
     int orderIndex,
     String displayMode,
     OffsetDateTime createdAt,
-    List<QuestionResponse> questions) {}
+    List<QuestionResponse> questions,
+    List<PassageResponse> passages) {}

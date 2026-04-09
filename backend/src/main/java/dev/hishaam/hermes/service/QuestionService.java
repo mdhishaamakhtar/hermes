@@ -6,9 +6,12 @@ import dev.hishaam.hermes.dto.OptionResponse;
 import dev.hishaam.hermes.dto.QuestionResponse;
 import dev.hishaam.hermes.dto.UpdateQuestionRequest;
 import dev.hishaam.hermes.entity.AnswerOption;
+import dev.hishaam.hermes.entity.Passage;
 import dev.hishaam.hermes.entity.Question;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.PassageTimerMode;
+import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
@@ -39,15 +42,17 @@ public class QuestionService {
   @Transactional
   public QuestionResponse createQuestion(Long quizId, CreateQuestionRequest request, Long userId) {
     Quiz quiz = ownershipService.requireQuizOwner(quizId, userId);
-    Question question =
-        Question.builder()
-            .quiz(quiz)
-            .text(request.text())
-            .orderIndex(request.orderIndex())
-            .timeLimitSeconds(request.timeLimitSeconds())
-            .displayModeOverride(request.displayModeOverride())
-            .build();
-    question.getOptions().addAll(buildOptions(question, request.options()));
+    Question question = buildQuestionEntity(quiz, null, request, false);
+    question = questionRepository.save(question);
+    return toResponse(question);
+  }
+
+  @Transactional
+  public QuestionResponse createPassageQuestion(
+      Long passageId, CreateQuestionRequest request, Long userId) {
+    Passage passage = ownershipService.requirePassageOwner(passageId, userId);
+    checkNoActiveSession(passage.getQuiz().getId());
+    Question question = buildQuestionEntity(passage.getQuiz(), passage, request, true);
     question = questionRepository.save(question);
     return toResponse(question);
   }
@@ -58,9 +63,25 @@ public class QuestionService {
     Question question = ownershipService.requireQuestionOwner(questionId, userId);
     checkNoActiveSession(question.getQuiz().getId());
 
+    int normalizedOrderIndex = request.orderIndex() != null ? request.orderIndex() : 0;
+    QuestionType questionType =
+        request.questionType() != null ? request.questionType() : QuestionType.SINGLE_SELECT;
+    int normalizedTimeLimitSeconds =
+        resolveTimeLimitSeconds(question.getPassage(), request.timeLimitSeconds(), true);
+
+    validateQuestionRequest(
+        question.getQuiz(),
+        question.getPassage(),
+        normalizedOrderIndex,
+        questionType,
+        normalizedTimeLimitSeconds,
+        request.options(),
+        question.getId());
+
     question.setText(request.text());
-    question.setOrderIndex(request.orderIndex());
-    question.setTimeLimitSeconds(request.timeLimitSeconds());
+    question.setOrderIndex(normalizedOrderIndex);
+    question.setTimeLimitSeconds(normalizedTimeLimitSeconds);
+    question.setQuestionType(questionType);
     question.setDisplayModeOverride(request.displayModeOverride());
 
     question.getOptions().clear();
@@ -83,7 +104,10 @@ public class QuestionService {
             .map(
                 o ->
                     new OptionResponse(
-                        o.getId(), o.getText(), o.getOrderIndex(), o.getPointValue() > 0))
+                        o.getId(),
+                        o.getText(),
+                        o.getOrderIndex(),
+                        o.getPointValue()))
             .toList();
     String displayModeOverride =
         question.getDisplayModeOverride() != null ? question.getDisplayModeOverride().name() : null;
@@ -95,12 +119,46 @@ public class QuestionService {
     return new QuestionResponse(
         question.getId(),
         question.getQuiz().getId(),
+        question.getPassage() != null ? question.getPassage().getId() : null,
         question.getText(),
+        question.getQuestionType().name(),
         question.getOrderIndex(),
         question.getTimeLimitSeconds(),
         displayModeOverride,
         effectiveDisplayMode,
         options);
+  }
+
+  Question buildQuestionEntity(
+      Quiz quiz, Passage passage, CreateQuestionRequest request, boolean passageSubQuestion) {
+    checkNoActiveSession(quiz.getId());
+    int normalizedOrderIndex = request.orderIndex() != null ? request.orderIndex() : 0;
+    QuestionType questionType =
+        request.questionType() != null ? request.questionType() : QuestionType.SINGLE_SELECT;
+    int normalizedTimeLimitSeconds =
+        resolveTimeLimitSeconds(passage, request.timeLimitSeconds(), passageSubQuestion);
+
+    validateQuestionRequest(
+        quiz,
+        passage,
+        normalizedOrderIndex,
+        questionType,
+        normalizedTimeLimitSeconds,
+        request.options(),
+        null);
+
+    Question question =
+        Question.builder()
+            .quiz(quiz)
+            .passage(passage)
+            .text(request.text())
+            .orderIndex(normalizedOrderIndex)
+            .timeLimitSeconds(normalizedTimeLimitSeconds)
+            .questionType(questionType)
+            .displayModeOverride(request.displayModeOverride())
+            .build();
+    question.getOptions().addAll(buildOptions(question, request.options()));
+    return question;
   }
 
   private List<AnswerOption> buildOptions(Question question, List<OptionRequest> optionRequests) {
@@ -110,12 +168,104 @@ public class QuestionService {
       options.add(
           AnswerOption.builder()
               .question(question)
-              .text(req.text())
-              .orderIndex(i + 1)
-              .pointValue(Boolean.TRUE.equals(req.isCorrect()) ? 10 : 0)
+              .text(req.normalizedText())
+              .orderIndex(req.orderIndex() != null ? req.orderIndex() : i)
+              .pointValue(req.pointValue())
               .build());
     }
     return options;
+  }
+
+  private void validateQuestionRequest(
+      Quiz quiz,
+      Passage passage,
+      int orderIndex,
+      QuestionType questionType,
+      int timeLimitSeconds,
+      List<OptionRequest> optionRequests,
+      Long currentQuestionId) {
+    if (optionRequests.size() < 2) {
+      throw AppException.badRequest("Questions must have at least 2 options");
+    }
+    if (optionRequests.stream().anyMatch(o -> o.normalizedText() == null || o.normalizedText().isBlank())) {
+      throw AppException.badRequest("Option text is required");
+    }
+
+    long positiveOptionCount = optionRequests.stream().filter(o -> o.pointValue() > 0).count();
+    if (questionType == QuestionType.SINGLE_SELECT && positiveOptionCount != 1) {
+      throw AppException.badRequest(
+          "SINGLE_SELECT questions must have exactly one option with pointValue > 0");
+    }
+    if (questionType == QuestionType.MULTI_SELECT && positiveOptionCount < 1) {
+      throw AppException.badRequest(
+          "MULTI_SELECT questions must have at least one option with pointValue > 0");
+    }
+
+    long uniqueOptionOrderIndexes =
+        optionRequests.stream()
+            .map(o -> o.orderIndex() != null ? o.orderIndex() : optionRequests.indexOf(o))
+            .distinct()
+            .count();
+    if (uniqueOptionOrderIndexes != optionRequests.size()) {
+      throw AppException.badRequest("Option orderIndex values must be unique within the question");
+    }
+
+    if (passage == null) {
+      if (timeLimitSeconds <= 0) {
+        throw AppException.badRequest("Questions must define a positive timeLimitSeconds");
+      }
+      validateQuizLevelOrderIndex(quiz, orderIndex, currentQuestionId);
+      return;
+    }
+
+    if (passage.getTimerMode() == PassageTimerMode.PER_SUB_QUESTION && timeLimitSeconds <= 0) {
+      throw AppException.badRequest(
+          "PER_SUB_QUESTION passage sub-questions must define a positive timeLimitSeconds");
+    }
+    validatePassageLevelOrderIndex(passage, orderIndex, currentQuestionId);
+  }
+
+  private int resolveTimeLimitSeconds(Passage passage, Integer requestTimeLimitSeconds, boolean passageSubQuestion) {
+    if (!passageSubQuestion || passage == null) {
+      if (requestTimeLimitSeconds == null) {
+        throw AppException.badRequest("Questions must define timeLimitSeconds");
+      }
+      return requestTimeLimitSeconds;
+    }
+    if (passage.getTimerMode() == PassageTimerMode.ENTIRE_PASSAGE) {
+      return requestTimeLimitSeconds != null ? requestTimeLimitSeconds : 0;
+    }
+    if (requestTimeLimitSeconds == null) {
+      throw AppException.badRequest(
+          "PER_SUB_QUESTION passage sub-questions must define timeLimitSeconds");
+    }
+    return requestTimeLimitSeconds;
+  }
+
+  private void validateQuizLevelOrderIndex(Quiz quiz, int orderIndex, Long currentQuestionId) {
+    boolean clashesWithQuestion =
+        quiz.getQuestions().stream()
+            .filter(q -> q.getPassage() == null)
+            .filter(q -> currentQuestionId == null || !q.getId().equals(currentQuestionId))
+            .anyMatch(q -> q.getOrderIndex() == orderIndex);
+    if (clashesWithQuestion) {
+      throw AppException.badRequest("orderIndex must be unique within the quiz");
+    }
+    boolean clashesWithPassage =
+        quiz.getPassages().stream().anyMatch(p -> p.getOrderIndex() == orderIndex);
+    if (clashesWithPassage) {
+      throw AppException.badRequest("orderIndex must be unique within the quiz");
+    }
+  }
+
+  private void validatePassageLevelOrderIndex(Passage passage, int orderIndex, Long currentQuestionId) {
+    boolean clashes =
+        passage.getSubQuestions().stream()
+            .filter(q -> currentQuestionId == null || !q.getId().equals(currentQuestionId))
+            .anyMatch(q -> q.getOrderIndex() == orderIndex);
+    if (clashes) {
+      throw AppException.badRequest("orderIndex must be unique within the passage");
+    }
   }
 
   private void checkNoActiveSession(Long quizId) {

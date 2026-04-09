@@ -4,34 +4,52 @@ export interface QuizSummary {
   orderIndex: number;
 }
 
-export interface OptionReq {
+export type QuestionType = "SINGLE_SELECT" | "MULTI_SELECT";
+export type DisplayMode = "LIVE" | "BLIND" | "CODE_DISPLAY";
+export type PassageTimerMode = "PER_SUB_QUESTION" | "ENTIRE_PASSAGE";
+
+export interface QuestionOptionInput {
   text: string;
-  isCorrect: boolean;
+  orderIndex?: number;
+  pointValue: number;
 }
 
-export interface Option {
+export interface QuestionOption {
   id: number;
   text: string;
   orderIndex: number;
-  isCorrect: boolean;
+  pointValue: number;
 }
 
 export interface Question {
   id: number;
+  passageId: number | null;
   text: string;
+  questionType: QuestionType;
   orderIndex: number;
   timeLimitSeconds: number;
-  displayModeOverride: string | null;
-  effectiveDisplayMode: string;
-  options: Option[];
+  displayModeOverride: DisplayMode | null;
+  effectiveDisplayMode: DisplayMode;
+  options: QuestionOption[];
+}
+
+export interface Passage {
+  id: number;
+  quizId: number;
+  text: string;
+  orderIndex: number;
+  timerMode: PassageTimerMode;
+  timeLimitSeconds: number | null;
+  subQuestions: Question[];
 }
 
 export interface Quiz {
   id: number;
   title: string;
   orderIndex: number;
-  displayMode: string;
+  displayMode: DisplayMode;
   questions: Question[];
+  passages: Passage[];
 }
 
 export interface EventSummary {
@@ -56,7 +74,11 @@ export interface LeaderboardEntry {
   score: number;
 }
 
-export interface OptionResult extends Option {
+export interface ResultOption {
+  id: number;
+  text: string;
+  orderIndex: number;
+  isCorrect: boolean;
   count: number;
 }
 
@@ -65,7 +87,7 @@ export interface QuestionResult {
   text: string;
   orderIndex: number;
   timeLimitSeconds: number;
-  options: OptionResult[];
+  options: ResultOption[];
   totalAnswers: number;
 }
 

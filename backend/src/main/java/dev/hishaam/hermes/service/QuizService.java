@@ -1,6 +1,7 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.CreateQuizRequest;
+import dev.hishaam.hermes.dto.PassageResponse;
 import dev.hishaam.hermes.dto.QuizResponse;
 import dev.hishaam.hermes.dto.QuizSessionListResponse;
 import dev.hishaam.hermes.dto.UpdateQuizRequest;
@@ -30,6 +31,7 @@ public class QuizService {
   private final ParticipantAnswerRepository participantAnswerRepository;
   private final OwnershipService ownershipService;
   private final QuestionService questionService;
+  private final PassageService passageService;
 
   public QuizService(
       QuizRepository quizRepository,
@@ -37,13 +39,15 @@ public class QuizService {
       ParticipantRepository participantRepository,
       ParticipantAnswerRepository participantAnswerRepository,
       OwnershipService ownershipService,
-      QuestionService questionService) {
+      QuestionService questionService,
+      PassageService passageService) {
     this.quizRepository = quizRepository;
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.participantAnswerRepository = participantAnswerRepository;
     this.ownershipService = ownershipService;
     this.questionService = questionService;
+    this.passageService = passageService;
   }
 
   @Transactional
@@ -114,7 +118,13 @@ public class QuizService {
   }
 
   private QuizResponse toResponse(Quiz quiz) {
-    var questions = quiz.getQuestions().stream().map(questionService::toResponse).toList();
+    var questions =
+        quiz.getQuestions().stream()
+            .filter(q -> q.getPassage() == null)
+            .map(questionService::toResponse)
+            .toList();
+    List<PassageResponse> passages =
+        quiz.getPassages().stream().map(passageService::toResponse).toList();
     return new QuizResponse(
         quiz.getId(),
         quiz.getEvent().getId(),
@@ -122,6 +132,7 @@ public class QuizService {
         quiz.getOrderIndex(),
         quiz.getDisplayMode().name(),
         quiz.getCreatedAt(),
-        questions);
+        questions,
+        passages);
   }
 }
