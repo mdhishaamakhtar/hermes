@@ -184,7 +184,8 @@ public class SessionResultsService {
                                       o.text(),
                                       o.pointValue() > 0,
                                       o.orderIndex(),
-                                      optionCounts.getOrDefault(o.id(), 0L)))
+                                      optionCounts.getOrDefault(o.id(), 0L),
+                                      o.pointValue()))
                           .toList();
 
                   return new SessionResultsResponse.QuestionResult(

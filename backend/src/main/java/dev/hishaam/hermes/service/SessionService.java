@@ -145,6 +145,19 @@ public class SessionService {
     engine.startTimerInternal(sessionId);
   }
 
+  public void endTimerEarly(Long sessionId, Long userId) {
+    ownershipService.requireSessionOwner(sessionId, userId);
+    String sid = sessionId.toString();
+    String questionState = liveStateService.getQuestionState(sid);
+    if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
+      throw AppException.conflict("Timer can only be ended while question is in TIMED state");
+    }
+
+    timerScheduler.cancelQuestionTimer(sessionId);
+    liveStateService.clearTimer(sid);
+    engine.onTimerExpired(sessionId);
+  }
+
   // ─── Advance / End (delegate to engine — cross-bean call, @Transactional works)
 
   public void advanceSession(Long sessionId, Long userId) {

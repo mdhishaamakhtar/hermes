@@ -59,6 +59,14 @@ public class SessionController {
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
+  @PostMapping("/{id}/end-timer")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<Void>> endTimerEarly(
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.endTimerEarly(id, user.getId());
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
+
   @PostMapping("/{id}/next")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> nextQuestion(

@@ -22,7 +22,8 @@ public record SessionResultsResponse(
       long totalAnswers,
       List<OptionInfo> options) {}
 
-  public record OptionInfo(Long id, String text, boolean isCorrect, int orderIndex, long count) {}
+  public record OptionInfo(
+      Long id, String text, boolean isCorrect, int orderIndex, long count, int pointValue) {}
 
   public record LeaderboardEntry(int rank, Long participantId, String displayName, long score) {}
 }

@@ -99,6 +99,17 @@ export const sessionsApi = {
   create: (quizId: number) =>
     api.post<{ id: number; joinCode: string }>("/api/sessions", { quizId }),
   start: (id: number | string) => api.post(`/api/sessions/${id}/start`),
+  startTimer: (id: number | string) =>
+    api.post(`/api/sessions/${id}/start-timer`),
+  endTimer: (id: number | string) => api.post(`/api/sessions/${id}/end-timer`),
   next: (id: number | string) => api.post(`/api/sessions/${id}/next`),
   end: (id: number | string) => api.post(`/api/sessions/${id}/end`),
+  correctScoring: (
+    id: number | string,
+    questionId: number,
+    options: Array<{ optionId: number; pointValue: number }>,
+  ) =>
+    api.patch(`/api/sessions/${id}/questions/${questionId}/scoring`, {
+      options,
+    }),
 };

@@ -99,6 +99,13 @@ export const api = {
       }),
     ),
 
+  patch: <T>(path: string, body?: unknown) =>
+    requestWrapper<T>(() =>
+      kyInstance.patch(normalizePath(path), {
+        json: body,
+      }),
+    ),
+
   delete: <T>(path: string) =>
     requestWrapper<T>(() => kyInstance.delete(normalizePath(path)), true),
 };

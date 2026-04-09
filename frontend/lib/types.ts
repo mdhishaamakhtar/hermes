@@ -80,6 +80,7 @@ export interface ResultOption {
   orderIndex: number;
   isCorrect: boolean;
   count: number;
+  pointValue: number;
 }
 
 export interface QuestionResult {
