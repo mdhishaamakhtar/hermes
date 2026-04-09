@@ -47,8 +47,9 @@ export default function PassageCard({
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(passage.text);
-  const [editTimerMode, setEditTimerMode] =
-    useState<PassageTimerMode>(passage.timerMode);
+  const [editTimerMode, setEditTimerMode] = useState<PassageTimerMode>(
+    passage.timerMode,
+  );
   const [editTimeLimitSeconds, setEditTimeLimitSeconds] = useState(
     passage.timeLimitSeconds ?? 120,
   );
@@ -158,7 +159,10 @@ export default function PassageCard({
   };
 
   const [, savePassageFormAction] = useActionState(savePassageAction, null);
-  const [, addSubQuestionFormAction] = useActionState(addSubQuestionAction, null);
+  const [, addSubQuestionFormAction] = useActionState(
+    addSubQuestionAction,
+    null,
+  );
 
   return (
     <AnimatePresence mode="wait" initial>
@@ -230,7 +234,8 @@ export default function PassageCard({
               <div>
                 <p className="label text-muted">Nested prompts</p>
                 <p className="mt-1 text-sm text-muted">
-                  The passage stays on stage while these prompts cycle beneath it.
+                  The passage stays on stage while these prompts cycle beneath
+                  it.
                 </p>
               </div>
               <span className="font-mono text-xs text-muted tabular-nums">

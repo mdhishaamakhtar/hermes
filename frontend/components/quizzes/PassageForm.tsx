@@ -45,7 +45,10 @@ export default function PassageForm({
     );
 
   const addSubQuestion = () =>
-    setSubQuestions((current) => [...current, createQuestionDraft(current.length)]);
+    setSubQuestions((current) => [
+      ...current,
+      createQuestionDraft(current.length),
+    ]);
 
   const removeSubQuestion = (index: number) =>
     setSubQuestions((current) =>
@@ -98,7 +101,8 @@ export default function PassageForm({
       text: text.trim(),
       orderIndex: nextOrderIndex,
       timerMode,
-      timeLimitSeconds: timerMode === "ENTIRE_PASSAGE" ? timeLimitSeconds : null,
+      timeLimitSeconds:
+        timerMode === "ENTIRE_PASSAGE" ? timeLimitSeconds : null,
       subQuestions: subQuestions.map((draft, index) => ({
         text: draft.text.trim(),
         questionType: draft.questionType,
@@ -145,7 +149,11 @@ export default function PassageForm({
             Build a reading block with nested prompts
           </h3>
         </div>
-        <button type="button" onClick={onCancel} className="btn-ghost px-5 py-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-ghost px-5 py-3"
+        >
           Cancel
         </button>
       </div>
@@ -179,8 +187,9 @@ export default function PassageForm({
           </select>
           <p className="mt-2 text-xs text-muted">
             {
-              PASSAGE_TIMER_MODE_OPTIONS.find((option) => option.value === timerMode)
-                ?.description
+              PASSAGE_TIMER_MODE_OPTIONS.find(
+                (option) => option.value === timerMode,
+              )?.description
             }
           </p>
         </label>
@@ -192,7 +201,9 @@ export default function PassageForm({
               type="number"
               min={5}
               value={timeLimitSeconds}
-              onChange={(event) => setTimeLimitSeconds(Number(event.target.value))}
+              onChange={(event) =>
+                setTimeLimitSeconds(Number(event.target.value))
+              }
               className="input-field font-mono tabular-nums"
             />
           </label>
@@ -251,7 +262,9 @@ export default function PassageForm({
                 showDisplayMode
                 onChange={(next) => updateDraft(index, next)}
                 onRemove={
-                  subQuestions.length > 1 ? () => removeSubQuestion(index) : undefined
+                  subQuestions.length > 1
+                    ? () => removeSubQuestion(index)
+                    : undefined
                 }
               />
             </div>
@@ -264,7 +277,11 @@ export default function PassageForm({
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={saving} className="btn-primary px-5 py-3">
+        <button
+          type="submit"
+          disabled={saving}
+          className="btn-primary px-5 py-3"
+        >
           {saving ? "Adding..." : "Add Passage"}
         </button>
       </div>

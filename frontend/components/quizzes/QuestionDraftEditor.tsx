@@ -78,7 +78,9 @@ export default function QuestionDraftEditor({
           <span className="field-label mb-2 block">Question Text</span>
           <textarea
             value={draft.text}
-            onChange={(event) => onChange({ ...draft, text: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...draft, text: event.target.value })
+            }
             rows={3}
             className="input-field min-h-[6rem] resize-y"
           />
@@ -99,7 +101,9 @@ export default function QuestionDraftEditor({
             className="input-field font-mono tabular-nums disabled:opacity-40"
           />
           <p className="mt-2 text-xs text-muted">
-            {timerLocked ? "Shared with the passage timer." : "Seconds for this sub-question."}
+            {timerLocked
+              ? "Shared with the passage timer."
+              : "Seconds for this sub-question."}
           </p>
         </label>
       </div>
@@ -112,7 +116,8 @@ export default function QuestionDraftEditor({
             onChange={(event) =>
               onChange({
                 ...draft,
-                questionType: event.target.value as QuestionDraft["questionType"],
+                questionType: event.target
+                  .value as QuestionDraft["questionType"],
                 options: normalizeOptionsForQuestionType(
                   event.target.value as QuestionDraft["questionType"],
                   draft.options,
@@ -188,7 +193,9 @@ export default function QuestionDraftEditor({
                 type="number"
                 value={option.pointValue}
                 onChange={(event) =>
-                  updateOption(optionIndex, { pointValue: Number(event.target.value) })
+                  updateOption(optionIndex, {
+                    pointValue: Number(event.target.value),
+                  })
                 }
                 className="input-field font-mono tabular-nums"
               />

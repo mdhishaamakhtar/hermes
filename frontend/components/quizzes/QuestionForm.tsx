@@ -35,8 +35,9 @@ export default function QuestionForm({
   const [qTime, setQTime] = useState(30);
   const [questionType, setQuestionType] =
     useState<QuestionType>("SINGLE_SELECT");
-  const [displayModeOverride, setDisplayModeOverride] =
-    useState<DisplayMode | "INHERIT">("INHERIT");
+  const [displayModeOverride, setDisplayModeOverride] = useState<
+    DisplayMode | "INHERIT"
+  >("INHERIT");
   const [options, setOptions] = useState<QuestionOptionInput[]>(
     createDefaultOptions("SINGLE_SELECT"),
   );
@@ -211,8 +212,8 @@ export default function QuestionForm({
           <div>
             <p className="label text-muted">Options + scoring</p>
             <p className="mt-1 text-sm text-muted">
-              Positive scores reveal the right path. Zero stays neutral. Negative
-              values punish trap picks.
+              Positive scores reveal the right path. Zero stays neutral.
+              Negative values punish trap picks.
             </p>
           </div>
           <button
@@ -257,7 +258,9 @@ export default function QuestionForm({
                   className="input-field"
                 />
                 <label className="block">
-                  <span className="field-label mb-2 block md:hidden">Points</span>
+                  <span className="field-label mb-2 block md:hidden">
+                    Points
+                  </span>
                   <input
                     type="number"
                     value={option.pointValue}
@@ -286,10 +289,18 @@ export default function QuestionForm({
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={creating} className="btn-primary px-5 py-3">
+        <button
+          type="submit"
+          disabled={creating}
+          className="btn-primary px-5 py-3"
+        >
           {creating ? "Adding..." : "Add Question"}
         </button>
-        <button type="button" onClick={onCancel} className="btn-ghost px-5 py-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-ghost px-5 py-3"
+        >
           Cancel
         </button>
       </div>

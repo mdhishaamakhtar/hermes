@@ -2,8 +2,7 @@ package dev.hishaam.hermes.controller;
 
 import dev.hishaam.hermes.dto.*;
 import dev.hishaam.hermes.entity.SessionStatus;
-import dev.hishaam.hermes.exception.AppException;
-import dev.hishaam.hermes.repository.UserRepository;
+import dev.hishaam.hermes.security.AuthenticatedUser;
 import dev.hishaam.hermes.service.ParticipantService;
 import dev.hishaam.hermes.service.AnswerService;
 import dev.hishaam.hermes.service.SessionResultsService;
@@ -13,7 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,80 +22,70 @@ public class SessionController {
   private final ParticipantService participantService;
   private final AnswerService answerService;
   private final SessionResultsService resultsService;
-  private final UserRepository userRepository;
 
   public SessionController(
       SessionService sessionService,
       ParticipantService participantService,
       AnswerService answerService,
-      SessionResultsService resultsService,
-      UserRepository userRepository) {
+      SessionResultsService resultsService) {
     this.sessionService = sessionService;
     this.participantService = participantService;
     this.answerService = answerService;
     this.resultsService = resultsService;
-    this.userRepository = userRepository;
   }
 
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionResponse>> createSession(
       @Valid @RequestBody CreateSessionRequest request,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
+      @AuthenticationPrincipal AuthenticatedUser user) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.ok(sessionService.createSession(request, userId)));
+        .body(ApiResponse.ok(sessionService.createSession(request, user.getId())));
   }
 
   @PostMapping("/{id}/start")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> startSession(
-      @PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
-    sessionService.startSession(id, userId);
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.startSession(id, user.getId());
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
   @PostMapping("/{id}/next")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> nextQuestion(
-      @PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
-    sessionService.advanceSession(id, userId);
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.advanceSession(id, user.getId());
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
   @PostMapping("/{id}/end")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> endSession(
-      @PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
-    sessionService.endSessionByOrganiser(id, userId);
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.endSessionByOrganiser(id, user.getId());
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
   @GetMapping("/{id}/status")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionStatus>> getSessionStatus(
-      @PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
-    return ResponseEntity.ok(ApiResponse.ok(sessionService.getSessionStatus(id, userId)));
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    return ResponseEntity.ok(ApiResponse.ok(sessionService.getSessionStatus(id, user.getId())));
   }
 
   @GetMapping("/{id}/lobby")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<LobbyStateResponse>> getLobbyState(
-      @PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
-    return ResponseEntity.ok(ApiResponse.ok(sessionService.getLobbyState(id, userId)));
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    return ResponseEntity.ok(ApiResponse.ok(sessionService.getLobbyState(id, user.getId())));
   }
 
   @GetMapping("/{id}/results")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionResultsResponse>> getResults(
-      @PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
-    Long userId = resolveUserId(userDetails);
-    return ResponseEntity.ok(ApiResponse.ok(resultsService.getResults(id, userId)));
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    return ResponseEntity.ok(ApiResponse.ok(resultsService.getResults(id, user.getId())));
   }
 
   @PostMapping("/join")
@@ -130,12 +118,5 @@ public class SessionController {
       @PathVariable Long id, @Valid @RequestBody LockInRequest request) {
     answerService.lockInAnswer(id, request);
     return ResponseEntity.ok(ApiResponse.ok(null));
-  }
-
-  private Long resolveUserId(UserDetails userDetails) {
-    return userRepository
-        .findByEmail(userDetails.getUsername())
-        .orElseThrow(() -> AppException.notFound("User not found"))
-        .getId();
   }
 }

@@ -22,6 +22,9 @@ public class ParticipantService {
   private final ParticipantRepository participantRepository;
   private final ParticipantAnswerRepository answerRepository;
   private final SessionRedisHelper redisHelper;
+  private final SessionSnapshotService snapshotService;
+  private final SessionLiveStateService liveStateService;
+  private final SessionCodeService sessionCodeService;
   private final StringRedisTemplate redis;
   private final SimpMessagingTemplate messaging;
 
@@ -30,19 +33,25 @@ public class ParticipantService {
       ParticipantRepository participantRepository,
       ParticipantAnswerRepository answerRepository,
       SessionRedisHelper redisHelper,
+      SessionSnapshotService snapshotService,
+      SessionLiveStateService liveStateService,
+      SessionCodeService sessionCodeService,
       StringRedisTemplate redis,
       SimpMessagingTemplate messaging) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
     this.redisHelper = redisHelper;
+    this.snapshotService = snapshotService;
+    this.liveStateService = liveStateService;
+    this.sessionCodeService = sessionCodeService;
     this.redis = redis;
     this.messaging = messaging;
   }
 
   @Transactional
   public JoinResponse joinSession(JoinSessionRequest request) {
-    String sessionIdStr = redis.opsForValue().get("joincode:" + request.joinCode().toUpperCase());
+    String sessionIdStr = liveStateService.getSessionIdForJoinCode(request.joinCode().toUpperCase());
     if (sessionIdStr == null) {
       throw AppException.notFound("Invalid or expired join code");
     }
@@ -63,7 +72,7 @@ public class ParticipantService {
       throw AppException.conflict("Session is no longer accepting participants");
     }
 
-    String rejoinToken = redisHelper.generateRejoinToken();
+    String rejoinToken = sessionCodeService.generateRejoinToken();
     Participant participant =
         Participant.builder()
             .session(session)
@@ -78,21 +87,21 @@ public class ParticipantService {
     redis
         .opsForValue()
         .set(
-            "participant:" + rejoinToken,
+            redisHelper.participantTokenKey(rejoinToken),
             participant.getId().toString(),
             SessionRedisHelper.REJOIN_TTL);
 
     // Increment participant count
-    redis.opsForValue().increment(redisHelper.key(sid, "participant_count"));
+    liveStateService.incrementParticipantCount(sid);
 
     // Cache display name in Redis for leaderboard building
-    redisHelper.cacheParticipantName(sid, participant.getId(), request.displayName());
+    liveStateService.cacheParticipantName(sid, participant.getId(), request.displayName());
 
     // Initialize leaderboard entry with score 0 (so zero-correct participants appear)
-    redisHelper.initLeaderboardEntry(sid, participant.getId());
+    liveStateService.initLeaderboardEntry(sid, participant.getId());
 
     // Broadcast PARTICIPANT_JOINED
-    long count = redisHelper.getParticipantCount(sid);
+    long count = liveStateService.getParticipantCount(sid);
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".control", new WsPayloads.ParticipantJoined(count));
 
@@ -117,14 +126,14 @@ public class ParticipantService {
             .orElseThrow(() -> AppException.notFound("Session not found"));
     SessionStatus status = session.getStatus();
 
-    String currentQIdStr = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
+    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
     Long currentQId =
         (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
 
     List<Long> answered = answerRepository.findAnsweredQuestionIds(participantId);
 
-    QuizSnapshot snapshot = redisHelper.loadSnapshot(sid);
-    int participantCount = (int) redisHelper.getParticipantCount(sid);
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+    int participantCount = (int) liveStateService.getParticipantCount(sid);
 
     RejoinResponse.CurrentQuestion currentQuestion = null;
     Integer timeLeftSeconds = null;
@@ -144,7 +153,7 @@ public class ParticipantService {
                 snapshot.questions().size(),
                 qSnap.timeLimitSeconds(),
                 options);
-        Long ttl = redis.getExpire(redisHelper.key(sid, "timer"), TimeUnit.SECONDS);
+        Long ttl = redis.getExpire(redisHelper.timerKey(sid), TimeUnit.SECONDS);
         if (ttl != null && ttl > 0) {
           timeLeftSeconds = ttl.intValue();
         }
@@ -165,7 +174,7 @@ public class ParticipantService {
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
   public Long resolveParticipantId(String rejoinToken) {
-    String participantIdStr = redis.opsForValue().get("participant:" + rejoinToken);
+    String participantIdStr = redis.opsForValue().get(redisHelper.participantTokenKey(rejoinToken));
     if (participantIdStr != null) {
       return Long.parseLong(participantIdStr);
     }
@@ -175,7 +184,10 @@ public class ParticipantService {
             .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
     redis
         .opsForValue()
-        .set("participant:" + rejoinToken, p.getId().toString(), SessionRedisHelper.REJOIN_TTL);
+        .set(
+            redisHelper.participantTokenKey(rejoinToken),
+            p.getId().toString(),
+            SessionRedisHelper.REJOIN_TTL);
     return p.getId();
   }
 }

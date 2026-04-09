@@ -1,5 +1,5 @@
 import ky, { HTTPError, type Options } from "ky";
-import { clearStoredAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
+import { getStoredAuthToken } from "@/lib/auth-storage";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -32,17 +32,6 @@ const kyInstance = ky.create({
             request.headers.set("Authorization", `Bearer ${token}`);
           }
         }
-      },
-    ],
-    afterResponse: [
-      (_request, _options, response) => {
-        if (response.status === 401) {
-          if (typeof window !== "undefined") {
-            clearStoredAuthToken();
-            window.location.href = "/auth/login";
-          }
-        }
-        return response;
       },
     ],
   },

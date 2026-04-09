@@ -43,8 +43,9 @@ export default function QuestionCard({
   const [editTime, setEditTime] = useState(30);
   const [editQuestionType, setEditQuestionType] =
     useState<QuestionType>("SINGLE_SELECT");
-  const [editDisplayModeOverride, setEditDisplayModeOverride] =
-    useState<DisplayMode | "INHERIT">("INHERIT");
+  const [editDisplayModeOverride, setEditDisplayModeOverride] = useState<
+    DisplayMode | "INHERIT"
+  >("INHERIT");
   const [editOptions, setEditOptions] = useState<QuestionOptionInput[]>([]);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -128,7 +129,8 @@ export default function QuestionCard({
       text: editText.trim(),
       questionType: editQuestionType,
       orderIndex: question.orderIndex,
-      timeLimitSeconds: nested && question.timeLimitSeconds === 0 ? 0 : editTime,
+      timeLimitSeconds:
+        nested && question.timeLimitSeconds === 0 ? 0 : editTime,
       displayModeOverride:
         editDisplayModeOverride === "INHERIT" ? null : editDisplayModeOverride,
       options: editOptions.map((option, index) => ({
@@ -168,7 +170,9 @@ export default function QuestionCard({
           <div className="mb-4 flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-3">
               <span className="label mt-1 text-foreground/80">
-                {nested ? `${question.orderIndex + 1}` : `Q${question.orderIndex}`}
+                {nested
+                  ? `${question.orderIndex + 1}`
+                  : `Q${question.orderIndex}`}
               </span>
               <div className="min-w-0">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -232,7 +236,9 @@ export default function QuestionCard({
                       {option.text}
                     </span>
                     <span className={`font-mono text-xs tabular-nums ${tone}`}>
-                      {option.pointValue > 0 ? `+${option.pointValue}` : option.pointValue}
+                      {option.pointValue > 0
+                        ? `+${option.pointValue}`
+                        : option.pointValue}
                     </span>
                   </div>
                 );
@@ -329,8 +335,8 @@ export default function QuestionCard({
               <div>
                 <p className="label text-muted">Option matrix</p>
                 <p className="mt-1 text-sm text-muted">
-                  Edit scores directly. Positive values reward, negatives punish,
-                  zero stays quiet.
+                  Edit scores directly. Positive values reward, negatives
+                  punish, zero stays quiet.
                 </p>
               </div>
               <button

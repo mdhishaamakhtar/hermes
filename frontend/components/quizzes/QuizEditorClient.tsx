@@ -1,15 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import useSWR from "swr";
-import {
-  passagesApi,
-  questionsApi,
-  quizzesApi,
-  sessionsApi,
-} from "@/lib/apiClient";
 import { QuizEditorSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import BackLink from "@/components/ui/BackLink";
@@ -20,22 +11,13 @@ import PassageForm from "@/components/quizzes/PassageForm";
 import QuestionCard from "@/components/quizzes/QuestionCard";
 import QuestionForm from "@/components/quizzes/QuestionForm";
 import SessionList from "@/components/quizzes/SessionList";
-import type { DisplayMode, Passage, Question, Quiz, SessionItem } from "@/lib/types";
+import { useQuizEditor } from "@/components/quizzes/useQuizEditor";
 import { DISPLAY_MODE_OPTIONS } from "@/components/quizzes/editor-model";
-
-type ComposerMode = "question" | "passage" | null;
+import type { DisplayMode, Passage, Question } from "@/lib/types";
 
 type CanvasItem =
   | { kind: "question"; orderIndex: number; question: Question }
   | { kind: "passage"; orderIndex: number; passage: Passage };
-
-function sortQuestions(questions: Question[]): Question[] {
-  return questions.toSorted((a, b) => a.orderIndex - b.orderIndex);
-}
-
-function sortPassages(passages: Passage[]): Passage[] {
-  return passages.toSorted((a, b) => a.orderIndex - b.orderIndex);
-}
 
 function sortCanvasItems(items: CanvasItem[]): CanvasItem[] {
   return items.toSorted((a, b) => {
@@ -48,63 +30,6 @@ function sortCanvasItems(items: CanvasItem[]): CanvasItem[] {
   });
 }
 
-function withQuestionUpdated(quiz: Quiz, updated: Question): Quiz {
-  if (updated.passageId == null) {
-    return {
-      ...quiz,
-      questions: sortQuestions(
-        quiz.questions.map((question) =>
-          question.id === updated.id ? updated : question,
-        ),
-      ),
-    };
-  }
-
-  return {
-    ...quiz,
-    passages: sortPassages(
-      quiz.passages.map((passage) =>
-        passage.id === updated.passageId
-          ? {
-              ...passage,
-              subQuestions: sortQuestions(
-                passage.subQuestions.map((question) =>
-                  question.id === updated.id ? updated : question,
-                ),
-              ),
-            }
-          : passage,
-      ),
-    ),
-  };
-}
-
-function withQuestionRemoved(quiz: Quiz, questionId: number): Quiz {
-  return {
-    ...quiz,
-    questions: quiz.questions.filter((question) => question.id !== questionId),
-    passages: quiz.passages.map((passage) => ({
-      ...passage,
-      subQuestions: passage.subQuestions.filter(
-        (question) => question.id !== questionId,
-      ),
-    })),
-  };
-}
-
-function nextOrderIndexForQuiz(quiz: Quiz): number {
-  const highestStandalone = quiz.questions.reduce(
-    (max, question) => Math.max(max, question.orderIndex),
-    0,
-  );
-  const highestPassage = quiz.passages.reduce(
-    (max, passage) => Math.max(max, passage.orderIndex),
-    0,
-  );
-
-  return Math.max(highestStandalone, highestPassage) + 1;
-}
-
 export default function QuizEditorClient({
   eventId,
   quizId,
@@ -112,43 +37,40 @@ export default function QuizEditorClient({
   eventId: string;
   quizId: string;
 }) {
-  const router = useRouter();
   const {
-    data: quiz,
-    mutate: mutateQuiz,
-    isLoading: quizLoading,
-    error: quizError,
-  } = useSWR<Quiz>(`/api/quizzes/${quizId}`);
-  const { data: sessions = [], mutate: mutateSessions } = useSWR<SessionItem[]>(
-    `/api/quizzes/${quizId}/sessions`,
-  );
-
-  const [composerMode, setComposerMode] = useState<ComposerMode>(null);
-  const [launching, setLaunching] = useState(false);
-  const [launchError, setLaunchError] = useState<string | null>(null);
-  const [abandoning, setAbandoning] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const [confirmLabel, setConfirmLabel] = useState("Confirm");
-  const [confirmVariant, setConfirmVariant] = useState<"warning" | "danger">(
-    "warning",
-  );
-  const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(
-    null,
-  );
-  const [quizDisplayModeDraft, setQuizDisplayModeDraft] =
-    useState<DisplayMode>("BLIND");
-  const [savingQuizSettings, setSavingQuizSettings] = useState(false);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (quizError) router.push(`/events/${eventId}`);
-  }, [quizError, eventId, router]);
-
-  useEffect(() => {
-    if (quiz) {
-      setQuizDisplayModeDraft(quiz.displayMode);
-    }
-  }, [quiz]);
+    quiz,
+    quizLoading,
+    sessions,
+    composerMode,
+    setComposerMode,
+    launching,
+    launchError,
+    abandoning,
+    confirmMessage,
+    confirmLabel,
+    confirmVariant,
+    confirmAction,
+    clearConfirm,
+    quizDisplayModeDraft,
+    setQuizDisplayModeDraft,
+    savingQuizSettings,
+    settingsError,
+    closeComposer,
+    handleQuestionAdded,
+    handlePassageAdded,
+    handleQuestionSaved,
+    handlePassageSaved,
+    handleSubQuestionAdded,
+    requestDeleteQuestion,
+    requestDeletePassage,
+    handleSaveQuizSettings,
+    handleLaunch,
+    handleAbandon,
+    handleAbandonAll,
+    nextOrderIndexForQuiz,
+    sortPassages,
+    sortQuestions,
+  } = useQuizEditor({ eventId, quizId });
 
   if (quizLoading || !quiz) return <QuizEditorSkeleton />;
 
@@ -175,205 +97,6 @@ export default function QuizEditorClient({
   const hasBlockingSession = sessions.some(
     (session) => session.status === "LOBBY" || session.status === "ACTIVE",
   );
-
-  const closeComposer = () => setComposerMode(null);
-
-  const handleQuestionAdded = (question: Question) => {
-    mutateQuiz(
-      {
-        ...quiz,
-        questions: sortQuestions([...quiz.questions, question]),
-      },
-      { revalidate: false },
-    );
-    closeComposer();
-  };
-
-  const handlePassageAdded = (passage: Passage) => {
-    mutateQuiz(
-      {
-        ...quiz,
-        passages: sortPassages([...quiz.passages, passage]),
-      },
-      { revalidate: false },
-    );
-    closeComposer();
-  };
-
-  const handleQuestionSaved = (updated: Question) => {
-    mutateQuiz(withQuestionUpdated(quiz, updated), { revalidate: false });
-  };
-
-  const handlePassageSaved = (updated: Passage) => {
-    mutateQuiz(
-      {
-        ...quiz,
-        passages: sortPassages(
-          quiz.passages.map((passage) =>
-            passage.id === updated.id ? updated : passage,
-          ),
-        ),
-      },
-      { revalidate: false },
-    );
-  };
-
-  const handleSubQuestionAdded = (passageId: number, question: Question) => {
-    mutateQuiz(
-      {
-        ...quiz,
-        passages: sortPassages(
-          quiz.passages.map((passage) =>
-            passage.id === passageId
-              ? {
-                  ...passage,
-                  subQuestions: sortQuestions([
-                    ...passage.subQuestions,
-                    question,
-                  ]),
-                }
-              : passage,
-          ),
-        ),
-      },
-      { revalidate: false },
-    );
-  };
-
-  const requestDeleteQuestion = (questionId: number) => {
-    setConfirmMessage("Delete this question? This cannot be undone.");
-    setConfirmLabel("Delete");
-    setConfirmVariant("danger");
-    setConfirmAction(() => async () => {
-      setConfirmMessage(null);
-      const response = await questionsApi.delete(questionId);
-
-      if (response.success) {
-        mutateQuiz(withQuestionRemoved(quiz, questionId), {
-          revalidate: false,
-        });
-      }
-    });
-  };
-
-  const requestDeletePassage = (passageId: number) => {
-    setConfirmMessage(
-      "Delete this passage and every nested sub-question? This cannot be undone.",
-    );
-    setConfirmLabel("Delete");
-    setConfirmVariant("danger");
-    setConfirmAction(() => async () => {
-      setConfirmMessage(null);
-      const response = await passagesApi.delete(passageId);
-
-      if (response.success) {
-        mutateQuiz(
-          {
-            ...quiz,
-            passages: quiz.passages.filter((passage) => passage.id !== passageId),
-          },
-          { revalidate: false },
-        );
-      }
-    });
-  };
-
-  const handleSaveQuizSettings = async () => {
-    setSavingQuizSettings(true);
-    setSettingsError(null);
-
-    const response = await quizzesApi.update(quizId, {
-      title: quiz.title,
-      orderIndex: quiz.orderIndex,
-      displayMode: quizDisplayModeDraft,
-    });
-
-    if (response.success) {
-      mutateQuiz(
-        {
-          ...quiz,
-          displayMode: quizDisplayModeDraft,
-        },
-        { revalidate: false },
-      );
-    } else {
-      setSettingsError(
-        response.error?.message ?? "Failed to save quiz display settings.",
-      );
-    }
-
-    setSavingQuizSettings(false);
-  };
-
-  const handleLaunch = async () => {
-    setLaunching(true);
-    setLaunchError(null);
-    const response = await sessionsApi.create(Number(quizId));
-
-    if (response.success) {
-      localStorage.setItem(
-        `hermes_session_${response.data.id}`,
-        response.data.joinCode,
-      );
-      router.refresh();
-      router.push(`/session/${response.data.id}/host`);
-      return;
-    }
-
-    setLaunchError(response.error?.message ?? "Failed to create session");
-    setLaunching(false);
-  };
-
-  const handleAbandon = (sessionId: number) => {
-    setConfirmMessage(
-      "Abandon this session? The quiz will become editable again.",
-    );
-    setConfirmLabel("Abandon");
-    setConfirmVariant("warning");
-    setConfirmAction(() => async () => {
-      setConfirmMessage(null);
-      setAbandoning(true);
-      const response = await sessionsApi.end(sessionId);
-      if (response.success) {
-        mutateSessions(
-          sessions.map((session) =>
-            session.id === sessionId
-              ? { ...session, status: "ENDED" }
-              : session,
-          ),
-          { revalidate: false },
-        );
-      }
-      setAbandoning(false);
-    });
-  };
-
-  const handleAbandonAll = () => {
-    const lobbyIds = sessions
-      .filter((session) => session.status === "LOBBY")
-      .map((session) => session.id);
-    if (!lobbyIds.length) return;
-
-    setConfirmMessage(
-      `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
-    );
-    setConfirmLabel("Abandon");
-    setConfirmVariant("warning");
-    setConfirmAction(() => async () => {
-      setConfirmMessage(null);
-      setAbandoning(true);
-      await Promise.all(lobbyIds.map((id) => sessionsApi.end(id)));
-      mutateSessions(
-        sessions.map((session) =>
-          lobbyIds.includes(session.id)
-            ? { ...session, status: "ENDED" }
-            : session,
-        ),
-        { revalidate: false },
-      );
-      setAbandoning(false);
-    });
-  };
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
@@ -418,7 +141,8 @@ export default function QuizEditorClient({
             <p className="label text-accent">Stage Defaults</p>
             <p className="mt-2 max-w-[58ch] text-sm text-muted">
               Set the default reveal behavior once. Individual questions can
-              still override it when the round needs a different stage treatment.
+              still override it when the round needs a different stage
+              treatment.
             </p>
           </div>
 
@@ -426,7 +150,7 @@ export default function QuizEditorClient({
             <label className="block">
               <span className="field-label mb-2 block">Quiz Display Mode</span>
               <select
-                value={quizDisplayModeDraft}
+                value={quizDisplayModeDraft ?? quiz.displayMode}
                 onChange={(event) =>
                   setQuizDisplayModeDraft(event.target.value as DisplayMode)
                 }
@@ -446,7 +170,7 @@ export default function QuizEditorClient({
               disabled={
                 hasBlockingSession ||
                 savingQuizSettings ||
-                quizDisplayModeDraft === quiz.displayMode
+                (quizDisplayModeDraft ?? quiz.displayMode) === quiz.displayMode
               }
               className="btn-primary px-5 py-3 disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -478,7 +202,9 @@ export default function QuizEditorClient({
               disabled={hasBlockingSession}
               className="label border border-border px-3 py-2 text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
             >
-              {composerMode === "question" ? "Close Question Composer" : "+ Standalone Question"}
+              {composerMode === "question"
+                ? "Close Question Composer"
+                : "+ Standalone Question"}
             </button>
             <button
               type="button"
@@ -490,7 +216,9 @@ export default function QuizEditorClient({
               disabled={hasBlockingSession}
               className="label border border-border px-3 py-2 text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
             >
-              {composerMode === "passage" ? "Close Passage Composer" : "+ Passage Block"}
+              {composerMode === "passage"
+                ? "Close Passage Composer"
+                : "+ Passage Block"}
             </button>
           </div>
         </div>
@@ -563,7 +291,7 @@ export default function QuizEditorClient({
         onConfirm={() => {
           void confirmAction?.();
         }}
-        onCancel={() => setConfirmMessage(null)}
+        onCancel={clearConfirm}
       />
     </div>
   );

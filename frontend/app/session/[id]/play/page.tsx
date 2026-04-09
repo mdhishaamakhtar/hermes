@@ -407,10 +407,9 @@ export default function PlayPage() {
                     aria-live="assertive"
                     className="text-center label"
                     style={{
-                      color:
-                        selectedOptionIds.includes(correctOptionId ?? -1)
-                          ? "var(--color-success)"
-                          : "var(--color-danger)",
+                      color: selectedOptionIds.includes(correctOptionId ?? -1)
+                        ? "var(--color-success)"
+                        : "var(--color-danger)",
                     }}
                   >
                     {selectedOptionIds.includes(correctOptionId ?? -1)

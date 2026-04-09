@@ -4,7 +4,6 @@ import dev.hishaam.hermes.repository.UserRepository;
 import java.util.Collections;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -26,7 +25,8 @@ public class CustomUserDetailsService implements UserDetailsService {
         userRepository
             .findByEmail(email)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
-    return new User(
+    return new AuthenticatedUser(
+        entity.getId(),
         entity.getEmail(),
         entity.getPasswordHash(),
         Collections.singletonList(new SimpleGrantedAuthority("ROLE_ORGANISER")));

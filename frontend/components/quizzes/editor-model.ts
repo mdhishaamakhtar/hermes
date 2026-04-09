@@ -175,8 +175,10 @@ export function validateQuestionDraft(
 }
 
 export function questionTypeLabel(questionType: QuestionType): string {
-  return QUESTION_TYPE_OPTIONS.find((option) => option.value === questionType)
-    ?.label ?? questionType;
+  return (
+    QUESTION_TYPE_OPTIONS.find((option) => option.value === questionType)
+      ?.label ?? questionType
+  );
 }
 
 export function displayModeLabel(mode: DisplayMode): string {

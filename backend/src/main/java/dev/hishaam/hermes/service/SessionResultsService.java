@@ -20,7 +20,7 @@ public class SessionResultsService {
   private final ParticipantRepository participantRepository;
   private final ParticipantAnswerRepository answerRepository;
   private final OwnershipService ownershipService;
-  private final SessionRedisHelper redisHelper;
+  private final SessionSnapshotService snapshotService;
   private final ParticipantService participantService;
 
   public SessionResultsService(
@@ -28,13 +28,13 @@ public class SessionResultsService {
       ParticipantRepository participantRepository,
       ParticipantAnswerRepository answerRepository,
       OwnershipService ownershipService,
-      SessionRedisHelper redisHelper,
+      SessionSnapshotService snapshotService,
       ParticipantService participantService) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
     this.ownershipService = ownershipService;
-    this.redisHelper = redisHelper;
+    this.snapshotService = snapshotService;
     this.participantService = participantService;
   }
 
@@ -63,7 +63,7 @@ public class SessionResultsService {
             .findById(participantId)
             .orElseThrow(() -> AppException.notFound("Participant not found"));
 
-    QuizSnapshot snapshot = redisHelper.deserializeSnapshot(session.getSnapshot());
+    QuizSnapshot snapshot = snapshotService.deserialize(session.getSnapshot());
     List<ParticipantAnswer> answers = answerRepository.findByParticipantId(participantId);
 
     Map<Long, ParticipantAnswer> answerMap = new LinkedHashMap<>();
@@ -151,7 +151,7 @@ public class SessionResultsService {
     Long eventId = session.getQuiz().getEvent().getId();
     String quizTitle = session.getQuiz().getTitle();
 
-    QuizSnapshot snapshot = redisHelper.deserializeSnapshot(session.getSnapshot());
+    QuizSnapshot snapshot = snapshotService.deserialize(session.getSnapshot());
     List<ParticipantAnswer> allAnswers = answerRepository.findBySessionId(sessionId);
     List<Participant> participants = participantRepository.findBySessionId(sessionId);
 

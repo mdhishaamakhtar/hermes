@@ -1,14 +1,13 @@
 package dev.hishaam.hermes.jobs;
 
 import dev.hishaam.hermes.service.SessionEngine;
-import dev.hishaam.hermes.service.SessionRedisHelper;
+import dev.hishaam.hermes.service.SessionLiveStateService;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobDataMap;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.context.ApplicationContext;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 @DisallowConcurrentExecution
 public class SessionTimeoutJob implements Job {
@@ -27,13 +26,12 @@ public class SessionTimeoutJob implements Job {
       Long sessionId = jobDataMap.getLong(SESSION_ID);
       long expectedQuestionSequence = jobDataMap.getLong(EXPECTED_QUESTION_SEQUENCE);
 
-      StringRedisTemplate redis = applicationContext.getBean(StringRedisTemplate.class);
-      SessionRedisHelper redisHelper = applicationContext.getBean(SessionRedisHelper.class);
+      SessionLiveStateService liveStateService =
+          applicationContext.getBean(SessionLiveStateService.class);
       SessionEngine sessionEngine = applicationContext.getBean(SessionEngine.class);
 
-      String currentSequence =
-          redis.opsForValue().get(redisHelper.key(sessionId.toString(), "question_seq"));
-      if (currentSequence == null || Long.parseLong(currentSequence) != expectedQuestionSequence) {
+      long currentSequence = liveStateService.getQuestionSequence(sessionId.toString());
+      if (currentSequence != expectedQuestionSequence) {
         return;
       }
 

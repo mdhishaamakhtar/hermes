@@ -13,7 +13,6 @@ import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +24,11 @@ public class SessionService {
   private final QuestionRepository questionRepository;
   private final ParticipantRepository participantRepository;
   private final OwnershipService ownershipService;
-  private final SessionRedisHelper redisHelper;
+  private final SessionSnapshotService snapshotService;
+  private final SessionLiveStateService liveStateService;
+  private final SessionCodeService sessionCodeService;
   private final SessionEngine engine;
   private final SessionTimerScheduler timerScheduler;
-  private final StringRedisTemplate redis;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -36,19 +36,21 @@ public class SessionService {
       QuestionRepository questionRepository,
       ParticipantRepository participantRepository,
       OwnershipService ownershipService,
-      SessionRedisHelper redisHelper,
+      SessionSnapshotService snapshotService,
+      SessionLiveStateService liveStateService,
+      SessionCodeService sessionCodeService,
       SessionEngine engine,
-      SessionTimerScheduler timerScheduler,
-      StringRedisTemplate redis) {
+      SessionTimerScheduler timerScheduler) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.questionRepository = questionRepository;
     this.participantRepository = participantRepository;
     this.ownershipService = ownershipService;
-    this.redisHelper = redisHelper;
+    this.snapshotService = snapshotService;
+    this.liveStateService = liveStateService;
+    this.sessionCodeService = sessionCodeService;
     this.engine = engine;
     this.timerScheduler = timerScheduler;
-    this.redis = redis;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -66,10 +68,10 @@ public class SessionService {
     }
 
     QuizSnapshot snapshot = buildSnapshot(quiz);
-    String snapshotJson = redisHelper.serializeSnapshot(snapshot);
+    String snapshotJson = snapshotService.serialize(snapshot);
 
     // Generate join code with atomic Redis reservation (fixes TOCTOU race)
-    String joinCode = redisHelper.generateJoinCode();
+    String joinCode = sessionCodeService.generateJoinCode();
 
     QuizSession session =
         QuizSession.builder()
@@ -82,7 +84,7 @@ public class SessionService {
 
     String sid = session.getId().toString();
     // Pipeline overwrites the "reserving" placeholder with actual session data
-    redisHelper.initSessionKeys(sid, joinCode, snapshotJson);
+    liveStateService.initSessionKeys(sid, joinCode, snapshotJson);
 
     return toResponse(session);
   }
@@ -96,7 +98,7 @@ public class SessionService {
       throw AppException.conflict("Session is not in LOBBY state");
     }
 
-    QuizSnapshot snapshot = redisHelper.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
     QuizSnapshot.QuestionSnapshot first =
         snapshot.questions().stream()
             .min(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
@@ -108,20 +110,8 @@ public class SessionService {
     sessionRepository.save(session);
 
     String sid = sessionId.toString();
-    redis
-        .opsForValue()
-        .set(
-            redisHelper.key(sid, "status"),
-            SessionStatus.ACTIVE.name(),
-            SessionRedisHelper.SESSION_TTL);
-    redis
-        .opsForValue()
-        .set(
-            redisHelper.key(sid, "current_question"),
-            first.id().toString(),
-            SessionRedisHelper.SESSION_TTL);
-
-    redisHelper.initQuestionCounts(sid, first);
+    liveStateService.activateSession(sid, first.id());
+    liveStateService.initQuestionCounts(sid, first);
     engine.broadcastQuestionStart(sessionId, first, snapshot);
     engine.scheduleQuestionTimer(sessionId, first.id(), first.timeLimitSeconds());
   }
@@ -132,8 +122,8 @@ public class SessionService {
     ownershipService.requireSessionOwner(sessionId, userId);
     String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
-    redis.delete(redisHelper.key(sid, "timer"));
-    redis.opsForValue().increment(redisHelper.key(sid, "question_seq"));
+    liveStateService.clearTimer(sid);
+    liveStateService.incrementQuestionSequence(sid);
     engine.advanceSessionInternal(sessionId);
   }
 
@@ -141,8 +131,8 @@ public class SessionService {
     ownershipService.requireSessionOwner(sessionId, userId);
     String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
-    redis.delete(redisHelper.key(sid, "timer"));
-    redis.opsForValue().increment(redisHelper.key(sid, "question_seq"));
+    liveStateService.clearTimer(sid);
+    liveStateService.incrementQuestionSequence(sid);
     engine.doEndSession(sessionId);
   }
 
@@ -156,7 +146,7 @@ public class SessionService {
   public LobbyStateResponse getLobbyState(Long sessionId, Long userId) {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
     String sid = sessionId.toString();
-    long participantCount = redisHelper.getParticipantCount(sid);
+    long participantCount = liveStateService.getParticipantCount(sid);
     if (participantCount == 0) {
       participantCount = participantRepository.countBySessionId(sessionId);
     }

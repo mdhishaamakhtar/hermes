@@ -13,9 +13,6 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SessionEngine {
 
-  private static final Logger log = LoggerFactory.getLogger(SessionEngine.class);
-
   private final QuizSessionRepository sessionRepository;
   private final QuestionRepository questionRepository;
   private final ParticipantAnswerRepository answerRepository;
-  private final SessionRedisHelper redisHelper;
-  private final StringRedisTemplate redis;
+  private final SessionSnapshotService snapshotService;
+  private final SessionLiveStateService liveStateService;
   private final SimpMessagingTemplate messaging;
   private final SessionTimerScheduler timerScheduler;
 
@@ -41,15 +36,15 @@ public class SessionEngine {
       QuizSessionRepository sessionRepository,
       QuestionRepository questionRepository,
       ParticipantAnswerRepository answerRepository,
-      SessionRedisHelper redisHelper,
-      StringRedisTemplate redis,
+      SessionSnapshotService snapshotService,
+      SessionLiveStateService liveStateService,
       SimpMessagingTemplate messaging,
       SessionTimerScheduler timerScheduler) {
     this.sessionRepository = sessionRepository;
     this.questionRepository = questionRepository;
     this.answerRepository = answerRepository;
-    this.redisHelper = redisHelper;
-    this.redis = redis;
+    this.snapshotService = snapshotService;
+    this.liveStateService = liveStateService;
     this.messaging = messaging;
     this.timerScheduler = timerScheduler;
   }
@@ -59,11 +54,11 @@ public class SessionEngine {
   @Transactional
   public void advanceSessionInternal(Long sessionId) {
     String sid = sessionId.toString();
-    String status = redis.opsForValue().get(redisHelper.key(sid, "status"));
+    String status = liveStateService.getStatus(sid);
     if (!SessionStatus.ACTIVE.name().equals(status)) return;
 
-    QuizSnapshot snapshot = redisHelper.loadSnapshot(sid);
-    String currentQIdStr = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
     Long currentQId =
         (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
 
@@ -90,8 +85,8 @@ public class SessionEngine {
       return;
     }
 
-    redis.opsForValue().set(redisHelper.key(sid, "current_question"), next.id().toString());
-    redisHelper.initQuestionCounts(sid, next);
+    liveStateService.setCurrentQuestion(sid, next.id());
+    liveStateService.initQuestionCounts(sid, next);
     broadcastQuestionStart(sessionId, next, snapshot);
     scheduleQuestionTimer(sessionId, next.id(), next.timeLimitSeconds());
 
@@ -109,7 +104,7 @@ public class SessionEngine {
 
   @Transactional
   public void doEndSession(Long sessionId) {
-    QuizSnapshot snapshot = redisHelper.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
     doEndSession(sessionId, snapshot);
   }
 
@@ -117,7 +112,7 @@ public class SessionEngine {
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
     String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
-    String currentQuestionId = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
+    String currentQuestionId = liveStateService.getCurrentQuestionId(sid);
     if (currentQuestionId != null && !currentQuestionId.isBlank()) {
       answerRepository.freezeAnswersForQuestion(
           sessionId, Long.parseLong(currentQuestionId), OffsetDateTime.now());
@@ -132,14 +127,14 @@ public class SessionEngine {
     // Skip broadcasting and leaderboard for LOBBY sessions — no participants joined yet
     if (session.getStatus() != SessionStatus.LOBBY) {
       // Build leaderboard from Redis (display names cached there)
-      List<SessionResultsResponse.LeaderboardEntry> leaderboard = redisHelper.buildLeaderboard(sid);
+      List<SessionResultsResponse.LeaderboardEntry> leaderboard = liveStateService.buildLeaderboard(sid);
 
       // Broadcast SESSION_END to participants
       messaging.convertAndSend(
           "/topic/session." + sessionId + ".question", new WsPayloads.SessionEnd());
 
       // Broadcast SESSION_END with leaderboard to organiser
-      long participantCount = redisHelper.getParticipantCount(sid);
+      long participantCount = liveStateService.getParticipantCount(sid);
       messaging.convertAndSend(
           "/topic/session." + sessionId + ".analytics",
           new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
@@ -152,7 +147,7 @@ public class SessionEngine {
     sessionRepository.save(session);
 
     // Clean up Redis — pass snapshot directly (no redundant DB load)
-    redisHelper.cleanupSessionKeys(sid, snapshot, joinCode);
+    liveStateService.cleanupSessionKeys(sid, snapshot, joinCode);
   }
 
   // ─── Question broadcasting ────────────────────────────────────────────────────
@@ -182,19 +177,15 @@ public class SessionEngine {
 
   void scheduleQuestionTimer(Long sessionId, Long questionId, int timeLimitSeconds) {
     String sid = sessionId.toString();
-    redis
-        .opsForValue()
-        .set(redisHelper.key(sid, "timer"), "1", Duration.ofSeconds(timeLimitSeconds));
-
-    String seqStr = redis.opsForValue().get(redisHelper.key(sid, "question_seq"));
-    long seqAtStart = seqStr != null ? Long.parseLong(seqStr) : 0;
+    liveStateService.setTimer(sid, timeLimitSeconds);
+    long seqAtStart = liveStateService.getQuestionSequence(sid);
     timerScheduler.scheduleQuestionTimer(sessionId, questionId, timeLimitSeconds, seqAtStart);
   }
 
   // ─── Leaderboard broadcast (shared with AnswerService) ────────────────────────
 
   public void broadcastLeaderboardUpdate(Long sessionId, String sid) {
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard = redisHelper.buildLeaderboard(sid);
+    List<SessionResultsResponse.LeaderboardEntry> leaderboard = liveStateService.buildLeaderboard(sid);
     messaging.convertAndSend(
         "/topic/session." + sessionId + ".analytics",
         new WsPayloads.LeaderboardUpdate(leaderboard));

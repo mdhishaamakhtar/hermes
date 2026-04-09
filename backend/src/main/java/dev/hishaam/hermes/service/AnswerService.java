@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,23 +21,23 @@ public class AnswerService {
 
   private final ParticipantAnswerRepository answerRepository;
   private final ParticipantService participantService;
-  private final SessionRedisHelper redisHelper;
+  private final SessionSnapshotService snapshotService;
+  private final SessionLiveStateService liveStateService;
   private final SessionEngine engine;
-  private final StringRedisTemplate redis;
   private final EntityManager entityManager;
 
   public AnswerService(
       ParticipantAnswerRepository answerRepository,
       ParticipantService participantService,
-      SessionRedisHelper redisHelper,
+      SessionSnapshotService snapshotService,
+      SessionLiveStateService liveStateService,
       SessionEngine engine,
-      StringRedisTemplate redis,
       EntityManager entityManager) {
     this.answerRepository = answerRepository;
     this.participantService = participantService;
-    this.redisHelper = redisHelper;
+    this.snapshotService = snapshotService;
+    this.liveStateService = liveStateService;
     this.engine = engine;
-    this.redis = redis;
     this.entityManager = entityManager;
   }
 
@@ -69,7 +68,7 @@ public class AnswerService {
     answer.setAnsweredAt(OffsetDateTime.now());
     answerRepository.save(answer);
 
-    redisHelper.replaceParticipantSelections(
+    liveStateService.replaceParticipantSelections(
         sid, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
     broadcastAnswerState(sessionId, request.questionId());
   }
@@ -96,27 +95,27 @@ public class AnswerService {
     answer.setFrozenAt(frozenAt);
     answerRepository.save(answer);
 
-    redisHelper.markLockedIn(sid, request.questionId(), participantId);
+    liveStateService.markLockedIn(sid, request.questionId(), participantId);
     broadcastAnswerState(sessionId, request.questionId());
   }
 
   private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(String sid, Long questionId) {
-    String status = redis.opsForValue().get(redisHelper.key(sid, "status"));
+    String status = liveStateService.getStatus(sid);
     if (!SessionStatus.ACTIVE.name().equals(status)) {
       throw AppException.conflict("Session is not accepting answers");
     }
 
-    String currentQuestionId = redis.opsForValue().get(redisHelper.key(sid, "current_question"));
+    String currentQuestionId = liveStateService.getCurrentQuestionId(sid);
     if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
       throw AppException.conflict("Question is no longer active");
     }
 
-    Long timerTtl = redis.getExpire(redisHelper.key(sid, "timer"));
+    Long timerTtl = liveStateService.getTimerTtlSeconds(sid);
     if (timerTtl == null || timerTtl <= 0) {
       throw AppException.conflict("Question is no longer accepting answers");
     }
 
-    QuizSnapshot.QuestionSnapshot question = redisHelper.loadSnapshot(sid).findQuestion(questionId);
+    QuizSnapshot.QuestionSnapshot question = snapshotService.loadSnapshot(sid).findQuestion(questionId);
     if (question == null) {
       throw AppException.notFound("Question not found in session snapshot");
     }
@@ -162,7 +161,7 @@ public class AnswerService {
   private Set<Long> previousSelectionIds(
       String sid, Long participantId, ParticipantAnswer answer) {
     Set<Long> previousSelectionIds =
-        redisHelper.getParticipantSelectionIds(sid, answer.getQuestionId(), participantId);
+        liveStateService.getParticipantSelectionIds(sid, answer.getQuestionId(), participantId);
     if (!previousSelectionIds.isEmpty()) {
       return previousSelectionIds;
     }
@@ -181,10 +180,10 @@ public class AnswerService {
 
   private void broadcastAnswerState(Long sessionId, Long questionId) {
     String sid = sessionId.toString();
-    Map<Long, Long> counts = redisHelper.getQuestionCounts(sid, questionId);
-    long totalAnswered = redisHelper.getTotalAnswered(sid, questionId);
-    long totalParticipants = redisHelper.getParticipantCount(sid);
-    long totalLockedIn = redisHelper.getTotalLockedIn(sid, questionId);
+    Map<Long, Long> counts = liveStateService.getQuestionCounts(sid, questionId);
+    long totalAnswered = liveStateService.getTotalAnswered(sid, questionId);
+    long totalParticipants = liveStateService.getParticipantCount(sid);
+    long totalLockedIn = liveStateService.getTotalLockedIn(sid, questionId);
 
     engine.broadcastAnswerUpdate(
         sessionId, questionId, counts, totalAnswered, totalParticipants, totalLockedIn);

@@ -17,8 +17,7 @@ export const eventsApi = {
   createQuiz: (
     eventId: string,
     data: { title: string; orderIndex: number; displayMode?: DisplayMode },
-  ) =>
-    api.post<QuizSummary>(`/api/events/${eventId}/quizzes`, data),
+  ) => api.post<QuizSummary>(`/api/events/${eventId}/quizzes`, data),
   deleteQuiz: (quizId: number) => api.delete(`/api/quizzes/${quizId}`),
 };
 
