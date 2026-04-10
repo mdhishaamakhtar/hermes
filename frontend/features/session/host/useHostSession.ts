@@ -15,6 +15,7 @@ import type { CorrectionDraftOption } from "@/components/session/ScoringDrawer";
 import type { QuestionCardData } from "@/components/session/QuestionCard";
 import type {
   DisplayMode,
+  HostSessionSync,
   PassageTimerMode,
   SessionResults,
 } from "@/lib/types";
@@ -194,6 +195,7 @@ export type HostSessionAction =
       status?: SessionStatus;
     }
   | { type: "RESULTS_LOADED"; results: SessionResults }
+  | { type: "SYNC_LOADED"; sync: HostSessionSync }
   | { type: "QUESTION_DISPLAYED"; message: QuestionDisplayedMsg }
   | { type: "PASSAGE_DISPLAYED"; message: PassageDisplayedMsg }
   | { type: "TIMER_START"; timeLimitSeconds: number }
@@ -254,6 +256,27 @@ function updateStats(
   };
 }
 
+function normalizeHostQuestionStats(
+  questionStatsById: HostSessionSync["questionStatsById"] | undefined,
+) {
+  if (!questionStatsById) return {};
+  return Object.fromEntries(
+    Object.entries(questionStatsById).map(([questionId, stats]) => [
+      Number(questionId),
+      {
+        counts: normalizeCounts(stats.counts ?? {}),
+        totalAnswered: stats.totalAnswered ?? 0,
+        totalLockedIn: stats.totalLockedIn ?? 0,
+        totalParticipants: stats.totalParticipants ?? 0,
+        correctOptionIds: normalizeIdList(stats.correctOptionIds ?? []),
+        optionPoints: normalizePoints(stats.optionPoints ?? {}),
+        revealed: Boolean(stats.revealed),
+        reviewed: Boolean(stats.reviewed),
+      } satisfies QuestionStats,
+    ]),
+  ) as Record<number, QuestionStats>;
+}
+
 export function initHostSessionState(id: string): HostSessionState {
   return {
     sessionStatus: "LOBBY",
@@ -298,6 +321,87 @@ export function hostSessionReducer(
         sessionResults: action.results,
         finalLeaderboard: action.results.leaderboard,
       };
+    case "SYNC_LOADED": {
+      const {
+        status,
+        questionLifecycle,
+        joinCode,
+        participantCount,
+        currentQuestion,
+        currentPassage,
+        questionStatsById,
+        leaderboard,
+        timeLeftSeconds,
+      } = action.sync;
+
+      const activeQuestion: ActiveQuestion | null = currentQuestion
+        ? {
+            id: currentQuestion.id,
+            text: currentQuestion.text,
+            questionType: currentQuestion.questionType,
+            orderIndex: currentQuestion.orderIndex,
+            totalQuestions: currentQuestion.totalQuestions,
+            timeLimitSeconds: currentQuestion.timeLimitSeconds,
+            effectiveDisplayMode: currentQuestion.effectiveDisplayMode,
+            passage: currentQuestion.passage,
+            options: currentQuestion.options,
+          }
+        : null;
+
+      const activePassage: ActivePassage | null = currentPassage
+        ? {
+            id: currentPassage.id,
+            text: currentPassage.text,
+            timerMode: currentPassage.timerMode,
+            questionIndex: currentPassage.questionIndex,
+            totalQuestions: currentPassage.totalQuestions,
+            effectiveDisplayMode: currentPassage.effectiveDisplayMode,
+            subQuestions: currentPassage.subQuestions.map((question) => ({
+              id: question.id,
+              text: question.text,
+              questionType: question.questionType,
+              orderIndex: question.orderIndex,
+              totalQuestions: question.totalQuestions,
+              timeLimitSeconds: question.timeLimitSeconds,
+              effectiveDisplayMode: question.effectiveDisplayMode,
+              passage: question.passage,
+              options: question.options,
+            })),
+          }
+        : null;
+
+      return {
+        ...state,
+        sessionStatus: (status as SessionStatus) ?? state.sessionStatus,
+        questionLifecycle:
+          (questionLifecycle as QuestionLifecycle) ?? state.questionLifecycle,
+        joinCode: joinCode || state.joinCode,
+        participantCount,
+        activeQuestion,
+        activePassage,
+        questionIndex:
+          currentPassage?.questionIndex ??
+          currentQuestion?.orderIndex ??
+          state.questionIndex,
+        totalQuestions:
+          currentPassage?.totalQuestions ??
+          currentQuestion?.totalQuestions ??
+          state.totalQuestions,
+        effectiveDisplayMode:
+          currentPassage?.effectiveDisplayMode ??
+          currentQuestion?.effectiveDisplayMode ??
+          state.effectiveDisplayMode,
+        timerLimitSeconds:
+          timeLeftSeconds ??
+          currentPassage?.timeLimitSeconds ??
+          currentQuestion?.timeLimitSeconds ??
+          0,
+        timeLeft: timeLeftSeconds ?? 0,
+        questionStatsById: normalizeHostQuestionStats(questionStatsById),
+        leaderboard,
+        hydrated: true,
+      };
+    }
     case "QUESTION_DISPLAYED": {
       const data = action.message;
       const question: ActiveQuestion = {
@@ -588,7 +692,8 @@ export function useHostSession(id: string) {
   const loadSessionContext = useCallback(async () => {
     if (!id) return;
 
-    const [lobbyResponse, statusResponse] = await Promise.all([
+    const [syncResponse, lobbyResponse, statusResponse] = await Promise.all([
+      sessionsApi.hostSync(id),
       api.get<{
         status: SessionStatus;
         participantCount: number;
@@ -596,6 +701,10 @@ export function useHostSession(id: string) {
       }>(`/api/sessions/${id}/lobby`),
       api.get<SessionStatus>(`/api/sessions/${id}/status`),
     ]);
+
+    if (syncResponse.success) {
+      dispatch({ type: "SYNC_LOADED", sync: syncResponse.data });
+    }
 
     if (lobbyResponse.success) {
       dispatch({ type: "CONTEXT_LOADED", lobby: lobbyResponse.data });
@@ -748,6 +857,26 @@ export function useHostSession(id: string) {
 
     return () => window.clearInterval(interval);
   }, [questionLifecycle, sessionStatus]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadSessionContext();
+      }
+    };
+
+    const handleFocus = () => {
+      void loadSessionContext();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [loadSessionContext]);
 
   const currentQuestions = useMemo(() => {
     if (activePassage?.subQuestions.length) {

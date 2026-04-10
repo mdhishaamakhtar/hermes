@@ -138,6 +138,76 @@ export interface RejoinResponse {
   timeLeftSeconds: number | null;
 }
 
+export interface HostSyncOptionInfo {
+  id: number;
+  text: string;
+  orderIndex: number;
+}
+
+export interface HostSyncPassageInfo {
+  id: number;
+  text: string;
+}
+
+export interface HostSyncCurrentQuestion {
+  id: number;
+  text: string;
+  questionType: QuestionType;
+  orderIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number;
+  effectiveDisplayMode: DisplayMode;
+  passage: HostSyncPassageInfo | null;
+  options: HostSyncOptionInfo[];
+}
+
+export interface HostSyncPassageQuestion {
+  id: number;
+  text: string;
+  questionType: QuestionType;
+  orderIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number;
+  effectiveDisplayMode: DisplayMode;
+  passage: HostSyncPassageInfo | null;
+  options: HostSyncOptionInfo[];
+}
+
+export interface HostSyncCurrentPassage {
+  id: number;
+  text: string;
+  timerMode: PassageTimerMode;
+  questionIndex: number;
+  totalQuestions: number;
+  timeLimitSeconds: number | null;
+  effectiveDisplayMode: DisplayMode;
+  subQuestions: HostSyncPassageQuestion[];
+}
+
+export interface HostSyncQuestionStats {
+  counts: Record<number, number>;
+  totalAnswered: number;
+  totalLockedIn: number;
+  totalParticipants: number;
+  correctOptionIds: number[];
+  optionPoints: Record<number, number>;
+  revealed: boolean;
+  reviewed: boolean;
+}
+
+export interface HostSessionSync {
+  sessionId: number;
+  status: string;
+  questionLifecycle: string | null;
+  joinCode: string;
+  participantCount: number;
+  currentQuestion: HostSyncCurrentQuestion | null;
+  currentPassage: HostSyncCurrentPassage | null;
+  questionStatsById: Record<number, HostSyncQuestionStats>;
+  leaderboard: LeaderboardEntry[];
+  timeLeftSeconds: number | null;
+}
+
 export interface ResultOption {
   id: number;
   text: string;

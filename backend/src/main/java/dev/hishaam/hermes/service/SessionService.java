@@ -15,7 +15,10 @@ import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -210,6 +213,84 @@ public class SessionService {
         session.getStatus().name(), participantCount, session.getJoinCode());
   }
 
+  public HostSessionSyncResponse getHostSyncState(Long sessionId, Long userId) {
+    QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
+    QuizSnapshot snapshot =
+        session.getSnapshot() != null && !session.getSnapshot().isBlank()
+            ? snapshotService.deserialize(session.getSnapshot())
+            : snapshotService.loadSnapshot(sessionId.toString());
+
+    SessionLiveStateService.RejoinContext ctx = liveStateService.buildRejoinContext(sessionId);
+    int participantCount = ctx.participantCount();
+    if (participantCount == 0) {
+      participantCount = (int) participantRepository.countBySessionId(sessionId);
+    }
+    final int totalParticipants = participantCount;
+
+    HostSessionSyncResponse.CurrentQuestion currentQuestion = null;
+    HostSessionSyncResponse.CurrentPassage currentPassage = null;
+    Map<Long, HostSessionSyncResponse.QuestionStats> questionStatsById = new LinkedHashMap<>();
+
+    if (session.getStatus() == SessionStatus.ACTIVE && ctx.currentQuestionId() != null) {
+      if (ctx.currentPassageId() != null) {
+        QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(ctx.currentPassageId());
+        if (passage != null) {
+          List<HostSessionSyncResponse.PassageQuestionInfo> subQuestions =
+              passage.subQuestionIds().stream()
+                  .map(snapshot::findQuestion)
+                  .filter(Objects::nonNull)
+                  .sorted(
+                      java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+                  .map(
+                      q -> {
+                        questionStatsById.put(
+                            q.id(),
+                            buildQuestionStats(
+                                sessionId, q, totalParticipants, ctx.questionLifecycle()));
+                        return buildPassageQuestionInfo(q, snapshot);
+                      })
+                  .toList();
+
+          currentPassage =
+              new HostSessionSyncResponse.CurrentPassage(
+                  passage.id(),
+                  passage.text(),
+                  passage.timerMode().name(),
+                  snapshot.questionPosition(
+                      subQuestions.isEmpty() ? ctx.currentQuestionId() : subQuestions.get(0).id()),
+                  snapshot.questions().size(),
+                  passage.timeLimitSeconds(),
+                  subQuestions.isEmpty()
+                      ? DisplayMode.LIVE.name()
+                      : subQuestions.get(0).effectiveDisplayMode(),
+                  subQuestions);
+        }
+      } else {
+        QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(ctx.currentQuestionId());
+        if (question != null) {
+          currentQuestion = buildCurrentQuestion(question, snapshot);
+          questionStatsById.put(
+              question.id(),
+              buildQuestionStats(sessionId, question, totalParticipants, ctx.questionLifecycle()));
+        }
+      }
+    }
+
+    return new HostSessionSyncResponse(
+        sessionId,
+        session.getStatus().name(),
+        ctx.questionLifecycle(),
+        session.getJoinCode(),
+        totalParticipants,
+        currentQuestion,
+        currentPassage,
+        questionStatsById,
+        session.getStatus() == SessionStatus.ACTIVE
+            ? liveStateService.buildLeaderboard(sessionId)
+            : List.of(),
+        ctx.timeLeftSeconds());
+  }
+
   // ─── Answer correction ────────────────────────────────────────────────────────
 
   public void correctScoring(
@@ -257,6 +338,83 @@ public class SessionService {
         passage.getTimerMode(),
         passage.getTimeLimitSeconds(),
         subQuestionIds);
+  }
+
+  private HostSessionSyncResponse.CurrentQuestion buildCurrentQuestion(
+      QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
+    HostSessionSyncResponse.PassageInfo passageInfo =
+        question.passageId() == null
+            ? null
+            : snapshot.findPassage(question.passageId()) == null
+                ? null
+                : new HostSessionSyncResponse.PassageInfo(
+                    question.passageId(), snapshot.findPassage(question.passageId()).text());
+
+    return new HostSessionSyncResponse.CurrentQuestion(
+        question.id(),
+        question.text(),
+        question.questionType().name(),
+        snapshot.questionPosition(question.id()),
+        snapshot.questions().size(),
+        question.timeLimitSeconds(),
+        question.effectiveDisplayMode().name(),
+        passageInfo,
+        question.options().stream()
+            .map(o -> new HostSessionSyncResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
+            .toList());
+  }
+
+  private HostSessionSyncResponse.PassageQuestionInfo buildPassageQuestionInfo(
+      QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
+    HostSessionSyncResponse.PassageInfo passageInfo =
+        question.passageId() == null
+            ? null
+            : snapshot.findPassage(question.passageId()) == null
+                ? null
+                : new HostSessionSyncResponse.PassageInfo(
+                    question.passageId(), snapshot.findPassage(question.passageId()).text());
+
+    return new HostSessionSyncResponse.PassageQuestionInfo(
+        question.id(),
+        question.text(),
+        question.questionType().name(),
+        snapshot.questionPosition(question.id()),
+        snapshot.questions().size(),
+        question.timeLimitSeconds(),
+        question.effectiveDisplayMode().name(),
+        passageInfo,
+        question.options().stream()
+            .map(o -> new HostSessionSyncResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
+            .toList());
+  }
+
+  private HostSessionSyncResponse.QuestionStats buildQuestionStats(
+      Long sessionId,
+      QuizSnapshot.QuestionSnapshot question,
+      int participantCount,
+      String questionLifecycle) {
+    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
+    question.options().forEach(option -> optionPoints.put(option.id(), option.pointValue()));
+    List<Long> correctOptionIds =
+        question.options().stream()
+            .filter(option -> option.pointValue() > 0)
+            .map(QuizSnapshot.OptionSnapshot::id)
+            .toList();
+    boolean reviewed = QuestionLifecycleState.REVIEWING.name().equals(questionLifecycle);
+    boolean revealed =
+        reviewed
+            && (question.effectiveDisplayMode() == DisplayMode.BLIND
+                || question.effectiveDisplayMode() == DisplayMode.CODE_DISPLAY);
+
+    return new HostSessionSyncResponse.QuestionStats(
+        liveStateService.getQuestionCounts(sessionId, question.id()),
+        liveStateService.getTotalAnswered(sessionId, question.id()),
+        liveStateService.getTotalLockedIn(sessionId, question.id()),
+        participantCount,
+        correctOptionIds,
+        optionPoints,
+        revealed,
+        reviewed);
   }
 
   private DisplayMode resolveEffectiveDisplayMode(Quiz quiz, Question question) {

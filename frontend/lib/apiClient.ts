@@ -8,6 +8,7 @@ import type {
   QuizSummary,
   Question,
   QuestionOptionInput,
+  HostSessionSync,
 } from "@/lib/types";
 
 export const eventsApi = {
@@ -105,6 +106,8 @@ export const sessionsApi = {
   next: (id: number | string) => api.post(`/api/sessions/${id}/next`),
   end: (id: number | string) => api.post(`/api/sessions/${id}/end`),
   abandon: (id: number | string) => api.delete(`/api/sessions/${id}`),
+  hostSync: (id: number | string) =>
+    api.get<HostSessionSync>(`/api/sessions/${id}/host-sync`),
   correctScoring: (
     id: number | string,
     questionId: number,

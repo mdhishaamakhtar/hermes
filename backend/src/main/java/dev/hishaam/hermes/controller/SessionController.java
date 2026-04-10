@@ -112,6 +112,13 @@ public class SessionController {
     return ResponseEntity.ok(ApiResponse.ok(resultsService.getResults(id, user.getId())));
   }
 
+  @GetMapping("/{id}/host-sync")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<HostSessionSyncResponse>> getHostSyncState(
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    return ResponseEntity.ok(ApiResponse.ok(sessionService.getHostSyncState(id, user.getId())));
+  }
+
   @PostMapping("/join")
   public ResponseEntity<ApiResponse<JoinResponse>> joinSession(
       @Valid @RequestBody JoinSessionRequest request) {
