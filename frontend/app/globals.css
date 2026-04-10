@@ -326,7 +326,7 @@ body {
 
   &:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 1px var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
   }
 
   &:disabled {
@@ -365,9 +365,7 @@ body {
 
   &:focus-visible {
     outline: none;
-    box-shadow:
-      0 0 0 2px var(--color-background),
-      0 0 0 4px var(--color-primary);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
   }
 }
 
@@ -405,9 +403,7 @@ body {
 
   &:focus-visible {
     outline: none;
-    box-shadow:
-      0 0 0 2px var(--color-background),
-      0 0 0 4px var(--color-primary);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
   }
 }
 
@@ -473,9 +469,8 @@ body {
 .loader-ring {
   inset: 0;
   border: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent),
-    0 0 24px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .loader-ring::after {
@@ -487,7 +482,6 @@ body {
   height: 0.5rem;
   border-radius: 9999px;
   background: var(--color-accent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 55%, transparent);
   transform-origin: 0 calc(50% + 1px);
   animation: loader-orbit 900ms linear infinite;
 }
@@ -499,7 +493,6 @@ body {
     var(--color-primary) 55%,
     transparent 70%
   );
-  box-shadow: 0 0 18px color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 /* ── 10. Animations ──────────────────────────────────────────────────────── */

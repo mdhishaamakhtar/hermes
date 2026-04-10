@@ -20,7 +20,9 @@ public final class WsPayloads {
     ANSWER_UPDATE,
     ANSWER_REVEAL,
     LEADERBOARD_UPDATE,
-    SCORING_CORRECTED
+    SCORING_CORRECTED,
+    ANSWER_ACCEPTED,
+    ANSWER_REJECTED
   }
 
   // ─── Question lifecycle events ────────────────────────────────────────────────
@@ -215,6 +217,26 @@ public final class WsPayloads {
     public AnswerReveal(
         Long questionId, Map<Long, Long> counts, long totalAnswered, long totalParticipants) {
       this(EventType.ANSWER_REVEAL, questionId, counts, totalAnswered, totalParticipants);
+    }
+  }
+
+  public record AnswerAccepted(
+      EventType event, String clientRequestId, Long questionId, boolean lockedIn) {
+    public AnswerAccepted(String clientRequestId, Long questionId, boolean lockedIn) {
+      this(EventType.ANSWER_ACCEPTED, clientRequestId, questionId, lockedIn);
+    }
+  }
+
+  public record AnswerRejected(
+      EventType event,
+      String clientRequestId,
+      Long questionId,
+      String code,
+      String message,
+      boolean lockedIn) {
+    public AnswerRejected(
+        String clientRequestId, Long questionId, String code, String message, boolean lockedIn) {
+      this(EventType.ANSWER_REJECTED, clientRequestId, questionId, code, message, lockedIn);
     }
   }
 

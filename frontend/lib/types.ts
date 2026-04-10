@@ -152,6 +152,7 @@ export interface QuestionResult {
   text: string;
   orderIndex: number;
   timeLimitSeconds: number;
+  passageText: string | null;
   options: ResultOption[];
   totalAnswers: number;
 }

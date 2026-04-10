@@ -9,6 +9,7 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import dev.hishaam.hermes.util.WsTopics;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -85,7 +86,6 @@ public class ParticipantService {
 
     String sid = sessionId.toString();
 
-    // Store rejoin token in Redis
     redis
         .opsForValue()
         .set(
@@ -93,18 +93,15 @@ public class ParticipantService {
             participant.getId().toString(),
             SessionRedisHelper.REJOIN_TTL);
 
-    // Increment participant count
     long count = liveStateService.incrementParticipantCount(sid);
-
-    // Cache display name in Redis for leaderboard building
     liveStateService.cacheParticipantName(sid, participant.getId(), request.displayName());
-
-    // Initialize leaderboard entry with score 0 (so zero-correct participants appear)
+    // Initialize with score 0 so zero-correct participants appear in leaderboard
     liveStateService.initLeaderboardEntry(sid, participant.getId());
 
-    // Broadcast PARTICIPANT_JOINED
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".control", new WsPayloads.ParticipantJoined(count));
+        WsTopics.sessionControl(sessionId), new WsPayloads.ParticipantJoined(count));
+    messaging.convertAndSend(
+        WsTopics.sessionQuestion(sessionId), new WsPayloads.ParticipantJoined(count));
 
     return new JoinResponse(participant.getId(), rejoinToken, sessionId);
   }

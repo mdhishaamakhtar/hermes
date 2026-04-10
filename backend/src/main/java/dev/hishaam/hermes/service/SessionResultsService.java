@@ -181,19 +181,27 @@ public class SessionResultsService {
             .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
             .map(
                 q -> {
+                  List<ParticipantAnswer> questionAnswers =
+                      allAnswers.stream().filter(a -> a.getQuestionId().equals(q.id())).toList();
                   Map<Long, Long> optionCounts = new LinkedHashMap<>();
                   q.options().forEach(o -> optionCounts.put(o.id(), 0L));
-                  allAnswers.stream()
-                      .filter(a -> a.getQuestionId().equals(q.id()))
-                      .forEach(
-                          answer ->
-                              answer
-                                  .getSelectedOptions()
-                                  .forEach(
-                                      option -> optionCounts.merge(option.getId(), 1L, Long::sum)));
+                  questionAnswers.forEach(
+                      answer ->
+                          answer
+                              .getSelectedOptions()
+                              .forEach(
+                                  option -> optionCounts.merge(option.getId(), 1L, Long::sum)));
 
                   long totalAnswers =
-                      optionCounts.values().stream().mapToLong(Long::longValue).sum();
+                      questionAnswers.stream()
+                          .filter(answer -> answer.getAnsweredAt() != null)
+                          .count();
+                  String passageText =
+                      q.passageId() != null
+                          ? snapshot.findPassage(q.passageId()) != null
+                              ? snapshot.findPassage(q.passageId()).text()
+                              : null
+                          : null;
 
                   List<SessionResultsResponse.OptionInfo> options =
                       q.options().stream()
@@ -213,6 +221,7 @@ public class SessionResultsService {
                       q.text(),
                       q.orderIndex(),
                       q.timeLimitSeconds(),
+                      passageText,
                       totalAnswers,
                       options);
                 })

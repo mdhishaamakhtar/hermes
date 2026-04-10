@@ -9,16 +9,21 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { sessionsApi } from "@/lib/apiClient";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { OPTION_META } from "@/lib/session-constants";
-import { colorRgb, enterAnimation } from "@/lib/design-tokens";
+import { enterAnimation } from "@/lib/design-tokens";
+import {
+  formatTime,
+  formatParticipantCount,
+  normalizeCounts,
+  normalizePoints,
+} from "@/lib/session-utils";
 import type {
   DisplayMode,
   PassageTimerMode,
@@ -207,27 +212,6 @@ const DEFAULT_STATS = (): QuestionStats => ({
   reviewed: false,
 });
 
-function normalizeCounts(
-  counts: Record<string, number> | Record<number, number>,
-) {
-  return Object.fromEntries(
-    Object.entries(counts).map(([key, value]) => [Number(key), Number(value)]),
-  ) as Record<number, number>;
-}
-
-function normalizePoints(points: Record<string | number, number>) {
-  return Object.fromEntries(
-    Object.entries(points).map(([key, value]) => [Number(key), Number(value)]),
-  ) as Record<number, number>;
-}
-
-function formatTime(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds));
-  const minutes = Math.floor(safe / 60);
-  const remainder = safe % 60;
-  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
-}
-
 function displayModeLabel(mode: DisplayMode) {
   return mode.replace("_", " ");
 }
@@ -296,6 +280,7 @@ function buildResultsQuestionCard(
     orderIndex: question.orderIndex,
     timeLimitSeconds: question.timeLimitSeconds,
     totalAnswers,
+    passageText: question.passageText,
     options: question.options
       .toSorted((a, b) => a.orderIndex - b.orderIndex)
       .map((option) => ({
@@ -370,10 +355,14 @@ function QuestionCard({
           <h2 className="text-2xl font-bold leading-snug text-foreground">
             {question.text}
           </h2>
-          {question.passageText ? (
-            <p className="mt-3 max-w-3xl text-sm text-muted">
-              {question.passageText}
-            </p>
+          {question.passageText && mode === "review" ? (
+            <div className="mt-4 border border-border bg-background p-4">
+              <p className="label mb-3 text-warning">Passage</p>
+              <div
+                className="prose prose-invert max-w-3xl text-sm leading-7 text-muted prose-p:my-0 prose-p:leading-7"
+                dangerouslySetInnerHTML={{ __html: question.passageText }}
+              />
+            </div>
           ) : null}
         </div>
 
@@ -381,7 +370,7 @@ function QuestionCard({
           {showMetrics ? (
             <div className="text-right">
               <div className="text-sm tabular-nums text-foreground">
-                {question.totalAnswers} answered
+                {question.totalAnswers} responded
               </div>
               {question.totalLockedIn !== undefined ? (
                 <div className="text-xs text-muted tabular-nums">
@@ -623,8 +612,6 @@ function ScoringDrawer({
 export default function HostPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const router = useRouter();
-
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("LOBBY");
   const [questionLifecycle, setQuestionLifecycle] =
     useState<QuestionLifecycle>("DISPLAYED");
@@ -656,7 +643,6 @@ export default function HostPage() {
     null,
   );
   const [copied, setCopied] = useState(false);
-  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
   const [loadingAction, setLoadingAction] = useState<
     | null
     | "start-session"
@@ -664,7 +650,6 @@ export default function HostPage() {
     | "end-timer"
     | "next"
     | "end-session"
-    | "abandon"
   >(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [scoringQuestionId, setScoringQuestionId] = useState<number | null>(
@@ -1054,22 +1039,12 @@ export default function HostPage() {
     if (!id) return;
     setLoadingAction("end-session");
     const res = await sessionsApi.end(id);
-    setLoadingAction(null);
     if (res.success) {
+      await loadResults();
       setSessionStatus((prev) => (prev === "ENDED" ? prev : "ENDED"));
     }
-  }, [id]);
-
-  const handleAbandon = useCallback(async () => {
-    if (!id) return;
-    setLoadingAction("abandon");
-    const res = await api.delete(`/api/sessions/${id}`);
-    if (res.success) {
-      router.push("/dashboard");
-    }
     setLoadingAction(null);
-    setShowAbandonConfirm(false);
-  }, [id, router]);
+  }, [id, loadResults]);
 
   const handleCopyCode = useCallback(() => {
     if (!joinCode) return;
@@ -1136,19 +1111,25 @@ export default function HostPage() {
   if (sessionStatus === "LOBBY") {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border px-6 py-4">
+        <header className="border-b border-border px-4 sm:px-6 py-4">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <Logo size="sm" />
             <div className="flex items-center gap-3">
               <CardBadge tone="warning">Lobby</CardBadge>
-              <span className="text-xs text-muted tabular-nums">
-                {participantCount} participants
-              </span>
+              <div className="border border-border bg-surface px-4 py-2 text-right">
+                <p className="label mb-1">Audience</p>
+                <p className="text-lg font-bold tabular-nums text-foreground">
+                  {participantCount}
+                </p>
+                <p className="text-[11px] text-muted">
+                  {formatParticipantCount(participantCount)}
+                </p>
+              </div>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-7xl items-center justify-center px-6 py-10">
+        <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-7xl items-center justify-center px-4 sm:px-6 py-10">
           <motion.div
             {...enterAnimation}
             className="w-full max-w-2xl border border-border bg-surface p-8 text-center"
@@ -1173,7 +1154,7 @@ export default function HostPage() {
                 {copied ? "Copied" : "Copy code"}
               </button>
               <span className="text-xs text-muted tabular-nums">
-                {participantCount} joined
+                {formatParticipantCount(participantCount)} in lobby
               </span>
             </div>
             <div className="mt-10 flex items-center justify-center gap-3">
@@ -1207,19 +1188,19 @@ export default function HostPage() {
     const leaderboardRows = finalLeaderboard ?? leaderboard;
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border px-6 py-4">
+        <header className="border-b border-border px-4 sm:px-6 py-4">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <Logo size="sm" />
             <div className="flex items-center gap-3">
               <CardBadge tone="muted">Ended</CardBadge>
               <span className="text-xs text-muted tabular-nums">
-                {participantCount} participants
+                {formatParticipantCount(participantCount)}
               </span>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto grid w-full max-w-7xl gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+        <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
           <div className="space-y-6">
             <motion.div
               {...enterAnimation}
@@ -1368,7 +1349,7 @@ export default function HostPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex flex-wrap items-center justify-end gap-3">
             <CardBadge
@@ -1377,9 +1358,15 @@ export default function HostPage() {
               {sessionStatus}
             </CardBadge>
             <CardBadge tone="accent">{questionLifecycle}</CardBadge>
-            <span className="text-xs text-muted tabular-nums">
-              {participantCount} participants
-            </span>
+            <div className="border border-border bg-surface px-4 py-2 text-right">
+              <p className="label mb-1">Live audience</p>
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {participantCount}
+              </p>
+              <p className="text-[11px] text-muted">
+                {formatParticipantCount(participantCount)}
+              </p>
+            </div>
             <button
               onClick={handleCopyCode}
               disabled={!joinCode}
@@ -1391,7 +1378,7 @@ export default function HostPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-7xl gap-6 px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <motion.section
             {...enterAnimation}
@@ -1418,10 +1405,6 @@ export default function HostPage() {
                     fontSize: "clamp(2rem, 7vw, 4rem)",
                     lineHeight: 1,
                     color: timerColour,
-                    textShadow:
-                      timeLeft !== null && timeLeft > 0 && timeLeft <= 5
-                        ? `0 0 16px rgba(${colorRgb.danger},0.45)`
-                        : "none",
                   }}
                 >
                   {formatTime(timeLeft)}
@@ -1674,16 +1657,6 @@ export default function HostPage() {
                   ? "Ending..."
                   : "Force End Session"}
               </button>
-
-              <button
-                onClick={() => setShowAbandonConfirm(true)}
-                disabled={loadingAction === "abandon"}
-                className="w-full border border-border px-5 py-3 text-xs tracking-widest uppercase text-danger transition-colors hover:bg-danger/5 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {loadingAction === "abandon"
-                  ? "Deleting..."
-                  : "Abandon Session"}
-              </button>
             </div>
           </section>
 
@@ -1747,18 +1720,6 @@ export default function HostPage() {
         }}
         onSave={handleSaveScoring}
       />
-
-      {showAbandonConfirm && (
-        <ConfirmDialog
-          message="Are you sure you want to abandon and DELETE this session? This cannot be undone."
-          confirmLabel={
-            loadingAction === "abandon" ? "Deleting..." : "Abandon Session"
-          }
-          variant="danger"
-          onConfirm={handleAbandon}
-          onCancel={() => setShowAbandonConfirm(false)}
-        />
-      )}
     </div>
   );
 }

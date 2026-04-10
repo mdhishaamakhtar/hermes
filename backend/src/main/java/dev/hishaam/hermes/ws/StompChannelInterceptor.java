@@ -52,6 +52,10 @@ public class StompChannelInterceptor implements ChannelInterceptor {
           accessor.setUser(() -> email);
         }
       }
+      if (accessor.getUser() == null) {
+        String sessionId = accessor.getSessionId();
+        accessor.setUser(() -> sessionId != null ? "ws:" + sessionId : "ws:anonymous");
+      }
     } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
       String destination = accessor.getDestination();
       if (destination == null) return message;

@@ -14,9 +14,13 @@ const WS_URL =
 
 export function useStompClient(options: UseStompOptions = {}) {
   const clientRef = useRef<Client | null>(null);
+  const connectedRef = useRef(false);
   const subscriptionsRef = useRef<Map<string, StompSubscription>>(new Map());
   const desiredSubscriptionsRef = useRef<Map<string, (body: unknown) => void>>(
     new Map(),
+  );
+  const publishQueueRef = useRef<Array<{ destination: string; body: unknown }>>(
+    [],
   );
   const optionsRef = useRef(options);
 
@@ -32,6 +36,8 @@ export function useStompClient(options: UseStompOptions = {}) {
       },
       reconnectDelay: 3000,
       onConnect: () => {
+        connectedRef.current = true;
+        console.info("[stomp] connected");
         subscriptionsRef.current.clear();
         desiredSubscriptionsRef.current.forEach((callback, destination) => {
           if (!subscriptionsRef.current.has(destination)) {
@@ -45,13 +51,24 @@ export function useStompClient(options: UseStompOptions = {}) {
             subscriptionsRef.current.set(destination, subscription);
           }
         });
+        publishQueueRef.current.forEach(({ destination, body }) => {
+          client.publish({
+            destination,
+            body: JSON.stringify(body),
+          });
+        });
+        publishQueueRef.current = [];
         optionsRef.current.onConnect?.();
       },
       onDisconnect: () => {
+        connectedRef.current = false;
+        console.info("[stomp] disconnected");
         subscriptionsRef.current.clear();
         optionsRef.current.onDisconnect?.();
       },
       onWebSocketClose: () => {
+        connectedRef.current = false;
+        console.info("[stomp] websocket-closed");
         subscriptionsRef.current.clear();
       },
       onStompError: (frame) => {
@@ -91,12 +108,20 @@ export function useStompClient(options: UseStompOptions = {}) {
 
   const publish = useCallback((destination: string, body: unknown) => {
     const client = clientRef.current;
+    console.info("[stomp] publish", {
+      destination,
+      connected: Boolean(client?.connected),
+      active: Boolean(client?.active),
+    });
     if (client?.connected) {
       client.publish({
         destination,
         body: JSON.stringify(body),
       });
+      return true;
     }
+    publishQueueRef.current.push({ destination, body });
+    return false;
   }, []);
 
   const unsubscribe = useCallback((destination: string) => {
@@ -108,5 +133,5 @@ export function useStompClient(options: UseStompOptions = {}) {
     }
   }, []);
 
-  return { subscribe, publish, unsubscribe, clientRef };
+  return { subscribe, publish, unsubscribe, clientRef, connectedRef };
 }

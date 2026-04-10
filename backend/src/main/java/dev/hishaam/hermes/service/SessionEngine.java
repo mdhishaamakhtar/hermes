@@ -10,6 +10,7 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import dev.hishaam.hermes.util.WsTopics;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
@@ -55,8 +56,6 @@ public class SessionEngine {
     this.gradingService = gradingService;
   }
 
-  // ─── Advance to next question (called by host pressing "Next" from REVIEWING) ─
-
   @Transactional
   public void advanceSessionInternal(Long sessionId) {
     String sid = sessionId.toString();
@@ -93,8 +92,6 @@ public class SessionEngine {
     updateDbCurrentQuestion(sessionId, next);
   }
 
-  // ─── Start timer (called by host pressing "Start Timer") ──────────────────────
-
   @Transactional
   public void startTimerInternal(Long sessionId) {
     String sid = sessionId.toString();
@@ -126,7 +123,7 @@ public class SessionEngine {
       liveStateService.recordTimerStartedAt(sid, Instant.now().toEpochMilli());
 
       messaging.convertAndSend(
-          "/topic/session." + sessionId + ".question",
+          WsTopics.sessionQuestion(sessionId),
           new WsPayloads.TimerStart(null, passageId, passage.timeLimitSeconds()));
 
       long seqAtStart = liveStateService.getQuestionSequence(sid);
@@ -151,7 +148,7 @@ public class SessionEngine {
       liveStateService.recordTimerStartedAt(sid, Instant.now().toEpochMilli());
 
       messaging.convertAndSend(
-          "/topic/session." + sessionId + ".question",
+          WsTopics.sessionQuestion(sessionId),
           new WsPayloads.TimerStart(questionId, null, question.timeLimitSeconds()));
 
       long seqAtStart = liveStateService.getQuestionSequence(sid);
@@ -159,8 +156,6 @@ public class SessionEngine {
           sessionId, questionId, question.timeLimitSeconds(), seqAtStart);
     }
   }
-
-  // ─── Timer expired (called by Quartz job) ─────────────────────────────────────
 
   @Transactional
   public void onTimerExpired(Long sessionId) {
@@ -186,7 +181,7 @@ public class SessionEngine {
           qid -> answerRepository.freezeAnswersForQuestion(sessionId, qid, OffsetDateTime.now()));
 
       messaging.convertAndSend(
-          "/topic/session." + sessionId + ".question",
+          WsTopics.sessionQuestion(sessionId),
           new WsPayloads.PassageFrozen(passageId, subQuestionIds));
 
       gradingService.gradePassage(sessionId, passageId);
@@ -198,7 +193,7 @@ public class SessionEngine {
         answerRepository.freezeAnswersForQuestion(sessionId, questionId, OffsetDateTime.now());
 
         messaging.convertAndSend(
-            "/topic/session." + sessionId + ".question", new WsPayloads.QuestionFrozen(questionId));
+            WsTopics.sessionQuestion(sessionId), new WsPayloads.QuestionFrozen(questionId));
 
         gradingService.gradeQuestion(sessionId, questionId);
       }
@@ -206,8 +201,6 @@ public class SessionEngine {
 
     liveStateService.setQuestionState(sid, QuestionLifecycleState.REVIEWING.name());
   }
-
-  // ─── End session ──────────────────────────────────────────────────────────────
 
   @Transactional
   public void doEndSession(Long sessionId) {
@@ -260,12 +253,11 @@ public class SessionEngine {
       List<SessionResultsResponse.LeaderboardEntry> leaderboard =
           liveStateService.buildLeaderboard(sid);
 
-      messaging.convertAndSend(
-          "/topic/session." + sessionId + ".question", new WsPayloads.SessionEnd());
+      messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
 
       long participantCount = liveStateService.getParticipantCount(sid);
       messaging.convertAndSend(
-          "/topic/session." + sessionId + ".analytics",
+          WsTopics.sessionAnalytics(sessionId),
           new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
     }
 
@@ -276,8 +268,6 @@ public class SessionEngine {
 
     liveStateService.cleanupSessionKeys(sid, snapshot, joinCode);
   }
-
-  // ─── Question broadcasting ────────────────────────────────────────────────────
 
   public void broadcastQuestionDisplayed(
       Long sessionId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
@@ -299,7 +289,7 @@ public class SessionEngine {
     }
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question",
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.QuestionDisplayed(
             question.id(),
             question.text(),
@@ -311,17 +301,12 @@ public class SessionEngine {
             question.effectiveDisplayMode()));
   }
 
-  // ─── Leaderboard broadcast (shared with AnswerService) ────────────────────────
-
   public void broadcastLeaderboardUpdate(Long sessionId, String sid) {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
         liveStateService.buildLeaderboard(sid);
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".analytics",
-        new WsPayloads.LeaderboardUpdate(leaderboard));
+        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
   }
-
-  // ─── Answer analytics broadcast ───────────────────────────────────────────────
 
   public void broadcastAnswerUpdate(
       Long sessionId,
@@ -341,13 +326,13 @@ public class SessionEngine {
     }
 
     Map<Long, Long> broadcastCounts = "BLIND".equals(mode) ? Map.of() : counts;
-    messaging.convertAndSend(
-        "/topic/session." + sessionId + ".analytics",
+    var answerUpdate =
         new WsPayloads.AnswerUpdate(
-            questionId, broadcastCounts, totalAnswered, totalParticipants, totalLockedIn));
+            questionId, broadcastCounts, totalAnswered, totalParticipants, totalLockedIn);
+    messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerUpdate);
+    // Also broadcast to .question so participants (unauthenticated) can receive live counts
+    messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerUpdate);
   }
-
-  // ─── Passage display helpers ──────────────────────────────────────────────────
 
   private void displayEntirePassage(
       Long sessionId, String sid, QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
@@ -387,7 +372,7 @@ public class SessionEngine {
         subQuestions.isEmpty() ? "LIVE" : subQuestions.get(0).effectiveDisplayMode();
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question",
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.PassageDisplayed(
             passage.id(),
             passage.text(),

@@ -7,6 +7,7 @@ import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
+import dev.hishaam.hermes.util.WsTopics;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -40,8 +41,6 @@ public class GradingService {
     this.liveStateService = liveStateService;
     this.messaging = messaging;
   }
-
-  // ─── Public API ───────────────────────────────────────────────────────────────
 
   /** Grade a single question (standalone or PER_SUB_QUESTION sub-question). */
   @Transactional
@@ -134,8 +133,6 @@ public class GradingService {
     broadcastLeaderboardFromDb(sessionId, participantTotals);
   }
 
-  // ─── Core grading logic ───────────────────────────────────────────────────────
-
   /**
    * Computes and persists scores for all frozen answers to the given question. Returns a map of
    * participantId → questionScore for leaderboard updates.
@@ -195,8 +192,6 @@ public class GradingService {
     return Math.min(Math.max(elapsed, 0L), maxMs);
   }
 
-  // ─── Broadcasting ─────────────────────────────────────────────────────────────
-
   private void broadcastQuestionReviewed(
       Long sessionId, Long questionId, QuizSnapshot.QuestionSnapshot question) {
     List<Long> correctOptionIds =
@@ -209,7 +204,7 @@ public class GradingService {
     question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question",
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.QuestionReviewed(questionId, correctOptionIds, optionPoints));
 
     // For BLIND/CODE_DISPLAY modes, reveal the full answer distribution after grading
@@ -220,9 +215,11 @@ public class GradingService {
       long totalAnswered = liveStateService.getTotalAnswered(sid, questionId);
       long totalParticipants = liveStateService.getParticipantCount(sid);
 
-      messaging.convertAndSend(
-          "/topic/session." + sessionId + ".analytics",
-          new WsPayloads.AnswerReveal(questionId, counts, totalAnswered, totalParticipants));
+      var answerReveal =
+          new WsPayloads.AnswerReveal(questionId, counts, totalAnswered, totalParticipants);
+      messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerReveal);
+      // Also send to .question so participants receive the reveal
+      messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerReveal);
     }
   }
 
@@ -238,7 +235,7 @@ public class GradingService {
     question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question",
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ScoringCorrected(questionId, correctOptionIds, optionPoints));
   }
 
@@ -263,11 +260,10 @@ public class GradingService {
             .toList();
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".analytics",
-        new WsPayloads.LeaderboardUpdate(leaderboard));
+        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question",
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ParticipantLeaderboard(
             leaderboard.stream()
                 .map(
@@ -285,11 +281,10 @@ public class GradingService {
 
     // Full leaderboard to organiser
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".analytics",
-        new WsPayloads.LeaderboardUpdate(leaderboard));
+        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
 
     messaging.convertAndSend(
-        "/topic/session." + sessionId + ".question",
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ParticipantLeaderboard(
             leaderboard.stream()
                 .sorted(Comparator.comparingInt(SessionResultsResponse.LeaderboardEntry::rank))

@@ -294,7 +294,7 @@ export function useQuizEditor({
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
-      const response = await sessionsApi.end(sessionId);
+      const response = await sessionsApi.abandon(sessionId);
       if (response.success) {
         mutateSessions(
           sessions.map((session) =>
@@ -323,7 +323,7 @@ export function useQuizEditor({
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
-      await Promise.all(lobbyIds.map((id) => sessionsApi.end(id)));
+      await Promise.all(lobbyIds.map((id) => sessionsApi.abandon(id)));
       mutateSessions(
         sessions.map((session) =>
           lobbyIds.includes(session.id)

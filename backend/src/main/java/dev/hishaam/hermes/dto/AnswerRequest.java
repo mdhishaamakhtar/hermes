@@ -7,4 +7,5 @@ import java.util.List;
 public record AnswerRequest(
     @NotBlank String rejoinToken,
     @NotNull Long questionId,
-    @NotNull List<@NotNull Long> selectedOptionIds) {}
+    @NotNull List<@NotNull Long> selectedOptionIds,
+    String clientRequestId) {}

@@ -10,8 +10,14 @@ import { useStompClient } from "@/hooks/useStompClient";
 import Logo from "@/components/Logo";
 import Spinner from "@/components/Spinner";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import { OPTION_META } from "@/lib/session-constants";
 import { colorRgb, enterAnimation } from "@/lib/design-tokens";
+import {
+  formatTime,
+  formatParticipantCount,
+  normalizeCounts,
+  normalizePoints,
+  optionLabel,
+} from "@/lib/session-utils";
 import type {
   DisplayMode,
   LeaderboardEntry,
@@ -166,6 +172,22 @@ interface SessionLeaderboardUpdateMsg {
   leaderboard: LeaderboardEntry[];
 }
 
+interface SessionAnswerAcceptedMsg {
+  event: "ANSWER_ACCEPTED";
+  clientRequestId: string;
+  questionId: number;
+  lockedIn: boolean;
+}
+
+interface SessionAnswerRejectedMsg {
+  event: "ANSWER_REJECTED";
+  clientRequestId: string;
+  questionId: number;
+  code: string;
+  message: string;
+  lockedIn: boolean;
+}
+
 interface SessionEndMsg {
   event: "SESSION_END";
   leaderboard?: LeaderboardEntry[];
@@ -190,6 +212,8 @@ type AnalyticsEventMsg =
   | SessionLeaderboardUpdateMsg
   | SessionEndMsg;
 
+type AnswerAckMsg = SessionAnswerAcceptedMsg | SessionAnswerRejectedMsg;
+
 interface QuestionCardProps {
   question: ParticipantQuestion;
   lifecycle: QuestionLifecycle;
@@ -197,25 +221,27 @@ interface QuestionCardProps {
   onLockIn: (questionId: number) => void;
 }
 
-function formatTime(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds));
-  const minutes = Math.floor(safe / 60);
-  const remainder = safe % 60;
-  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+function normalizeSelectionIds(selectedOptionIds: number[]) {
+  return selectedOptionIds.toSorted((a, b) => a - b);
 }
 
-function normalizeCounts(
-  counts: Record<string, number> | Record<number, number>,
+function createClientRequestId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function formatQuestionSpanLabel(
+  startIndex: number | null,
+  endIndex: number | null,
+  totalQuestions: number | null,
 ) {
-  return Object.fromEntries(
-    Object.entries(counts).map(([key, value]) => [Number(key), Number(value)]),
-  ) as Record<number, number>;
-}
-
-function normalizePoints(points: Record<string | number, number>) {
-  return Object.fromEntries(
-    Object.entries(points).map(([key, value]) => [Number(key), Number(value)]),
-  ) as Record<number, number>;
+  if (!startIndex || !totalQuestions) return "Waiting";
+  if (!endIndex || endIndex <= startIndex) {
+    return `Q${startIndex} of ${totalQuestions}`;
+  }
+  return `Q${startIndex}-Q${endIndex} of ${totalQuestions}`;
 }
 
 function sumQuestionPoints(question: ParticipantQuestion) {
@@ -226,10 +252,6 @@ function sumQuestionPoints(question: ParticipantQuestion) {
       0,
     ),
   );
-}
-
-function optionLabel(index: number) {
-  return OPTION_META[index % OPTION_META.length];
 }
 
 function buildQuestionFromDisplayed(
@@ -437,20 +459,25 @@ function QuestionCard({
           const pointValue = question.optionPoints[option.id] ?? 0;
           const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
 
-          const bgStyle =
-            resolved && isCorrect
-              ? `rgba(${colorRgb.success},0.12)`
+          const chosenCorrect = resolved && isCorrect && isSelected;
+          const missedCorrect = resolved && isCorrect && !isSelected;
+
+          const bgStyle = chosenCorrect
+            ? `rgba(${colorRgb.success},0.15)`
+            : missedCorrect
+              ? `rgba(${colorRgb.success},0.06)`
               : isWrongSelected
                 ? `rgba(${colorRgb.danger},0.1)`
                 : isSelected
                   ? `rgba(${meta.rgb},0.14)`
                   : "var(--color-background)";
 
-          const borderColor =
-            resolved && isCorrect
-              ? "rgba(34,197,94,0.72)"
+          const borderColor = chosenCorrect
+            ? `rgba(${colorRgb.success},0.8)`
+            : missedCorrect
+              ? `rgba(${colorRgb.success},0.3)`
               : isWrongSelected
-                ? "rgba(239,68,68,0.6)"
+                ? `rgba(${colorRgb.danger},0.6)`
                 : isSelected
                   ? meta.color
                   : "var(--color-border)";
@@ -463,9 +490,10 @@ function QuestionCard({
                     className="inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
                     style={{
                       borderColor: borderColor,
-                      color:
-                        resolved && isCorrect
-                          ? "var(--color-success)"
+                      color: chosenCorrect
+                        ? "var(--color-success)"
+                        : missedCorrect
+                          ? `rgba(${colorRgb.success},0.55)`
                           : isWrongSelected
                             ? "var(--color-danger)"
                             : isSelected
@@ -497,9 +525,13 @@ function QuestionCard({
                       {pointValue > 0 ? `+${pointValue}` : pointValue}
                     </span>
                   ) : null}
-                  {resolved && isCorrect ? (
+                  {chosenCorrect ? (
                     <span className="text-success">✓</span>
-                  ) : resolved && isWrongSelected ? (
+                  ) : missedCorrect ? (
+                    <span style={{ color: `rgba(${colorRgb.success},0.55)` }}>
+                      ○
+                    </span>
+                  ) : isWrongSelected ? (
                     <span className="text-danger">✕</span>
                   ) : null}
                 </div>
@@ -623,8 +655,29 @@ export default function PlayPage() {
     return localStorage.getItem(`hermes_rejoin_${sessionId}`);
   });
   const [hydrated, setHydrated] = useState(() => rejoinToken === null);
+  const [syncStatus, setSyncStatus] = useState<
+    "idle" | "saving" | "retrying" | "error"
+  >("idle");
+  const [syncMessage, setSyncMessage] = useState("");
   const timerRef = useRef<number | null>(null);
   const redirectRef = useRef(false);
+  const pendingSelectionsRef = useRef(new Map<number, number[]>());
+  const syncingQuestionPromisesRef = useRef(
+    new Map<number, Promise<boolean>>(),
+  );
+  const pendingAckResolversRef = useRef(
+    new Map<
+      string,
+      {
+        resolve: (result: {
+          success: boolean;
+          code?: string;
+          message?: string;
+        }) => void;
+        timeoutId: number;
+      }
+    >(),
+  );
 
   const authToken = getStoredAuthToken();
 
@@ -766,14 +819,31 @@ export default function PlayPage() {
   }, [hydrated, rejoinToken, loadSessionContext]);
 
   useEffect(() => {
+    const pendingAckResolvers = pendingAckResolversRef.current;
+    return () => {
+      pendingAckResolvers.forEach(({ timeoutId, resolve }) => {
+        window.clearTimeout(timeoutId);
+        resolve({
+          success: false,
+          code: "CANCELLED",
+          message: "Connection closed before the answer sync completed",
+        });
+      });
+      pendingAckResolvers.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!sessionId) return;
 
     const questionDestination = `/topic/session.${sessionId}.question`;
-    const analyticsDestination = `/topic/session.${sessionId}.analytics`;
-    const controlDestination = `/topic/session.${sessionId}.control`;
+    const answerQueueDestination = "/user/queue/answers";
 
+    // Participants are unauthenticated — only subscribe to the open .question topic.
+    // The backend also fans out PARTICIPANT_JOINED, ANSWER_UPDATE, and ANSWER_REVEAL
+    // to .question so participants receive them without needing the auth-gated topics.
     subscribe(questionDestination, (msg) => {
-      const data = msg as QuestionEventMsg;
+      const data = msg as QuestionEventMsg | AnalyticsEventMsg;
 
       if (data.event === "QUESTION_DISPLAYED") {
         stopTimer();
@@ -782,6 +852,8 @@ export default function PlayPage() {
         setLeaderboard([]);
         setParticipantLeaderboard([]);
         setFinalLeaderboard([]);
+        setSyncStatus("idle");
+        setSyncMessage("");
         setPassage(
           data.passage
             ? {
@@ -797,7 +869,6 @@ export default function PlayPage() {
         );
         const rejointQuestion = buildQuestionFromDisplayed(data);
         replaceQuestions([rejointQuestion]);
-        // Participant count is not in this event, but it's handled by PARTICIPANT_JOINED
         setTimeLeft(0);
         return;
       }
@@ -809,6 +880,8 @@ export default function PlayPage() {
         setLeaderboard([]);
         setParticipantLeaderboard([]);
         setFinalLeaderboard([]);
+        setSyncStatus("idle");
+        setSyncMessage("");
         setPassage({
           id: data.passageId,
           text: data.passageText,
@@ -845,6 +918,7 @@ export default function PlayPage() {
       }
 
       if (data.event === "SESSION_END") {
+        stopTimer();
         setSessionState("ENDED");
         if ((data as SessionEndMsg).leaderboard) {
           setFinalLeaderboard((data as SessionEndMsg).leaderboard!);
@@ -888,25 +962,17 @@ export default function PlayPage() {
         return;
       }
 
-      // ... moved to controlDestination ...
-
       if (data.event === "PARTICIPANT_LEADERBOARD") {
         setParticipantLeaderboard(data.leaderboard);
         setLeaderboard(data.leaderboard);
         setParticipantCount(data.totalParticipants);
         return;
       }
-    });
 
-    subscribe(controlDestination, (msg) => {
-      const data = msg as QuestionEventMsg;
       if (data.event === "PARTICIPANT_JOINED") {
         setParticipantCount(data.count);
+        return;
       }
-    });
-
-    subscribe(analyticsDestination, (msg) => {
-      const data = msg as AnalyticsEventMsg;
 
       if (data.event === "ANSWER_UPDATE") {
         applyQuestionPatch(data.questionId, {
@@ -925,34 +991,31 @@ export default function PlayPage() {
         });
         return;
       }
-
-      if (data.event === "LEADERBOARD_UPDATE") {
-        setLeaderboard(data.leaderboard);
-        return;
-      }
-
-      if (data.event === "SESSION_END") {
-        stopTimer();
-        setSessionState("ENDED");
-        const sessionEndData = data as SessionEndMsg;
-        if (sessionEndData.leaderboard) {
-          setFinalLeaderboard(sessionEndData.leaderboard);
-        }
-        return;
-      }
     });
 
-    subscribe(controlDestination, (msg) => {
-      const data = msg as { event: "PARTICIPANT_JOINED"; count: number };
-      if (data.event === "PARTICIPANT_JOINED") {
-        setParticipantCount(data.count);
+    subscribe(answerQueueDestination, (msg) => {
+      const data = msg as AnswerAckMsg;
+      const pending = pendingAckResolversRef.current.get(data.clientRequestId);
+      if (!pending) return;
+
+      window.clearTimeout(pending.timeoutId);
+      pendingAckResolversRef.current.delete(data.clientRequestId);
+
+      if (data.event === "ANSWER_ACCEPTED") {
+        pending.resolve({ success: true });
+        return;
       }
+
+      pending.resolve({
+        success: false,
+        code: data.code,
+        message: data.message,
+      });
     });
 
     return () => {
       unsubscribe(questionDestination);
-      unsubscribe(analyticsDestination);
-      unsubscribe(controlDestination);
+      unsubscribe(answerQueueDestination);
     };
   }, [
     applyQuestionPatch,
@@ -1027,56 +1090,270 @@ export default function PlayPage() {
 
   const canLockAll = lockableQuestions.length > 0;
 
+  const waitForAnswerAck = useCallback((clientRequestId: string) => {
+    return new Promise<{ success: boolean; code?: string; message?: string }>(
+      (resolve) => {
+        const timeoutId = window.setTimeout(() => {
+          pendingAckResolversRef.current.delete(clientRequestId);
+          resolve({
+            success: false,
+            code: "TIMEOUT",
+            message: "Realtime confirmation timed out",
+          });
+        }, 2500);
+
+        pendingAckResolversRef.current.set(clientRequestId, {
+          resolve,
+          timeoutId,
+        });
+      },
+    );
+  }, []);
+
+  const fallbackSubmitAnswer = useCallback(
+    async (questionId: number, selectedOptionIds: number[]) => {
+      if (!sessionId || !rejoinToken) return false;
+      setSyncStatus("retrying");
+      setSyncMessage("Realtime save stalled. Retrying.");
+      const response = await api.post<void>(
+        `/api/sessions/${sessionId}/answers`,
+        {
+          rejoinToken,
+          questionId,
+          selectedOptionIds,
+        },
+      );
+      if (!response.success) {
+        setSyncStatus("error");
+        setSyncMessage(response.error?.message ?? "Failed to save answer");
+        void loadSessionContext();
+        return false;
+      }
+      setSyncStatus("idle");
+      setSyncMessage("");
+      return true;
+    },
+    [loadSessionContext, rejoinToken, sessionId],
+  );
+
+  const fallbackLockIn = useCallback(
+    async (questionId: number) => {
+      if (!sessionId || !rejoinToken) return false;
+      setSyncStatus("retrying");
+      setSyncMessage("Realtime lock-in stalled. Retrying.");
+      const response = await api.post<void>(
+        `/api/sessions/${sessionId}/lock-in`,
+        {
+          rejoinToken,
+          questionId,
+        },
+      );
+      if (!response.success) {
+        setSyncStatus("error");
+        setSyncMessage(response.error?.message ?? "Failed to lock in answer");
+        void loadSessionContext();
+        return false;
+      }
+      setSyncStatus("idle");
+      setSyncMessage("");
+      return true;
+    },
+    [loadSessionContext, rejoinToken, sessionId],
+  );
+
+  const syncAnswerSelection = useCallback(
+    async (questionId: number) => {
+      if (!sessionId || !rejoinToken) return false;
+      console.info("[play] syncAnswerSelection:start", {
+        questionId,
+        hasRejoinToken: Boolean(rejoinToken),
+        sessionId,
+      });
+      const existingPromise =
+        syncingQuestionPromisesRef.current.get(questionId);
+      if (existingPromise) {
+        console.info("[play] syncAnswerSelection:reuse-promise", {
+          questionId,
+        });
+        return existingPromise;
+      }
+
+      const syncPromise = (async () => {
+        try {
+          while (true) {
+            const queuedSelection =
+              pendingSelectionsRef.current.get(questionId);
+            if (!queuedSelection) {
+              return true;
+            }
+
+            const clientRequestId = createClientRequestId();
+            const ackPromise = waitForAnswerAck(clientRequestId);
+            setSyncStatus("saving");
+            setSyncMessage("Saving answer.");
+            console.info("[play] syncAnswerSelection:publish", {
+              questionId,
+              selectedOptionIds: queuedSelection,
+              clientRequestId,
+            });
+            publish(`/app/session/${sessionId}/answer`, {
+              rejoinToken,
+              questionId,
+              selectedOptionIds: queuedSelection,
+              clientRequestId,
+            });
+
+            const ack = await ackPromise;
+            if (!ack.success && ack.code === "TIMEOUT") {
+              const fallbackSucceeded = await fallbackSubmitAnswer(
+                questionId,
+                queuedSelection,
+              );
+              if (!fallbackSucceeded) {
+                pendingSelectionsRef.current.delete(questionId);
+                return false;
+              }
+            } else if (!ack.success) {
+              pendingSelectionsRef.current.delete(questionId);
+              setSyncStatus("error");
+              setSyncMessage(ack.message ?? "Failed to save answer");
+              void loadSessionContext();
+              return false;
+            }
+
+            const latestSelection =
+              pendingSelectionsRef.current.get(questionId);
+            if (
+              latestSelection &&
+              normalizeSelectionIds(latestSelection).join(",") !==
+                normalizeSelectionIds(queuedSelection).join(",")
+            ) {
+              continue;
+            }
+
+            pendingSelectionsRef.current.delete(questionId);
+            setSyncStatus("idle");
+            setSyncMessage("");
+            return true;
+          }
+        } finally {
+          syncingQuestionPromisesRef.current.delete(questionId);
+        }
+      })();
+
+      syncingQuestionPromisesRef.current.set(questionId, syncPromise);
+      return syncPromise;
+    },
+    [
+      fallbackSubmitAnswer,
+      loadSessionContext,
+      publish,
+      rejoinToken,
+      sessionId,
+      waitForAnswerAck,
+    ],
+  );
+
   const handleToggleOption = useCallback(
     (questionId: number, optionId: number) => {
       if (questionLifecycle !== "TIMED" || !rejoinToken) return;
 
-      let didUpdate = false;
-      let nextSelection: number[] = [];
-      setQuestions((current) => {
-        const question = current.find((entry) => entry.id === questionId);
-        if (!question || question.lockedIn) return current;
+      const question = questions.find((entry) => entry.id === questionId);
+      if (!question || question.lockedIn) return;
 
-        didUpdate = true;
-        nextSelection =
-          question.questionType === "MULTI_SELECT"
-            ? question.selectedOptionIds.includes(optionId)
-              ? question.selectedOptionIds.filter((id) => id !== optionId)
-              : [...question.selectedOptionIds, optionId]
-            : question.selectedOptionIds.includes(optionId)
-              ? question.selectedOptionIds
-              : [optionId];
-        return setQuestionSelection(current, questionId, nextSelection);
-      });
-      if (!didUpdate) return;
+      const nextSelection =
+        question.questionType === "MULTI_SELECT"
+          ? question.selectedOptionIds.includes(optionId)
+            ? question.selectedOptionIds.filter((id) => id !== optionId)
+            : [...question.selectedOptionIds, optionId]
+          : question.selectedOptionIds.includes(optionId)
+            ? question.selectedOptionIds
+            : [optionId];
 
-      publish(`/app/session/${sessionId}/answer`, {
-        rejoinToken,
+      // No-op: re-selecting the already-selected option in single-select
+      if (nextSelection === question.selectedOptionIds) return;
+
+      setQuestions((current) =>
+        setQuestionSelection(current, questionId, nextSelection),
+      );
+
+      pendingSelectionsRef.current.set(
         questionId,
-        selectedOptionIds: nextSelection,
+        normalizeSelectionIds(nextSelection),
+      );
+      console.info("[play] toggle-option", {
+        questionId,
+        optionId,
+        nextSelection: normalizeSelectionIds(nextSelection),
       });
+      void syncAnswerSelection(questionId);
     },
-    [publish, questionLifecycle, rejoinToken, sessionId],
+    [questionLifecycle, questions, rejoinToken, syncAnswerSelection],
   );
 
   const handleLockIn = useCallback(
-    (questionId: number) => {
+    async (questionId: number) => {
       if (!rejoinToken) return;
 
+      const question = questions.find((entry) => entry.id === questionId);
+      if (
+        !question ||
+        question.lockedIn ||
+        question.selectedOptionIds.length === 0
+      ) {
+        return;
+      }
+
+      pendingSelectionsRef.current.set(
+        questionId,
+        normalizeSelectionIds(question.selectedOptionIds),
+      );
+      setSyncStatus("saving");
+      setSyncMessage("Saving answer.");
+      const synced = await syncAnswerSelection(questionId);
+      if (!synced) return;
+
+      const clientRequestId = createClientRequestId();
+      const ackPromise = waitForAnswerAck(clientRequestId);
       publish(`/app/session/${sessionId}/lock-in`, {
         rejoinToken,
         questionId,
+        clientRequestId,
       });
 
+      const ack = await ackPromise;
+      if (!ack.success && ack.code === "TIMEOUT") {
+        const fallbackSucceeded = await fallbackLockIn(questionId);
+        if (!fallbackSucceeded) {
+          return;
+        }
+      } else if (!ack.success) {
+        setSyncStatus("error");
+        setSyncMessage(ack.message ?? "Failed to lock in answer");
+        void loadSessionContext();
+        return;
+      }
+
+      setSyncStatus("idle");
+      setSyncMessage("");
       setQuestions((current) =>
-        current.map((question) =>
-          question.id === questionId
-            ? { ...question, lockedIn: true }
-            : question,
+        current.map((currentQuestion) =>
+          currentQuestion.id === questionId
+            ? { ...currentQuestion, lockedIn: true }
+            : currentQuestion,
         ),
       );
     },
-    [publish, rejoinToken, sessionId],
+    [
+      fallbackLockIn,
+      loadSessionContext,
+      publish,
+      questions,
+      rejoinToken,
+      sessionId,
+      syncAnswerSelection,
+      waitForAnswerAck,
+    ],
   );
 
   const handleLockAll = useCallback(() => {
@@ -1098,7 +1375,7 @@ export default function PlayPage() {
   if (sessionState === "LOBBY") {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border px-6 py-4">
+        <header className="border-b border-border px-4 sm:px-6 py-4">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <Logo size="sm" />
             <div className="flex items-center gap-3">
@@ -1110,7 +1387,7 @@ export default function PlayPage() {
           </div>
         </header>
 
-        <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl items-center justify-center px-6 py-10">
+        <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl items-center justify-center px-4 sm:px-6 py-10">
           <motion.div
             {...enterAnimation}
             className="w-full border border-border bg-surface px-8 py-10 text-center"
@@ -1143,14 +1420,16 @@ export default function PlayPage() {
     );
   }
 
-  const currentQuestionsLabel =
-    activeQuestions.length > 1 && activePassage?.timerMode === "ENTIRE_PASSAGE"
-      ? `Q${activeQuestions[0].questionIndex}-${maxQuestionIndex} / ${
-          activeQuestions[0].totalQuestions
-        }`
-      : activeQuestions[0]
-        ? `Q${activeQuestions[0].questionIndex} / ${activeQuestions[0].totalQuestions}`
-        : "Waiting";
+  const currentQuestionsLabel = activeQuestions[0]
+    ? formatQuestionSpanLabel(
+        activeQuestions[0].questionIndex,
+        activeQuestions.length > 1 &&
+          activePassage?.timerMode === "ENTIRE_PASSAGE"
+          ? maxQuestionIndex
+          : activeQuestions[0].questionIndex,
+        activeQuestions[0].totalQuestions,
+      )
+    : "Waiting";
 
   const headerStatus =
     questionLifecycle === "DISPLAYED"
@@ -1169,18 +1448,24 @@ export default function PlayPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex flex-wrap items-center justify-end gap-3">
             <span className="label">{headerStatus}</span>
-            <span className="text-xs text-muted tabular-nums">
-              {participantCount} participants
-            </span>
+            <div className="border border-border bg-surface px-4 py-2 text-right">
+              <p className="label mb-1">Live audience</p>
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {participantCount}
+              </p>
+              <p className="text-[11px] text-muted">
+                {formatParticipantCount(participantCount)}
+              </p>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-7xl gap-6 px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <motion.section
             {...enterAnimation}
@@ -1209,10 +1494,6 @@ export default function PlayPage() {
                     fontSize: "clamp(2.2rem, 8vw, 4.5rem)",
                     lineHeight: 1,
                     color: timerColour,
-                    textShadow:
-                      timeLeft !== null && timeLeft > 0 && timeLeft <= 5
-                        ? `0 0 16px rgba(${colorRgb.danger},0.45)`
-                        : "none",
                   }}
                 >
                   {formatTime(timeLeft ?? 0)}
@@ -1255,28 +1536,42 @@ export default function PlayPage() {
               {...enterAnimation}
               className="border border-border bg-surface p-6"
             >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
+              <div className="flex flex-wrap items-start justify-between gap-6">
+                <div className="min-w-0">
                   <p className="label mb-2">Passage</p>
                   <div
-                    className="max-w-4xl text-lg leading-relaxed text-foreground prose prose-invert"
+                    className="prose prose-invert max-w-4xl text-lg leading-relaxed text-foreground prose-p:my-0 prose-p:leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: activePassage.text }}
                   />
                 </div>
-                <div className="text-right text-xs text-muted">
-                  <p className="tabular-nums">
-                    {activePassage.questionIndex} - {maxQuestionIndex} of{" "}
-                    {activePassage.totalQuestions}
-                  </p>
-                  <p>{activePassage.timerMode.replace("_", " ")}</p>
+                <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-1">
+                  <div className="border border-border bg-background px-4 py-3">
+                    <p className="label mb-2">Active span</p>
+                    <p className="text-lg font-bold tabular-nums text-foreground">
+                      Q{activePassage.questionIndex}
+                      {maxQuestionIndex > activePassage.questionIndex
+                        ? `-Q${maxQuestionIndex}`
+                        : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-muted tabular-nums">
+                      of {activePassage.totalQuestions} total questions
+                    </p>
+                  </div>
+                  <div className="border border-border bg-background px-4 py-3">
+                    <p className="label mb-2">Mode</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {activePassage.timerMode === "ENTIRE_PASSAGE"
+                        ? "All sub-questions together"
+                        : "Passage stays pinned"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {activePassage.timerMode === "ENTIRE_PASSAGE"
+                        ? "Answer any visible question in any order."
+                        : "The passage remains fixed while each sub-question rotates below."}
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              <p className="mt-4 max-w-4xl text-sm leading-7 text-muted">
-                {activePassage.timerMode === "ENTIRE_PASSAGE"
-                  ? "All sub-questions are live together. Answer in any order and lock them individually or all at once."
-                  : "The passage stays on screen while the sub-question below changes."}
-              </p>
             </motion.section>
           ) : null}
 
@@ -1330,7 +1625,7 @@ export default function PlayPage() {
             {...enterAnimation}
             className="border border-border bg-surface p-6"
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="label mb-2">Answer state</p>
                 <h3 className="text-xl font-bold text-foreground">
@@ -1343,9 +1638,23 @@ export default function PlayPage() {
                         : "Results revealed"}
                 </h3>
               </div>
-              <div className="text-right text-xs text-muted">
-                <p className="tabular-nums">{selectedQuestionCount} answered</p>
-                <p>{activeQuestions.length} on screen</p>
+              <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:min-w-[15rem]">
+                <div className="border border-border bg-background px-4 py-3 text-right">
+                  <p className="label mb-2">Ready</p>
+                  <p className="text-lg font-bold tabular-nums text-foreground">
+                    {selectedQuestionCount}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">with a selection</p>
+                </div>
+                <div className="border border-border bg-background px-4 py-3 text-right">
+                  <p className="label mb-2">Visible</p>
+                  <p className="text-lg font-bold tabular-nums text-foreground">
+                    {activeQuestions.length}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    question{activeQuestions.length === 1 ? "" : "s"} on screen
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1382,6 +1691,15 @@ export default function PlayPage() {
                 </p>
               )}
             </div>
+            {syncStatus !== "idle" || syncMessage ? (
+              <p
+                className={`mt-3 text-xs ${
+                  syncStatus === "error" ? "text-danger" : "text-muted"
+                }`}
+              >
+                {syncMessage}
+              </p>
+            ) : null}
           </motion.section>
         </div>
 

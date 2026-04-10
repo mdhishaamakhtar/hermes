@@ -5,16 +5,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { OPTION_META } from "@/lib/session-constants";
 import Logo from "@/components/Logo";
 import Spinner from "@/components/Spinner";
 import BackLink from "@/components/ui/BackLink";
-import { enterAnimation } from "@/lib/design-tokens";
+import { colorRgb, enterAnimation } from "@/lib/design-tokens";
+import { optionLabel } from "@/lib/session-utils";
 import type { MyResults } from "@/lib/types";
-
-function optionLabel(index: number) {
-  return OPTION_META[index % OPTION_META.length];
-}
 
 function QuestionResultCard({
   question,
@@ -76,22 +72,27 @@ function QuestionResultCard({
             const correct = question.correctOptionIds.includes(option.id);
             const chosenCorrect = selected && correct;
             const chosenWrong = selected && !correct;
+            const missedCorrect = !selected && correct;
 
             const background = chosenCorrect
-              ? `rgba(34,197,94,0.12)`
+              ? `rgba(${colorRgb.success},0.12)`
               : chosenWrong
-                ? `rgba(239,68,68,0.1)`
-                : selected
-                  ? `rgba(${meta.rgb},0.14)`
-                  : "var(--color-background)";
+                ? `rgba(${colorRgb.danger},0.1)`
+                : missedCorrect
+                  ? `rgba(${colorRgb.success},0.05)`
+                  : selected
+                    ? `rgba(${meta.rgb},0.14)`
+                    : "var(--color-background)";
 
             const borderColor = chosenCorrect
-              ? "rgba(34,197,94,0.7)"
+              ? `rgba(${colorRgb.success},0.7)`
               : chosenWrong
-                ? "rgba(239,68,68,0.55)"
-                : selected
-                  ? meta.color
-                  : "var(--color-border)";
+                ? `rgba(${colorRgb.danger},0.55)`
+                : missedCorrect
+                  ? `rgba(${colorRgb.success},0.28)`
+                  : selected
+                    ? meta.color
+                    : "var(--color-border)";
 
             return (
               <div
@@ -105,7 +106,15 @@ function QuestionResultCard({
                       className="inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
                       style={{
                         borderColor,
-                        color: selected ? meta.color : "var(--color-muted)",
+                        color: chosenCorrect
+                          ? "var(--color-success)"
+                          : missedCorrect
+                            ? `rgba(${colorRgb.success},0.55)`
+                            : chosenWrong
+                              ? "var(--color-danger)"
+                              : selected
+                                ? meta.color
+                                : "var(--color-muted)",
                       }}
                     >
                       {meta.letter}
@@ -130,6 +139,10 @@ function QuestionResultCard({
                     </span>
                     {chosenCorrect ? (
                       <span className="text-success">✓</span>
+                    ) : missedCorrect ? (
+                      <span style={{ color: `rgba(${colorRgb.success},0.55)` }}>
+                        ○
+                      </span>
                     ) : chosenWrong ? (
                       <span className="text-danger">✕</span>
                     ) : null}
@@ -217,7 +230,7 @@ export default function ResultsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border px-6 py-4">
+      <header className="border-b border-border px-4 sm:px-6 py-4">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <Logo size="sm" />
           <div className="flex items-center gap-3">
@@ -229,7 +242,7 @@ export default function ResultsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
         <BackLink href="/" label="Back to Home" />
 
         <motion.section
@@ -248,7 +261,7 @@ export default function ResultsPage() {
               <p className="label mt-2">points</p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid w-full grid-cols-3 gap-4 sm:w-auto">
               <div className="border border-border bg-background p-4 text-center">
                 <p className="font-bold text-2xl text-foreground tabular-nums leading-none">
                   #{results.rank}

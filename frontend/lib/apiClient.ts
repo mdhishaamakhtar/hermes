@@ -104,6 +104,7 @@ export const sessionsApi = {
   endTimer: (id: number | string) => api.post(`/api/sessions/${id}/end-timer`),
   next: (id: number | string) => api.post(`/api/sessions/${id}/next`),
   end: (id: number | string) => api.post(`/api/sessions/${id}/end`),
+  abandon: (id: number | string) => api.delete(`/api/sessions/${id}`),
   correctScoring: (
     id: number | string,
     questionId: number,

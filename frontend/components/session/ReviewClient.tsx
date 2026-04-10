@@ -1,30 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { ReviewSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
+import { formatParticipantCount } from "@/lib/session-utils";
 import type { SessionResults } from "@/lib/types";
 
 export default function ReviewClient({ sessionId }: { sessionId: string }) {
-  const router = useRouter();
   const {
     data: results,
     isLoading,
     error,
+    mutate,
   } = useSWR<SessionResults>(`/api/sessions/${sessionId}/results`);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "questions">(
     "leaderboard",
   );
-
-  useEffect(() => {
-    if (error) router.push("/dashboard");
-  }, [error, router]);
 
   const sortedQuestions = useMemo(
     () =>
@@ -34,10 +30,33 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
     [results?.questions],
   );
 
-  if (isLoading || !results) return <ReviewSkeleton />;
+  if (isLoading || (!results && !error)) return <ReviewSkeleton />;
+
+  if (!results) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 py-12">
+        <BackLink href="/dashboard" label="Back to Dashboard" />
+        <div className="mt-8 border border-border bg-surface p-8">
+          <p className="label mb-3 text-warning">Review unavailable</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            Final review is still loading
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
+            The session has ended, but the final review payload is not ready
+            yet. Retry once the results snapshot finishes loading.
+          </p>
+          <div className="mt-6">
+            <button onClick={() => void mutate()} className="btn-primary">
+              Retry review
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
       <BackLink
         href={`/events/${results.eventId}/quizzes/${results.quizId}`}
         label="Back to Quiz"
@@ -49,7 +68,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
         meta={
           <div className="flex items-center gap-6 text-xs text-muted">
             <span className="tabular-nums">
-              {results.participantCount} participants
+              {formatParticipantCount(results.participantCount)}
             </span>
             {results.startedAt && (
               <span>{new Date(results.startedAt).toLocaleDateString()}</span>
@@ -57,6 +76,35 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
           </div>
         }
       />
+
+      <section className="mb-8 border border-border bg-surface p-6">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="max-w-2xl">
+            <p className="label mb-2">Ended session</p>
+            <h2 className="text-2xl font-bold text-foreground">
+              Final standings and question-by-question response shape
+            </h2>
+          </div>
+          <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2">
+            <div className="border border-border bg-background px-4 py-3">
+              <p className="label mb-2">Question set</p>
+              <p className="text-2xl font-black tabular-nums text-foreground">
+                {sortedQuestions.length}
+              </p>
+              <p className="mt-1 text-xs text-muted">reviewed items</p>
+            </div>
+            <div className="border border-border bg-background px-4 py-3">
+              <p className="label mb-2">Audience</p>
+              <p className="text-2xl font-black tabular-nums text-foreground">
+                {results.participantCount}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {formatParticipantCount(results.participantCount)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="flex gap-0 mb-8 border-b border-border">
         {(["leaderboard", "questions"] as const).map((tab) => (
@@ -129,8 +177,8 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                   key={question.id}
                   className="border border-border bg-surface p-6"
                 >
-                  <div className="flex items-start justify-between mb-6">
-                    <div>
+                  <div className="mb-6 flex items-start justify-between gap-6">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <p className="label tabular-nums">
                           Q{question.orderIndex}
@@ -143,11 +191,33 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                       <h2 className="text-lg font-bold text-foreground leading-snug">
                         {question.text}
                       </h2>
+                      {question.passageText ? (
+                        <div className="mt-4 border border-border bg-background p-4">
+                          <p className="label mb-3 text-warning">Passage</p>
+                          <div
+                            className="prose prose-invert max-w-none text-sm leading-7 text-muted prose-p:my-0 prose-p:leading-7"
+                            dangerouslySetInnerHTML={{
+                              __html: question.passageText,
+                            }}
+                          />
+                        </div>
+                      ) : null}
                     </div>
-                    <span className="text-xs text-muted tabular-nums ml-4 shrink-0">
-                      {question.totalAnswers}{" "}
-                      {question.totalAnswers === 1 ? "answer" : "answers"}
-                    </span>
+                    <div className="ml-4 shrink-0 text-right">
+                      <p className="label mb-2">Responses</p>
+                      <p className="text-lg font-bold tabular-nums text-foreground">
+                        {question.totalAnswers}/{results.participantCount}
+                      </p>
+                      <p className="text-xs text-muted tabular-nums">
+                        {results.participantCount > 0
+                          ? `${Math.round(
+                              (question.totalAnswers /
+                                results.participantCount) *
+                                100,
+                            )}% participation`
+                          : "No participants"}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -195,9 +265,6 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                                   background: option.isCorrect
                                     ? "var(--color-success)"
                                     : "var(--color-primary)",
-                                  boxShadow: option.isCorrect
-                                    ? "0 0 8px rgba(34,197,94,0.4)"
-                                    : "none",
                                   willChange: "transform",
                                 }}
                               />
