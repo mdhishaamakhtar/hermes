@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Logo from "@/components/Logo";
-import Spinner from "@/components/Spinner";
+import { SessionPageSkeleton } from "@/components/PageSkeleton";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
 import { ParticipantQuestionCard } from "@/components/session/ParticipantQuestionCard";
@@ -14,7 +14,6 @@ import {
   formatCountdownClock,
   formatParticipantCountPhrase,
 } from "@/lib/session-utils";
-import { passageTimerModeLabel } from "@/components/quizzes/editor-model";
 import {
   formatQuestionSpanLabel,
   sumVisibleQuestionsPoints,
@@ -53,13 +52,7 @@ export default function PlayPage() {
     handleLeave,
   } = usePlaySession(sessionId);
 
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner />
-      </div>
-    );
-  }
+  if (!hydrated) return <SessionPageSkeleton />;
 
   if (sessionState === "LOBBY") {
     return (
@@ -111,8 +104,17 @@ export default function PlayPage() {
 
   if (sessionState === "ENDED") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background">
+        <div className="flex items-center gap-2">
+          {([0, 0.15, 0.3] as const).map((delay, i) => (
+            <span
+              key={i}
+              className="live-dot h-1.5 w-1.5 rounded-full bg-accent"
+              style={{ animationDelay: `${delay}s` }}
+            />
+          ))}
+        </div>
+        <p className="label text-muted">Session ended</p>
       </div>
     );
   }
@@ -177,56 +179,55 @@ export default function PlayPage() {
               ) : null}
             </div>
 
-            <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
-              <div>
-                <p className="label mb-2">Timer</p>
-                <div
-                  className="font-black tabular-nums"
-                  style={{
-                    fontSize: "clamp(2.2rem, 8vw, 4.5rem)",
-                    lineHeight: 1,
-                    color: timerColour,
-                  }}
-                >
-                  {formatCountdownClock(timeLeft, questionLifecycle)}
-                </div>
-              </div>
-
-              <div className="min-w-0 w-full max-w-sm shrink">
-                <div className="h-1 min-w-[10rem] overflow-hidden bg-border">
-                  <motion.div
-                    key={`${questionLifecycle}-${timerBarLimitSeconds}`}
-                    className="h-full max-w-full"
-                    initial={false}
-                    animate={{
-                      width: `${Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          questionLifecycle === "TIMED" &&
-                            timeLeft !== null &&
-                            timerBarLimitSeconds > 0
-                            ? (timeLeft / timerBarLimitSeconds) * 100
-                            : 0,
-                        ),
-                      )}%`,
+            {questionLifecycle === "TIMED" ? (
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="label mb-2">Timer</p>
+                  <div
+                    className="font-black tabular-nums"
+                    style={{
+                      fontSize: "clamp(2.2rem, 8vw, 4.5rem)",
+                      lineHeight: 1,
+                      color: timerColour,
                     }}
-                    transition={{ duration: 1, ease: "linear" }}
-                    style={{ backgroundColor: timerColour }}
-                  />
+                  >
+                    {formatCountdownClock(timeLeft, questionLifecycle)}
+                  </div>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted">
-                  <span>
-                    {activePassage
-                      ? passageTimerModeLabel(activePassage.timerMode)
-                      : "Standalone question"}
-                  </span>
-                  <span className="tabular-nums">
-                    {timerBarLimitSeconds || 0}s
-                  </span>
+                <div className="min-w-0 w-full max-w-sm shrink">
+                  <div className="h-1 overflow-hidden bg-border">
+                    <motion.div
+                      key={`${questionLifecycle}-${timerBarLimitSeconds}`}
+                      className="h-full max-w-full"
+                      initial={false}
+                      animate={{
+                        width: `${Math.max(
+                          0,
+                          Math.min(
+                            100,
+                            timeLeft !== null && timerBarLimitSeconds > 0
+                              ? (timeLeft / timerBarLimitSeconds) * 100
+                              : 0,
+                          ),
+                        )}%`,
+                      }}
+                      transition={{ duration: 1, ease: "linear" }}
+                      style={{ backgroundColor: timerColour }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="mt-3">
+                <span className="label text-muted">
+                  {questionLifecycle === "DISPLAYED"
+                    ? "Awaiting timer"
+                    : questionLifecycle === "FROZEN"
+                      ? "Time\u2019s up"
+                      : "Reviewing"}
+                </span>
+              </div>
+            )}
           </section>
 
           {activePassage ? (
@@ -316,9 +317,9 @@ export default function PlayPage() {
 
           <motion.section
             {...enterAnimation}
-            className="border border-border bg-surface p-6"
+            className="border border-border bg-surface p-4 sm:p-6"
           >
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="hidden sm:flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="label mb-2">Answer state</p>
                 <h3 className="text-xl font-bold text-foreground">
@@ -342,7 +343,7 @@ export default function PlayPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 mt-3 sm:mt-4">
               {questionLifecycle === "TIMED" ? (
                 <>
                   <button
@@ -463,7 +464,7 @@ export default function PlayPage() {
 
           <motion.section
             {...enterAnimation}
-            className="border border-border bg-surface p-6"
+            className="hidden xl:block border border-border bg-surface p-6"
           >
             <p className="label mb-4">Session details</p>
             <div className="space-y-3 text-sm text-muted">

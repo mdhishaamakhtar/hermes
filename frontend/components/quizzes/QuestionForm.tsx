@@ -205,45 +205,34 @@ export default function QuestionForm({
           </button>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1">
           {options.map((option, index) => {
-            const tone = isPositiveOption(option.pointValue)
-              ? "border-success/35 text-success"
+            const letterClass = isPositiveOption(option.pointValue)
+              ? "text-success"
               : isNegativeOption(option.pointValue)
-                ? "border-danger/35 text-danger"
-                : "border-border text-muted";
+                ? "text-danger"
+                : "text-foreground/80";
 
             return (
               <div
                 key={index}
-                className="grid items-center gap-x-5 gap-y-3 border-b border-border/50 py-3 md:grid-cols-[1.75rem_2.5rem_minmax(0,1fr)_5rem_auto]"
+                className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_1.75rem] items-center gap-2 border-b border-border/50 py-2"
               >
-                <div className="flex items-center gap-5 md:contents">
-                  <span className="label shrink-0 text-foreground/80">
-                    {String.fromCharCode(65 + index)}
-                  </span>
-                  <span
-                    className={`inline-flex min-h-[1.25rem] min-w-[1.75rem] shrink-0 items-center justify-center text-[11px] font-medium ${tone}`}
-                  >
-                    {isPositiveOption(option.pointValue)
-                      ? "✓"
-                      : isNegativeOption(option.pointValue)
-                        ? "–"
-                        : "○"}
-                  </span>
-                </div>
+                <span className={`label shrink-0 ${letterClass}`}>
+                  {String.fromCharCode(65 + index)}
+                </span>
                 <input
                   value={option.text}
                   onChange={(event) => setOptionText(index, event.target.value)}
                   placeholder={`Option ${index + 1}`}
-                  className="input-field min-w-0"
+                  className="input-field min-w-0 py-2 px-3 text-sm"
                 />
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={option.pointValue}
                   onChange={(event) => {
                     const raw = event.target.value;
-                    // Allow negative sign while typing
                     if (raw === "-" || raw === "") {
                       setOptionPoints(index, raw);
                       return;
@@ -253,13 +242,13 @@ export default function QuestionForm({
                       setOptionPoints(index, parsed);
                     }
                   }}
-                  className="input-field font-mono tabular-nums"
+                  className="input-field py-2 px-2 text-center font-mono tabular-nums text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => removeOption(index)}
                   disabled={options.length <= 2}
-                  className="label self-center text-muted transition-colors hover:text-danger disabled:opacity-30"
+                  className="flex items-center justify-center label text-muted transition-colors hover:text-danger disabled:opacity-30"
                 >
                   ✕
                 </button>

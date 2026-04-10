@@ -23,7 +23,7 @@ export default function PageHeader({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className={`mb-10 ${action ? "flex items-start justify-between" : ""}`}
+      className={`mb-6 sm:mb-10 ${action ? "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between" : ""}`}
     >
       <div>
         <p className="label mb-1">{label}</p>

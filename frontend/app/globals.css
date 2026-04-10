@@ -481,6 +481,33 @@ body {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+/*
+ * .skeleton
+ * Shimmer loading placeholder. Apply alongside a bg-* class for the base
+ * colour — the ::after sweeps a translucent accent gradient across it.
+ *
+ * Usage: <div className="h-4 w-36 bg-surface skeleton" />
+ *        <div className="h-3 w-20 bg-border skeleton" />  ← more prominent
+ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-accent) 16%, var(--color-border)) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 2s linear infinite;
+}
+
 .loader-orbit {
   position: relative;
   display: inline-flex;
@@ -574,6 +601,15 @@ body {
   }
   to {
     transform: translateX(-50%) rotate(360deg);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 

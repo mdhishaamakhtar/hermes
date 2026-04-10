@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Logo from "@/components/Logo";
+import { SessionPageSkeleton } from "@/components/PageSkeleton";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { CardBadge } from "@/components/session/CardBadge";
 import { QuestionCard } from "@/components/session/QuestionCard";
@@ -65,13 +66,7 @@ export default function HostPage() {
     isLastQuestion,
   } = useHostSession(id);
 
-  if (!hydrated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-5 h-5 border border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
+  if (!hydrated) return <SessionPageSkeleton />;
 
   if (sessionStatus === "LOBBY") {
     return (
@@ -111,7 +106,7 @@ export default function HostPage() {
               <button
                 onClick={handleCopyCode}
                 disabled={!joinCode}
-                className="border border-border px-4 py-2 text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                className="border border-border px-4 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {copied ? "Copied" : "Copy code"}
               </button>
@@ -412,7 +407,9 @@ export default function HostPage() {
             >
               {sessionStatus}
             </CardBadge>
-            <CardBadge tone="accent">{questionLifecycle}</CardBadge>
+            <CardBadge tone="accent" className="hidden sm:inline-flex">
+              {questionLifecycle}
+            </CardBadge>
             <LiveParticipantCount
               count={participantCount}
               caption={formatParticipantCountPhrase(participantCount)}
@@ -422,9 +419,12 @@ export default function HostPage() {
             <button
               onClick={handleCopyCode}
               disabled={!joinCode}
-              className="border border-border px-3 py-2 text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              className="border border-border px-3 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {copied ? "Copied" : joinCode || "Copy code"}
+              <span className="hidden sm:inline">
+                {copied ? "Copied" : joinCode || "Copy code"}
+              </span>
+              <span className="sm:hidden">{copied ? "Copied" : "Code"}</span>
             </button>
           </div>
         </div>
@@ -477,6 +477,57 @@ export default function HostPage() {
               </div>
             </div>
           </motion.section>
+
+          {/* Mobile-only session controls — shown above question so host doesn't have to scroll */}
+          <div className="xl:hidden border border-border bg-surface p-4 sm:p-6 space-y-3">
+            {questionLifecycle === "DISPLAYED" ? (
+              <button
+                onClick={handleStartTimer}
+                disabled={loadingAction === "start-timer"}
+                className="btn-primary w-full"
+              >
+                {loadingAction === "start-timer"
+                  ? "Starting timer..."
+                  : "Start Timer"}
+              </button>
+            ) : null}
+
+            {questionLifecycle === "TIMED" ? (
+              <button
+                onClick={handleEndTimerEarly}
+                disabled={loadingAction === "end-timer"}
+                className="btn-primary w-full"
+              >
+                {loadingAction === "end-timer"
+                  ? "Freezing..."
+                  : "End Timer Early"}
+              </button>
+            ) : null}
+
+            {questionLifecycle === "REVIEWING" ? (
+              <button
+                onClick={handleNextQuestion}
+                disabled={!canAdvance || loadingAction === "next"}
+                className="btn-primary w-full"
+              >
+                {loadingAction === "next"
+                  ? "Advancing..."
+                  : canAdvance
+                    ? isLastQuestion
+                      ? "Finish quiz"
+                      : "Next question"
+                    : "Waiting for review"}
+              </button>
+            ) : null}
+
+            <button
+              onClick={handleForceEnd}
+              disabled={loadingAction === "end-session"}
+              className="w-full border border-border px-5 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:border-danger/50 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {loadingAction === "end-session" ? "Ending..." : "Force End"}
+            </button>
+          </div>
 
           {isCodeDisplay ? (
             <motion.section

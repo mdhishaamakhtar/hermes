@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import Logo from "@/components/Logo";
-import Spinner from "@/components/Spinner";
+import { ResultsPageSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";
 import { QuestionResultCard } from "@/components/session/QuestionResultCard";
 import { enterAnimation } from "@/lib/design-tokens";
@@ -68,13 +68,7 @@ export default function ResultsPage() {
     );
   }
 
-  if (!results) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner />
-      </div>
-    );
-  }
+  if (!results) return <ResultsPageSkeleton />;
 
   return (
     <div className="min-h-screen bg-background">

@@ -43,49 +43,49 @@ export function QuestionCard({
 
   return (
     <article className="border border-border bg-surface p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <p className="label tabular-nums">Q{question.orderIndex}</p>
-            <span className="text-xs text-muted/50">·</span>
-            {question.timeLimitSeconds > 0 && (
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="label tabular-nums">Q{question.orderIndex}</p>
+          {question.timeLimitSeconds > 0 && (
+            <>
+              <span className="text-xs text-muted/50">·</span>
               <span className="text-xs text-muted tabular-nums">
-                {question.timeLimitSeconds}s time limit
+                {question.timeLimitSeconds}s
               </span>
-            )}
-            {question.passageId != null ? (
-              <CardBadge tone="accent">Passage</CardBadge>
-            ) : null}
-          </div>
-          <h2 className="text-2xl font-bold leading-snug text-foreground">
-            {question.text}
-          </h2>
+            </>
+          )}
+          {question.passageId != null ? (
+            <CardBadge tone="accent">Passage</CardBadge>
+          ) : null}
         </div>
 
-        <div className="flex shrink-0 items-start gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {showMetrics ? (
-            <div className="text-right">
-              <div className="text-sm tabular-nums text-foreground">
-                {question.totalAnswers} responded
-              </div>
+            <span className="text-xs tabular-nums text-muted">
+              {question.totalAnswers} responded
               {question.totalLockedIn !== undefined ? (
-                <div className="text-xs text-muted tabular-nums">
-                  {question.totalLockedIn} locked in
-                </div>
+                <span className="text-muted/60">
+                  {" "}
+                  · {question.totalLockedIn} locked
+                </span>
               ) : null}
-            </div>
+            </span>
           ) : null}
 
           {onEdit ? (
             <button
               onClick={onEdit}
-              className="border border-border px-4 py-2 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="border border-border px-3 py-1.5 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               Edit scoring
             </button>
           ) : null}
         </div>
       </div>
+
+      <h2 className="text-xl font-bold leading-snug text-foreground sm:text-2xl">
+        {question.text}
+      </h2>
 
       {mode === "display" ? (
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
@@ -186,7 +186,7 @@ export function QuestionCard({
                     ) : null}
                   </div>
                 </div>
-                <div className="h-3 bg-background overflow-hidden border border-border">
+                <div className="h-3 bg-border/40 overflow-hidden">
                   <motion.div
                     initial={false}
                     animate={{ scaleX: pct / 100 }}
