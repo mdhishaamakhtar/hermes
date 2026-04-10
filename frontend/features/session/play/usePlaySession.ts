@@ -1092,7 +1092,7 @@ export function usePlaySession(sessionId: string) {
 
             const ack = await Promise.race([
               ackPromise,
-              new Promise<{ success: boolean; code?: string }>(
+              new Promise<{ success: boolean; code?: string; message?: string }>(
                 (resolveInterrupt) => {
                   syncInterruptRef.current.set(questionId, () =>
                     resolveInterrupt({ success: true, code: "SUPERSEDED" }),
