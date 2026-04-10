@@ -26,7 +26,7 @@ public class AnswerService {
   private final ParticipantService participantService;
   private final SessionSnapshotService snapshotService;
   private final SessionLiveStateService liveStateService;
-  private final SessionEngine engine;
+  private final SessionEventPublisher eventPublisher;
   private final EntityManager entityManager;
 
   public AnswerService(
@@ -34,13 +34,13 @@ public class AnswerService {
       ParticipantService participantService,
       SessionSnapshotService snapshotService,
       SessionLiveStateService liveStateService,
-      SessionEngine engine,
+      SessionEventPublisher eventPublisher,
       EntityManager entityManager) {
     this.answerRepository = answerRepository;
     this.participantService = participantService;
     this.snapshotService = snapshotService;
     this.liveStateService = liveStateService;
-    this.engine = engine;
+    this.eventPublisher = eventPublisher;
     this.entityManager = entityManager;
   }
 
@@ -199,7 +199,7 @@ public class AnswerService {
     long totalParticipants = liveStateService.getParticipantCount(sessionId);
     long totalLockedIn = liveStateService.getTotalLockedIn(sessionId, questionId);
 
-    engine.broadcastAnswerUpdate(
+    eventPublisher.publishAnswerUpdate(
         sessionId,
         questionId,
         new AnswerStats(counts, totalAnswered, totalParticipants, totalLockedIn));

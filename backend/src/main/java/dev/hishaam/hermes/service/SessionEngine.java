@@ -1,26 +1,19 @@
 package dev.hishaam.hermes.service;
 
-import dev.hishaam.hermes.dto.AnswerStats;
 import dev.hishaam.hermes.dto.QuizSnapshot;
-import dev.hishaam.hermes.dto.SessionResultsResponse;
-import dev.hishaam.hermes.dto.WsPayloads;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
-import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
-import dev.hishaam.hermes.util.WsTopics;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +29,7 @@ public class SessionEngine {
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
   private final SessionLiveStateService liveStateService;
-  private final SimpMessagingTemplate messaging;
+  private final SessionEventPublisher eventPublisher;
   private final SessionTimerScheduler timerScheduler;
   private final GradingService gradingService;
 
@@ -46,7 +39,7 @@ public class SessionEngine {
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
       SessionLiveStateService liveStateService,
-      SimpMessagingTemplate messaging,
+      SessionEventPublisher eventPublisher,
       SessionTimerScheduler timerScheduler,
       GradingService gradingService) {
     this.sessionRepository = sessionRepository;
@@ -54,7 +47,7 @@ public class SessionEngine {
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
     this.liveStateService = liveStateService;
-    this.messaging = messaging;
+    this.eventPublisher = eventPublisher;
     this.timerScheduler = timerScheduler;
     this.gradingService = gradingService;
   }
@@ -91,7 +84,7 @@ public class SessionEngine {
     liveStateService.clearCurrentPassage(sessionId);
     liveStateService.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
     liveStateService.initQuestionCounts(sessionId, next);
-    broadcastQuestionDisplayed(sessionId, next, snapshot);
+    eventPublisher.publishQuestionDisplayed(sessionId, next, snapshot);
     updateDbCurrentQuestion(sessionId, next);
   }
 
@@ -125,9 +118,7 @@ public class SessionEngine {
       liveStateService.setTimer(sessionId, passage.timeLimitSeconds());
       liveStateService.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
 
-      messaging.convertAndSend(
-          WsTopics.sessionQuestion(sessionId),
-          new WsPayloads.TimerStart(null, passageId, passage.timeLimitSeconds()));
+      eventPublisher.publishTimerStart(sessionId, null, passageId, passage.timeLimitSeconds());
 
       long seqAtStart = liveStateService.getQuestionSequence(sessionId);
       Long anchorQuestionId = Long.parseLong(currentQIdStr);
@@ -150,9 +141,7 @@ public class SessionEngine {
       liveStateService.setTimer(sessionId, question.timeLimitSeconds());
       liveStateService.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
 
-      messaging.convertAndSend(
-          WsTopics.sessionQuestion(sessionId),
-          new WsPayloads.TimerStart(questionId, null, question.timeLimitSeconds()));
+      eventPublisher.publishTimerStart(sessionId, questionId, null, question.timeLimitSeconds());
 
       long seqAtStart = liveStateService.getQuestionSequence(sessionId);
       timerScheduler.scheduleQuestionTimer(
@@ -183,9 +172,7 @@ public class SessionEngine {
       subQuestionIds.forEach(
           qid -> answerRepository.freezeAnswersForQuestion(sessionId, qid, OffsetDateTime.now()));
 
-      messaging.convertAndSend(
-          WsTopics.sessionQuestion(sessionId),
-          new WsPayloads.PassageFrozen(passageId, subQuestionIds));
+      eventPublisher.publishPassageFrozen(sessionId, passageId, subQuestionIds);
 
       gradingService.gradePassage(sessionId, passageId);
 
@@ -195,8 +182,7 @@ public class SessionEngine {
         Long questionId = Long.parseLong(currentQIdStr);
         answerRepository.freezeAnswersForQuestion(sessionId, questionId, OffsetDateTime.now());
 
-        messaging.convertAndSend(
-            WsTopics.sessionQuestion(sessionId), new WsPayloads.QuestionFrozen(questionId));
+        eventPublisher.publishQuestionFrozen(sessionId, questionId);
 
         gradingService.gradeQuestion(sessionId, questionId);
       }
@@ -253,15 +239,8 @@ public class SessionEngine {
     String joinCode = session.getJoinCode();
 
     if (session.getStatus() != SessionStatus.LOBBY) {
-      List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-          liveStateService.buildLeaderboard(sessionId);
-
-      messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
-
-      long participantCount = liveStateService.getParticipantCount(sessionId);
-      messaging.convertAndSend(
-          WsTopics.sessionAnalytics(sessionId),
-          new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
+      eventPublisher.publishSessionEnd(sessionId);
+      eventPublisher.publishSessionEndAnalytics(sessionId);
     }
 
     session.setStatus(SessionStatus.ENDED);
@@ -270,69 +249,6 @@ public class SessionEngine {
     sessionRepository.save(session);
 
     liveStateService.cleanupSessionKeys(sessionId, snapshot, joinCode);
-  }
-
-  public void broadcastQuestionDisplayed(
-      Long sessionId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    int questionIndex = snapshot.questionPosition(question.id());
-    int totalQuestions = snapshot.questions().size();
-
-    List<WsPayloads.Option> options =
-        question.options().stream()
-            .map(o -> new WsPayloads.Option(o.id(), o.text(), o.orderIndex()))
-            .toList();
-
-    // Include passage context for PER_SUB_QUESTION sub-questions
-    WsPayloads.PassageContext passageContext = null;
-    if (question.passageId() != null) {
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(question.passageId());
-      if (passage != null) {
-        passageContext = new WsPayloads.PassageContext(passage.id(), passage.text());
-      }
-    }
-
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.QuestionDisplayed(
-            question.id(),
-            question.text(),
-            question.questionType().name(),
-            options,
-            questionIndex,
-            totalQuestions,
-            passageContext,
-            question.effectiveDisplayMode().name()));
-  }
-
-  public void broadcastLeaderboardUpdate(Long sessionId) {
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        liveStateService.buildLeaderboard(sessionId);
-    messaging.convertAndSend(
-        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
-  }
-
-  public void broadcastAnswerUpdate(Long sessionId, Long questionId, AnswerStats stats) {
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
-    DisplayMode mode = question != null ? question.effectiveDisplayMode() : DisplayMode.LIVE;
-
-    if (mode == DisplayMode.CODE_DISPLAY) {
-      // Suppress entirely during TIMED state
-      return;
-    }
-
-    Map<Long, Long> broadcastCounts = mode == DisplayMode.BLIND ? Map.of() : stats.optionCounts();
-    var answerUpdate =
-        new WsPayloads.AnswerUpdate(
-            questionId,
-            broadcastCounts,
-            stats.totalAnswered(),
-            stats.totalParticipants(),
-            stats.totalLockedIn());
-    messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerUpdate);
-    // Also broadcast to .question so participants (unauthenticated) can receive live counts
-    messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerUpdate);
   }
 
   private void displayEntirePassage(
@@ -352,38 +268,7 @@ public class SessionEngine {
 
     subQuestions.forEach(q -> liveStateService.initQuestionCounts(sessionId, q));
 
-    int questionIndex = snapshot.questionPosition(subQuestions.get(0).id());
-    int totalQuestions = snapshot.questions().size();
-
-    List<WsPayloads.SubQuestion> wsSubQuestions =
-        subQuestions.stream()
-            .map(
-                q -> {
-                  List<WsPayloads.Option> opts =
-                      q.options().stream()
-                          .map(o -> new WsPayloads.Option(o.id(), o.text(), o.orderIndex()))
-                          .toList();
-                  return new WsPayloads.SubQuestion(q.id(), q.text(), q.questionType().name(), opts);
-                })
-            .toList();
-
-    // Use the first sub-question's effective display mode for the passage (sub-questions share
-    // mode)
-    String effectiveDisplayMode =
-        subQuestions.isEmpty()
-            ? DisplayMode.LIVE.name()
-            : subQuestions.get(0).effectiveDisplayMode().name();
-
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.PassageDisplayed(
-            passage.id(),
-            passage.text(),
-            passage.timeLimitSeconds(),
-            wsSubQuestions,
-            questionIndex,
-            totalQuestions,
-            effectiveDisplayMode));
+    eventPublisher.publishPassageDisplayed(sessionId, passage, subQuestions, snapshot);
   }
 
   private QuizSnapshot.QuestionSnapshot findLastSubQuestion(

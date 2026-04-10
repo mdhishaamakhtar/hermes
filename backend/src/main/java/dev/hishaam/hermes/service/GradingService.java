@@ -1,23 +1,11 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.QuizSnapshot;
-import dev.hishaam.hermes.dto.SessionResultsResponse;
-import dev.hishaam.hermes.dto.WsPayloads;
-import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import dev.hishaam.hermes.repository.ParticipantRepository;
-import dev.hishaam.hermes.entity.enums.DisplayMode;
-import dev.hishaam.hermes.util.LeaderboardBuilder;
-import dev.hishaam.hermes.util.WsTopics;
-import java.time.OffsetDateTime;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,22 +13,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class GradingService {
 
   private final ParticipantAnswerRepository answerRepository;
-  private final ParticipantRepository participantRepository;
   private final SessionSnapshotService snapshotService;
   private final SessionLiveStateService liveStateService;
-  private final SimpMessagingTemplate messaging;
+  private final SessionEventPublisher eventPublisher;
+  private final AnswerScoringService scoringService;
 
   public GradingService(
       ParticipantAnswerRepository answerRepository,
-      ParticipantRepository participantRepository,
       SessionSnapshotService snapshotService,
       SessionLiveStateService liveStateService,
-      SimpMessagingTemplate messaging) {
+      SessionEventPublisher eventPublisher,
+      AnswerScoringService scoringService) {
     this.answerRepository = answerRepository;
-    this.participantRepository = participantRepository;
     this.snapshotService = snapshotService;
     this.liveStateService = liveStateService;
-    this.messaging = messaging;
+    this.eventPublisher = eventPublisher;
+    this.scoringService = scoringService;
   }
 
   /** Grade a single question (standalone or PER_SUB_QUESTION sub-question). */
@@ -60,8 +48,8 @@ public class GradingService {
         (participantId, score) ->
             liveStateService.incrementLeaderboardScore(sessionId, participantId, score));
 
-    broadcastQuestionReviewed(sessionId, questionId, question);
-    broadcastLeaderboardUpdates(sessionId);
+    eventPublisher.publishQuestionReviewed(sessionId, questionId, question);
+    eventPublisher.publishLeaderboardUpdates(sessionId);
   }
 
   /** Grade all sub-questions of an ENTIRE_PASSAGE passage together. */
@@ -93,10 +81,10 @@ public class GradingService {
     for (Long subQuestionId : passage.subQuestionIds()) {
       QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(subQuestionId);
       if (question != null) {
-        broadcastQuestionReviewed(sessionId, subQuestionId, question);
+        eventPublisher.publishQuestionReviewed(sessionId, subQuestionId, question);
       }
     }
-    broadcastLeaderboardUpdates(sessionId);
+    eventPublisher.publishLeaderboardUpdates(sessionId);
   }
 
   /**
@@ -114,24 +102,20 @@ public class GradingService {
     List<ParticipantAnswer> answers =
         answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, questionId);
     for (ParticipantAnswer answer : answers) {
-      answer.setScore(computeScore(answer, question));
+      answer.setScore(scoringService.computeScore(answer, question));
     }
     answerRepository.saveAll(answers);
 
     // Full leaderboard recompute from DB
     List<ParticipantAnswer> allGraded = answerRepository.findGradedBySessionId(sessionId);
-    Map<Long, Long> participantTotals = new HashMap<>();
-    for (ParticipantAnswer a : allGraded) {
-      participantTotals.merge(
-          a.getParticipantId(), Long.valueOf(a.getScore() != null ? a.getScore() : 0), Long::sum);
-    }
+    Map<Long, Long> participantTotals = scoringService.sumScoresByParticipant(allGraded);
 
     // Update Redis ZSet (best-effort — no-op if Redis state was already cleaned up)
     participantTotals.forEach(
         (pid, total) -> liveStateService.setLeaderboardScore(sessionId, pid, total));
 
-    broadcastScoringCorrected(sessionId, questionId, question);
-    broadcastLeaderboardFromDb(sessionId, participantTotals);
+    eventPublisher.publishScoringCorrected(sessionId, questionId, question);
+    eventPublisher.publishLeaderboardFromDb(sessionId, participantTotals);
   }
 
   /**
@@ -149,12 +133,12 @@ public class GradingService {
     Map<Long, Integer> participantScores = new HashMap<>();
 
     for (ParticipantAnswer answer : answers) {
-      int score = computeScore(answer, question);
+      int score = scoringService.computeScore(answer, question);
       answer.setScore(score);
 
       if (answer.getAnsweredAt() != null && timerStartedAt != null) {
         long answerTimeMs =
-            computeAnswerTimeMs(
+            scoringService.computeAnswerTimeMs(
                 answer.getAnsweredAt(), timerStartedAt, question.timeLimitSeconds());
         liveStateService.incrementCumulativeTime(
             sessionId, answer.getParticipantId(), answerTimeMs);
@@ -167,122 +151,5 @@ public class GradingService {
 
     answerRepository.saveAll(answers);
     return participantScores;
-  }
-
-  private int computeScore(ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
-    Map<Long, Integer> pointsByOptionId = new LinkedHashMap<>();
-    question.options().forEach(o -> pointsByOptionId.put(o.id(), o.pointValue()));
-
-    int rawScore =
-        answer.getSelectedOptions().stream()
-            .map(AnswerOption::getId)
-            .map(pointsByOptionId::get)
-            .filter(Objects::nonNull)
-            .mapToInt(Integer::intValue)
-            .sum();
-
-    return Math.max(rawScore, 0);
-  }
-
-  private long computeAnswerTimeMs(
-      OffsetDateTime answeredAt, long timerStartedAtEpochMs, int timeLimitSeconds) {
-    long answeredAtMs = answeredAt.toInstant().toEpochMilli();
-    long elapsed = answeredAtMs - timerStartedAtEpochMs;
-    // Cap at the question's time limit to guard against clock skew or late writes
-    long maxMs = (long) timeLimitSeconds * 1000;
-    return Math.min(Math.max(elapsed, 0L), maxMs);
-  }
-
-  private void broadcastQuestionReviewed(
-      Long sessionId, Long questionId, QuizSnapshot.QuestionSnapshot question) {
-    List<Long> correctOptionIds =
-        question.options().stream()
-            .filter(o -> o.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .toList();
-
-    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
-    question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
-
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.QuestionReviewed(questionId, correctOptionIds, optionPoints));
-
-    // For BLIND/CODE_DISPLAY modes, reveal the full answer distribution after grading
-    DisplayMode mode = question.effectiveDisplayMode();
-    if (mode == DisplayMode.BLIND || mode == DisplayMode.CODE_DISPLAY) {
-      Map<Long, Long> counts = liveStateService.getQuestionCounts(sessionId, questionId);
-      long totalAnswered = liveStateService.getTotalAnswered(sessionId, questionId);
-      long totalParticipants = liveStateService.getParticipantCount(sessionId);
-
-      var answerReveal =
-          new WsPayloads.AnswerReveal(questionId, counts, totalAnswered, totalParticipants);
-      messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerReveal);
-      // Also send to .question so participants receive the reveal
-      messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerReveal);
-    }
-  }
-
-  private void broadcastScoringCorrected(
-      Long sessionId, Long questionId, QuizSnapshot.QuestionSnapshot question) {
-    List<Long> correctOptionIds =
-        question.options().stream()
-            .filter(o -> o.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .toList();
-
-    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
-    question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
-
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.ScoringCorrected(questionId, correctOptionIds, optionPoints));
-  }
-
-  private void broadcastLeaderboardFromDb(Long sessionId, Map<Long, Long> participantTotals) {
-    Map<Long, String> names = new HashMap<>();
-    participantRepository
-        .findBySessionId(sessionId)
-        .forEach(p -> names.put(p.getId(), p.getDisplayName()));
-    long totalParticipants = participantRepository.countBySessionId(sessionId);
-
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        LeaderboardBuilder.rank(participantTotals, names);
-
-    messaging.convertAndSend(
-        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
-
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.ParticipantLeaderboard(
-            leaderboard.stream()
-                .map(
-                    e ->
-                        new WsPayloads.ParticipantLeaderboardEntry(
-                            e.participantId(), e.rank(), e.displayName(), e.score()))
-                .toList(),
-            totalParticipants));
-  }
-
-  private void broadcastLeaderboardUpdates(Long sessionId) {
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        liveStateService.buildLeaderboard(sessionId);
-    long totalParticipants = liveStateService.getParticipantCount(sessionId);
-
-    // Full leaderboard to organiser
-    messaging.convertAndSend(
-        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
-
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.ParticipantLeaderboard(
-            leaderboard.stream()
-                .sorted(Comparator.comparingInt(SessionResultsResponse.LeaderboardEntry::rank))
-                .map(
-                    e ->
-                        new WsPayloads.ParticipantLeaderboardEntry(
-                            e.participantId(), e.rank(), e.displayName(), e.score()))
-                .toList(),
-            totalParticipants));
   }
 }

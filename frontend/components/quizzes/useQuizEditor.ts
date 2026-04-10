@@ -9,6 +9,7 @@ import {
   quizzesApi,
   sessionsApi,
 } from "@/lib/apiClient";
+import { storeSessionJoinCode } from "@/lib/session-storage";
 import type {
   DisplayMode,
   Passage,
@@ -272,10 +273,7 @@ export function useQuizEditor({
     const response = await sessionsApi.create(Number(quizId));
 
     if (response.success) {
-      localStorage.setItem(
-        `hermes_session_${response.data.id}`,
-        response.data.joinCode,
-      );
+      storeSessionJoinCode(response.data.id, response.data.joinCode);
       router.refresh();
       router.push(`/session/${response.data.id}/host`);
       return;

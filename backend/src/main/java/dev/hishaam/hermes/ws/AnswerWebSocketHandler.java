@@ -2,16 +2,15 @@ package dev.hishaam.hermes.ws;
 
 import dev.hishaam.hermes.dto.AnswerRequest;
 import dev.hishaam.hermes.dto.LockInRequest;
-import dev.hishaam.hermes.dto.WsPayloads;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.service.AnswerService;
+import dev.hishaam.hermes.service.SessionEventPublisher;
 import java.security.Principal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -20,11 +19,11 @@ public class AnswerWebSocketHandler {
   private static final Logger log = LoggerFactory.getLogger(AnswerWebSocketHandler.class);
 
   private final AnswerService answerService;
-  private final SimpMessagingTemplate messaging;
+  private final SessionEventPublisher eventPublisher;
 
-  public AnswerWebSocketHandler(AnswerService answerService, SimpMessagingTemplate messaging) {
+  public AnswerWebSocketHandler(AnswerService answerService, SessionEventPublisher eventPublisher) {
     this.answerService = answerService;
-    this.messaging = messaging;
+    this.eventPublisher = eventPublisher;
   }
 
   @MessageMapping("/session/{sessionId}/answer")
@@ -70,10 +69,8 @@ public class AnswerWebSocketHandler {
   private void sendAccepted(
       Principal principal, String clientRequestId, Long questionId, boolean lockedIn) {
     if (principal == null || clientRequestId == null || clientRequestId.isBlank()) return;
-    messaging.convertAndSendToUser(
-        principal.getName(),
-        "/queue/answers",
-        new WsPayloads.AnswerAccepted(clientRequestId, questionId, lockedIn));
+    eventPublisher.publishAnswerAccepted(
+        principal.getName(), clientRequestId, questionId, lockedIn);
   }
 
   private void sendRejected(
@@ -83,10 +80,12 @@ public class AnswerWebSocketHandler {
       AppException exception,
       boolean lockedIn) {
     if (principal == null || clientRequestId == null || clientRequestId.isBlank()) return;
-    messaging.convertAndSendToUser(
+    eventPublisher.publishAnswerRejected(
         principal.getName(),
-        "/queue/answers",
-        new WsPayloads.AnswerRejected(
-            clientRequestId, questionId, exception.getCode(), exception.getMessage(), lockedIn));
+        clientRequestId,
+        questionId,
+        exception.getCode(),
+        exception.getMessage(),
+        lockedIn);
   }
 }

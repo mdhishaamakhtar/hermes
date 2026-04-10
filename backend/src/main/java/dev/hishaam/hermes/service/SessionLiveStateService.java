@@ -4,17 +4,13 @@ import dev.hishaam.hermes.dto.QuizSnapshot;
 import dev.hishaam.hermes.dto.SessionResultsResponse;
 import dev.hishaam.hermes.entity.SessionStatus;
 import java.time.Duration;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.stereotype.Service;
 
@@ -23,10 +19,15 @@ public class SessionLiveStateService {
 
   private final StringRedisTemplate redis;
   private final SessionRedisHelper redisHelper;
+  private final SessionLeaderboardStore leaderboardStore;
 
-  public SessionLiveStateService(StringRedisTemplate redis, SessionRedisHelper redisHelper) {
+  public SessionLiveStateService(
+      StringRedisTemplate redis,
+      SessionRedisHelper redisHelper,
+      SessionLeaderboardStore leaderboardStore) {
     this.redis = redis;
     this.redisHelper = redisHelper;
+    this.leaderboardStore = leaderboardStore;
   }
 
   public record RejoinContext(
@@ -58,7 +59,8 @@ public class SessionLiveStateService {
     Long ttl = getTimerTtlSeconds(sessionId);
     Integer timeLeftSeconds = (ttl != null && ttl > 0) ? ttl.intValue() : null;
 
-    return new RejoinContext(questionLifecycle, currentQId, currentPassageId, participantCount, timeLeftSeconds);
+    return new RejoinContext(
+        questionLifecycle, currentQId, currentPassageId, participantCount, timeLeftSeconds);
   }
 
   public void initSessionKeys(Long sessionId, String joinCode, String snapshotJson) {
@@ -229,22 +231,16 @@ public class SessionLiveStateService {
   }
 
   public void initLeaderboardEntry(Long sessionId, Long participantId) {
-    String sid = sessionId.toString();
-    redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), 0);
-    redis.expire(redisHelper.leaderboardKey(sid), SessionRedisHelper.SESSION_TTL);
+    leaderboardStore.initEntry(sessionId, participantId);
   }
 
   public void incrementLeaderboardScore(Long sessionId, Long participantId, long deltaPoints) {
-    String sid = sessionId.toString();
-    redis
-        .opsForZSet()
-        .incrementScore(redisHelper.leaderboardKey(sid), participantId.toString(), deltaPoints);
+    leaderboardStore.incrementScore(sessionId, participantId, deltaPoints);
   }
 
   /** Replaces a participant's leaderboard score (used during regrading). */
   public void setLeaderboardScore(Long sessionId, Long participantId, long newScore) {
-    String sid = sessionId.toString();
-    redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), newScore);
+    leaderboardStore.setScore(sessionId, participantId, newScore);
   }
 
   public void recordTimerStartedAt(Long sessionId, long epochMillis) {
@@ -264,51 +260,11 @@ public class SessionLiveStateService {
   }
 
   public void incrementCumulativeTime(Long sessionId, Long participantId, long millis) {
-    String sid = sessionId.toString();
-    redis
-        .opsForHash()
-        .increment(redisHelper.cumulativeTimeKey(sid), participantId.toString(), millis);
-    redis.expire(redisHelper.cumulativeTimeKey(sid), SessionRedisHelper.SESSION_TTL);
+    leaderboardStore.incrementCumulativeTime(sessionId, participantId, millis);
   }
 
   public List<SessionResultsResponse.LeaderboardEntry> buildLeaderboard(Long sessionId) {
-    String sid = sessionId.toString();
-    Set<ZSetOperations.TypedTuple<String>> data =
-        redis.opsForZSet().reverseRangeWithScores(redisHelper.leaderboardKey(sid), 0, -1);
-    if (data == null || data.isEmpty()) {
-      return List.of();
-    }
-
-    Map<Object, Object> namesMap = redis.opsForHash().entries(redisHelper.participantNamesKey(sid));
-    Map<Object, Object> timesMap = redis.opsForHash().entries(redisHelper.cumulativeTimeKey(sid));
-
-    // Sort by score desc, then cumulative time asc as tiebreaker
-    List<ZSetOperations.TypedTuple<String>> sorted =
-        data.stream()
-            .sorted(
-                Comparator.<ZSetOperations.TypedTuple<String>>comparingDouble(
-                        t -> -(t.getScore() != null ? t.getScore() : 0.0))
-                    .thenComparingLong(
-                        t -> {
-                          Object val = timesMap.get(t.getValue());
-                          return val != null ? Long.parseLong(val.toString()) : 0L;
-                        }))
-            .toList();
-
-    AtomicLong rank = new AtomicLong(1);
-    return sorted.stream()
-        .map(
-            tuple -> {
-              Long participantId = Long.parseLong(Objects.requireNonNull(tuple.getValue()));
-              long score = tuple.getScore() != null ? tuple.getScore().longValue() : 0;
-              String name =
-                  namesMap.containsKey(participantId.toString())
-                      ? namesMap.get(participantId.toString()).toString()
-                      : "Unknown";
-              return new SessionResultsResponse.LeaderboardEntry(
-                  (int) rank.getAndIncrement(), participantId, name, score);
-            })
-        .toList();
+    return leaderboardStore.buildLeaderboard(sessionId);
   }
 
   public void initQuestionCounts(Long sessionId, QuizSnapshot.QuestionSnapshot question) {

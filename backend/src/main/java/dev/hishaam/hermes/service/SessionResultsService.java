@@ -23,6 +23,7 @@ public class SessionResultsService {
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
   private final ParticipantService participantService;
+  private final AnswerScoringService scoringService;
 
   public SessionResultsService(
       QuizSessionRepository sessionRepository,
@@ -30,13 +31,15 @@ public class SessionResultsService {
       ParticipantAnswerRepository answerRepository,
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
-      ParticipantService participantService) {
+      ParticipantService participantService,
+      AnswerScoringService scoringService) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
     this.participantService = participantService;
+    this.scoringService = scoringService;
   }
 
   @Transactional(readOnly = true)
@@ -75,7 +78,8 @@ public class SessionResultsService {
             answers.stream()
                 .filter(
                     answer ->
-                        isCorrectSelection(answer, snapshot.findQuestion(answer.getQuestionId())))
+                        scoringService.isCorrectSelection(
+                            answer, snapshot.findQuestion(answer.getQuestionId())))
                 .count();
     int totalScore =
         answers.stream()
@@ -89,14 +93,12 @@ public class SessionResultsService {
     Map<Long, Long> scores = new LinkedHashMap<>();
     // Initialize all participants with 0 so zero-score participants get ranked
     participantRepository.findBySessionId(sessionId).forEach(p -> scores.put(p.getId(), 0L));
-    allAnswers.stream()
-        .forEach(
-            answer -> {
-              scores.merge(
-                  answer.getParticipantId(),
-                  (long) (answer.getScore() != null ? answer.getScore() : 0),
-                  Long::sum);
-            });
+    allAnswers.forEach(
+        answer ->
+            scores.merge(
+                answer.getParticipantId(),
+                (long) (answer.getScore() != null ? answer.getScore() : 0),
+                Long::sum));
 
     List<Long> sortedIds =
         scores.entrySet().stream()
@@ -136,7 +138,7 @@ public class SessionResultsService {
                               ? snapshot.findPassage(q.passageId()).text()
                               : null
                           : null;
-                  boolean isCorrect = isCorrectSelection(ans, q);
+                  boolean isCorrect = scoringService.isCorrectSelection(ans, q);
                   int pointsEarned = ans != null && ans.getScore() != null ? ans.getScore() : 0;
                   return new MyResultsResponse.QuestionResult(
                       q.id(),
@@ -261,24 +263,5 @@ public class SessionResultsService {
         .sorted(Comparator.comparingInt(option -> option.getOrderIndex()))
         .map(option -> option.getId())
         .toList();
-  }
-
-  private boolean isCorrectSelection(
-      ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot questionSnapshot) {
-    if (answer == null || questionSnapshot == null) {
-      return false;
-    }
-
-    Set<Long> selectedOptionIds =
-        answer.getSelectedOptions().stream()
-            .map(option -> option.getId())
-            .collect(LinkedHashSet::new, Set::add, Set::addAll);
-    Set<Long> correctOptionIds =
-        questionSnapshot.options().stream()
-            .filter(option -> option.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .collect(LinkedHashSet::new, Set::add, Set::addAll);
-
-    return !selectedOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds);
   }
 }

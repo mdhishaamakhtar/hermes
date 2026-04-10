@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import MinimalNav from "@/components/MinimalNav";
+import {
+  getStoredRejoinToken,
+  listStoredRejoinTokens,
+  storeRejoinToken,
+} from "@/lib/session-storage";
 
 export default function JoinPage() {
   const [code, setCode] = useState("");
@@ -16,31 +21,23 @@ export default function JoinPage() {
   const router = useRouter();
   const codeRef = useRef<HTMLInputElement>(null);
 
-  // On mount, scan localStorage for any existing rejoin tokens
   useEffect(() => {
-    const keys = Object.keys(localStorage).filter((k) =>
-      k.startsWith("hermes_rejoin_"),
-    );
-    if (keys.length === 0) return;
-    for (const key of keys) {
-      const token = localStorage.getItem(key);
-      const sessionId = key.replace("hermes_rejoin_", "");
-      if (token) {
-        api
-          .post<{ status: string }>(
-            "/api/sessions/rejoin",
-            { sessionId: Number(sessionId), rejoinToken: token },
-            { skipAuth: true },
-          )
-          .then((res) => {
-            if (res.success && res.data.status !== "ENDED") {
-              setActiveSession({ sessionId, token });
-            }
-          })
-          .catch(() => {});
-        break;
-      }
-    }
+    const [storedRejoin] = listStoredRejoinTokens();
+    if (!storedRejoin) return;
+
+    const { sessionId, token } = storedRejoin;
+    api
+      .post<{ status: string }>(
+        "/api/sessions/rejoin",
+        { sessionId: Number(sessionId), rejoinToken: token },
+        { skipAuth: true },
+      )
+      .then((res) => {
+        if (res.success && res.data.status !== "ENDED") {
+          setActiveSession({ sessionId, token });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   interface JoinState {
@@ -67,16 +64,11 @@ export default function JoinPage() {
         );
         if (res.success) {
           const sessionId = res.data.sessionId;
-          const existingToken = localStorage.getItem(
-            `hermes_rejoin_${sessionId}`,
-          );
+          const existingToken = getStoredRejoinToken(sessionId);
           if (existingToken) {
             router.push(`/session/${sessionId}/play`);
           } else {
-            localStorage.setItem(
-              `hermes_rejoin_${sessionId}`,
-              res.data.rejoinToken,
-            );
+            storeRejoinToken(sessionId, res.data.rejoinToken);
             router.push(`/session/${sessionId}/play`);
           }
           return { error: "" };

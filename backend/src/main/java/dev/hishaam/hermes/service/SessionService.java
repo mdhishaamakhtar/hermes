@@ -15,8 +15,6 @@ import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +30,9 @@ public class SessionService {
   private final SessionLiveStateService liveStateService;
   private final SessionCodeService sessionCodeService;
   private final SessionEngine engine;
+  private final SessionEventPublisher eventPublisher;
   private final SessionTimerScheduler timerScheduler;
-  private final GradingService gradingService;
+  private final ScoringCorrectionService scoringCorrectionService;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -45,8 +44,9 @@ public class SessionService {
       SessionLiveStateService liveStateService,
       SessionCodeService sessionCodeService,
       SessionEngine engine,
+      SessionEventPublisher eventPublisher,
       SessionTimerScheduler timerScheduler,
-      GradingService gradingService) {
+      ScoringCorrectionService scoringCorrectionService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.questionRepository = questionRepository;
@@ -56,8 +56,9 @@ public class SessionService {
     this.liveStateService = liveStateService;
     this.sessionCodeService = sessionCodeService;
     this.engine = engine;
+    this.eventPublisher = eventPublisher;
     this.timerScheduler = timerScheduler;
-    this.gradingService = gradingService;
+    this.scoringCorrectionService = scoringCorrectionService;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -131,7 +132,7 @@ public class SessionService {
     liveStateService.activateSession(sessionId, first.id());
     liveStateService.initQuestionCounts(sessionId, first);
     liveStateService.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
-    engine.broadcastQuestionDisplayed(sessionId, first, snapshot);
+    eventPublisher.publishQuestionDisplayed(sessionId, first, snapshot);
     // Timer is NOT started — host will call /start-timer
   }
 
@@ -210,41 +211,9 @@ public class SessionService {
 
   // ─── Answer correction ────────────────────────────────────────────────────────
 
-  @Transactional
   public void correctScoring(
       Long sessionId, Long questionId, ScoringCorrectionRequest request, Long userId) {
-    QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
-    String sid = sessionId.toString();
-
-    // Allow correction during REVIEWING state or after session ends
-    if (session.getStatus() == SessionStatus.ACTIVE) {
-      String questionState = liveStateService.getQuestionState(sessionId);
-      if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
-        throw AppException.conflict(
-            "Scoring can only be corrected while reviewing or after session ends");
-      }
-    } else if (session.getStatus() != SessionStatus.ENDED) {
-      throw AppException.conflict(
-          "Scoring can only be corrected while reviewing or after session ends");
-    }
-
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    if (snapshot.findQuestion(questionId) == null) {
-      throw AppException.notFound("Question not found in session snapshot");
-    }
-
-    Map<Long, Integer> newPointValues =
-        request.options().stream()
-            .collect(
-                Collectors.toMap(
-                    ScoringCorrectionRequest.OptionScoring::optionId,
-                    ScoringCorrectionRequest.OptionScoring::pointValue));
-
-    QuizSnapshot updated =
-        snapshot.withCorrectedScoring(questionId, newPointValues, OffsetDateTime.now());
-    snapshotService.updateSnapshot(sid, sessionId, updated);
-
-    gradingService.regradeQuestion(sessionId, questionId);
+    scoringCorrectionService.correctScoring(sessionId, questionId, request, userId);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────

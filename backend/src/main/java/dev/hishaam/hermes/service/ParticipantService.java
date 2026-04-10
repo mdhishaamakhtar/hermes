@@ -9,10 +9,7 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
-import dev.hishaam.hermes.util.WsTopics;
 import java.util.List;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,32 +19,29 @@ public class ParticipantService {
   private final QuizSessionRepository sessionRepository;
   private final ParticipantRepository participantRepository;
   private final ParticipantAnswerRepository answerRepository;
-  private final SessionRedisHelper redisHelper;
   private final SessionSnapshotService snapshotService;
   private final SessionLiveStateService liveStateService;
   private final SessionCodeService sessionCodeService;
-  private final StringRedisTemplate redis;
-  private final SimpMessagingTemplate messaging;
+  private final SessionEventPublisher eventPublisher;
+  private final ParticipantRejoinTokenStore rejoinTokenStore;
 
   public ParticipantService(
       QuizSessionRepository sessionRepository,
       ParticipantRepository participantRepository,
       ParticipantAnswerRepository answerRepository,
-      SessionRedisHelper redisHelper,
       SessionSnapshotService snapshotService,
       SessionLiveStateService liveStateService,
       SessionCodeService sessionCodeService,
-      StringRedisTemplate redis,
-      SimpMessagingTemplate messaging) {
+      SessionEventPublisher eventPublisher,
+      ParticipantRejoinTokenStore rejoinTokenStore) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
-    this.redisHelper = redisHelper;
     this.snapshotService = snapshotService;
     this.liveStateService = liveStateService;
     this.sessionCodeService = sessionCodeService;
-    this.redis = redis;
-    this.messaging = messaging;
+    this.eventPublisher = eventPublisher;
+    this.rejoinTokenStore = rejoinTokenStore;
   }
 
   @Transactional
@@ -83,22 +77,14 @@ public class ParticipantService {
             .build();
     participant = participantRepository.save(participant);
 
-    redis
-        .opsForValue()
-        .set(
-            redisHelper.participantTokenKey(rejoinToken),
-            participant.getId().toString(),
-            SessionRedisHelper.REJOIN_TTL);
+    rejoinTokenStore.store(rejoinToken, participant.getId());
 
     long count = liveStateService.incrementParticipantCount(sessionId);
     liveStateService.cacheParticipantName(sessionId, participant.getId(), request.displayName());
     // Initialize with score 0 so zero-correct participants appear in leaderboard
     liveStateService.initLeaderboardEntry(sessionId, participant.getId());
 
-    messaging.convertAndSend(
-        WsTopics.sessionControl(sessionId), new WsPayloads.ParticipantJoined(count));
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId), new WsPayloads.ParticipantJoined(count));
+    eventPublisher.publishParticipantJoined(sessionId, count);
 
     return new JoinResponse(participant.getId(), rejoinToken, sessionId);
   }
@@ -171,36 +157,7 @@ public class ParticipantService {
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
   public Long resolveParticipantId(String rejoinToken, Long sessionId) {
-    String participantIdStr = redis.opsForValue().get(redisHelper.participantTokenKey(rejoinToken));
-    Long participantId = null;
-
-    if (participantIdStr != null) {
-      participantId = Long.parseLong(participantIdStr);
-    } else {
-      Participant p =
-          participantRepository
-              .findByRejoinToken(rejoinToken)
-              .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
-      participantId = p.getId();
-      redis
-          .opsForValue()
-          .set(
-              redisHelper.participantTokenKey(rejoinToken),
-              participantId.toString(),
-              SessionRedisHelper.REJOIN_TTL);
-    }
-
-    // Security: Verify that this participant actually belongs to the sessionId from the request
-    Participant p =
-        participantRepository
-            .findById(participantId)
-            .orElseThrow(() -> AppException.notFound("Participant not found"));
-
-    if (!p.getSession().getId().equals(sessionId)) {
-      throw AppException.notFound("Invalid rejoin token for this session");
-    }
-
-    return participantId;
+    return rejoinTokenStore.resolveParticipantId(rejoinToken, sessionId);
   }
 
   private RejoinResponse.CurrentQuestion buildCurrentQuestion(
