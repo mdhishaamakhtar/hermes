@@ -22,19 +22,17 @@ export interface QuestionCardData {
   totalLockedIn?: number;
   totalParticipants?: number;
   options: QuestionCardOption[];
-  passageText?: string | null;
+  /** Set when this question belongs to a passage; passage body is never rendered here. */
   passageId?: number | null;
 }
 
 export function QuestionCard({
   question,
   mode,
-  isInsidePassage,
   onEdit,
 }: {
   question: QuestionCardData;
   mode: "display" | "timed-live" | "timed-summary" | "review";
-  isInsidePassage?: boolean;
   onEdit?: () => void;
 }) {
   const showMetrics = mode !== "display";
@@ -55,22 +53,13 @@ export function QuestionCard({
                 {question.timeLimitSeconds}s time limit
               </span>
             )}
-            {question.passageText ? (
+            {question.passageId != null ? (
               <CardBadge tone="accent">Passage</CardBadge>
             ) : null}
           </div>
           <h2 className="text-2xl font-bold leading-snug text-foreground">
             {question.text}
           </h2>
-          {question.passageText && mode === "review" && !isInsidePassage ? (
-            <div className="mt-4 border border-border bg-background p-4">
-              <p className="label mb-3 text-warning">Passage</p>
-              <div
-                className="prose prose-invert max-w-3xl text-sm leading-7 text-muted prose-p:my-0 prose-p:leading-7"
-                dangerouslySetInnerHTML={{ __html: question.passageText }}
-              />
-            </div>
-          ) : null}
         </div>
 
         <div className="flex shrink-0 items-start gap-3">

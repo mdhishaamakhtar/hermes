@@ -199,7 +199,6 @@ public class SessionEngine {
 
   @Transactional
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
-    String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
 
     // Freeze and GRADE any outstanding answers before ending

@@ -6,6 +6,7 @@ import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +70,12 @@ public class GradingService {
       if (question == null) continue;
 
       Map<Long, Integer> scores = gradeAndSave(sessionId, subQuestionId, question, timerStartedAt);
-      scores.forEach((pid, s) -> totalScores.merge(pid, s, Integer::sum));
+      scores.forEach(
+          (pid, s) ->
+              totalScores.merge(
+                  pid,
+                  s,
+                  (a, b) -> Integer.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
     }
 
     // Single leaderboard update for the whole passage

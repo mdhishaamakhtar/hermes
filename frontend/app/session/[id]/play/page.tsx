@@ -6,12 +6,18 @@ import { useParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import Spinner from "@/components/Spinner";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
+import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
 import { ParticipantQuestionCard } from "@/components/session/ParticipantQuestionCard";
+import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
 import { enterAnimation } from "@/lib/design-tokens";
-import { formatTime, formatParticipantCount } from "@/lib/session-utils";
+import {
+  formatCountdownClock,
+  formatParticipantCountPhrase,
+} from "@/lib/session-utils";
+import { passageTimerModeLabel } from "@/components/quizzes/editor-model";
 import {
   formatQuestionSpanLabel,
-  sumQuestionPoints,
+  sumVisibleQuestionsPoints,
   usePlaySession,
 } from "@/features/session/play/usePlaySession";
 
@@ -38,6 +44,9 @@ export default function PlayPage() {
     leaderboardRows,
     lockableQuestions,
     canLockAll,
+    anyLockInPending,
+    lockInPendingByQuestionId,
+    timerBarLimitSeconds,
     handleToggleOption,
     handleLockIn,
     handleLockAll,
@@ -60,9 +69,12 @@ export default function PlayPage() {
             <Logo size="sm" />
             <div className="flex items-center gap-3">
               <span className="label text-warning">Lobby</span>
-              <span className="text-xs text-muted tabular-nums">
-                {participantCount} participants
-              </span>
+              <LiveParticipantCount
+                count={participantCount}
+                caption={formatParticipantCountPhrase(participantCount)}
+                size="sm"
+                layout="inline"
+              />
             </div>
           </div>
         </header>
@@ -81,10 +93,15 @@ export default function PlayPage() {
               starts the timer, the first question will slide into place here.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs text-muted">
-              <span className="label">Live session</span>
-              <span className="text-muted/40">·</span>
-              <span className="tabular-nums">{participantCount} joined</span>
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <span className="label text-accent">Live session</span>
+              <LiveParticipantCount
+                count={participantCount}
+                caption="joined"
+                size="lg"
+                layout="stack"
+                className="w-full max-w-xs"
+              />
             </div>
           </motion.div>
         </main>
@@ -121,8 +138,8 @@ export default function PlayPage() {
           : "Review";
 
   const focusedScore =
-    questionLifecycle === "REVIEWING" && activeQuestions.length === 1
-      ? sumQuestionPoints(activeQuestions[0])
+    questionLifecycle === "REVIEWING" && activeQuestions.length > 0
+      ? sumVisibleQuestionsPoints(activeQuestions)
       : null;
 
   return (
@@ -132,19 +149,20 @@ export default function PlayPage() {
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             <span className="label">{headerStatus}</span>
-            <span className="text-xs text-muted tabular-nums">
-              {formatParticipantCount(participantCount)}
-            </span>
+            <LiveParticipantCount
+              count={participantCount}
+              caption={formatParticipantCountPhrase(participantCount)}
+              size="sm"
+              layout="inline"
+            />
           </div>
         </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
-          <motion.section
-            {...enterAnimation}
-            className="border border-border bg-surface p-6"
-          >
+          {/* Plain section: Framer enterAnimation on a parent applies transform and breaks %-width timer fills */}
+          <section className="border border-border bg-surface p-6">
             <div className="flex flex-wrap items-center gap-3">
               <span className="label tabular-nums">
                 {currentQuestionsLabel}
@@ -170,40 +188,46 @@ export default function PlayPage() {
                     color: timerColour,
                   }}
                 >
-                  {formatTime(timeLeft ?? 0)}
+                  {formatCountdownClock(timeLeft, questionLifecycle)}
                 </div>
               </div>
 
-              <div className="w-full max-w-sm">
-                <div className="h-1 bg-border">
+              <div className="min-w-0 w-full max-w-sm shrink">
+                <div className="h-1 min-w-[10rem] overflow-hidden bg-border">
                   <motion.div
-                    className="h-full origin-left"
+                    key={`${questionLifecycle}-${timerBarLimitSeconds}`}
+                    className="h-full max-w-full"
+                    initial={false}
                     animate={{
-                      scaleX:
-                        timeLeft !== null &&
-                        activeQuestions[0]?.timeLimitSeconds
-                          ? Math.max(
-                              0,
-                              timeLeft / activeQuestions[0].timeLimitSeconds,
-                            )
-                          : 0,
+                      width: `${Math.max(
+                        0,
+                        Math.min(
+                          100,
+                          questionLifecycle === "TIMED" &&
+                            timeLeft !== null &&
+                            timerBarLimitSeconds > 0
+                            ? (timeLeft / timerBarLimitSeconds) * 100
+                            : 0,
+                        ),
+                      )}%`,
                     }}
-                    transition={{ duration: 0.25 }}
-                    style={{
-                      backgroundColor: timerColour,
-                      willChange: "transform",
-                    }}
+                    transition={{ duration: 1, ease: "linear" }}
+                    style={{ backgroundColor: timerColour }}
                   />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs text-muted">
-                  <span>{activePassage?.timerMode ?? "single question"}</span>
+                  <span>
+                    {activePassage
+                      ? passageTimerModeLabel(activePassage.timerMode)
+                      : "Standalone question"}
+                  </span>
                   <span className="tabular-nums">
-                    {activeQuestions[0].timeLimitSeconds || 0}s
+                    {timerBarLimitSeconds || 0}s
                   </span>
                 </div>
               </div>
             </div>
-          </motion.section>
+          </section>
 
           {activePassage ? (
             <motion.section
@@ -253,6 +277,9 @@ export default function PlayPage() {
                   <ParticipantQuestionCard
                     question={question}
                     lifecycle={questionLifecycle}
+                    lockInPending={Boolean(
+                      lockInPendingByQuestionId[question.id],
+                    )}
                     onToggleOption={handleToggleOption}
                     onLockIn={handleLockIn}
                   />
@@ -264,6 +291,9 @@ export default function PlayPage() {
               <ParticipantQuestionCard
                 question={activeQuestions[0]}
                 lifecycle={questionLifecycle}
+                lockInPending={Boolean(
+                  lockInPendingByQuestionId[activeQuestions[0].id],
+                )}
                 onToggleOption={handleToggleOption}
                 onLockIn={handleLockIn}
               />
@@ -318,12 +348,19 @@ export default function PlayPage() {
                   <button
                     type="button"
                     onClick={handleLockAll}
-                    disabled={!canLockAll}
-                    className="btn-primary"
+                    disabled={!canLockAll || anyLockInPending}
+                    className={`relative overflow-hidden btn-primary ${anyLockInPending ? "btn-lock-in-pending" : ""}`}
                   >
-                    {activePassage?.timerMode === "ENTIRE_PASSAGE"
-                      ? "Lock In All"
-                      : "Lock In"}
+                    {anyLockInPending ? (
+                      <LockInPendingOverlay tone="primary" />
+                    ) : null}
+                    <span className="relative z-[var(--z-raised)]">
+                      {anyLockInPending
+                        ? "Locking…"
+                        : activePassage?.timerMode === "ENTIRE_PASSAGE"
+                          ? "Lock In All"
+                          : "Lock In"}
+                    </span>
                   </button>
                   <p className="text-xs text-muted">
                     {activePassage?.timerMode === "ENTIRE_PASSAGE"
@@ -334,7 +371,9 @@ export default function PlayPage() {
               ) : questionLifecycle === "REVIEWING" ? (
                 <p className="text-xs text-muted">
                   {focusedScore !== null
-                    ? `You scored ${focusedScore} points on the current question.`
+                    ? activeQuestions.length > 1
+                      ? `You scored ${focusedScore} points across these questions.`
+                      : `You scored ${focusedScore} points on this question.`
                     : "Scores are being recalculated."}
                 </p>
               ) : (
@@ -445,7 +484,7 @@ export default function PlayPage() {
               <div className="flex items-center justify-between gap-4">
                 <span>Timer</span>
                 <span className="text-foreground tabular-nums">
-                  {formatTime(timeLeft ?? 0)}
+                  {formatCountdownClock(timeLeft, questionLifecycle)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
@@ -472,12 +511,16 @@ export default function PlayPage() {
                       lineHeight: 1,
                     }}
                   >
-                    {sumQuestionPoints(activeQuestions[0]).toLocaleString()}
+                    {sumVisibleQuestionsPoints(
+                      activeQuestions,
+                    ).toLocaleString()}
                   </div>
                   <p className="mt-2 text-xs text-muted">Points earned</p>
                 </div>
                 <span className="label text-success">
-                  {activeQuestions[0].reviewed ? "Reviewed" : "Pending"}
+                  {activeQuestions.every((q) => q.reviewed)
+                    ? "Reviewed"
+                    : "Pending"}
                 </span>
               </div>
             </motion.section>

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
 import { colorRgb } from "@/lib/design-tokens";
 import { optionLabel } from "@/lib/session-utils";
 import type { QuestionType } from "@/lib/types";
@@ -13,7 +14,7 @@ interface ParticipantQuestionCardQuestion {
   questionIndex: number;
   timeLimitSeconds: number;
   questionType: QuestionType;
-  passageText: string | null;
+  passageId: number | null;
   options: Array<{ id: number; text: string; orderIndex: number }>;
   selectedOptionIds: number[];
   lockedIn: boolean;
@@ -28,6 +29,7 @@ interface ParticipantQuestionCardQuestion {
 interface ParticipantQuestionCardProps {
   question: ParticipantQuestionCardQuestion;
   lifecycle: QuestionLifecycle;
+  lockInPending?: boolean;
   onToggleOption: (questionId: number, optionId: number) => void;
   onLockIn: (questionId: number) => void;
 }
@@ -59,11 +61,13 @@ function currentQuestionLabel(
 export function ParticipantQuestionCard({
   question,
   lifecycle,
+  lockInPending = false,
   onToggleOption,
   onLockIn,
 }: ParticipantQuestionCardProps) {
   const resolved = lifecycle === "REVIEWING" || question.reviewed;
-  const interactive = lifecycle === "TIMED" && !question.lockedIn;
+  const interactive =
+    lifecycle === "TIMED" && !question.lockedIn && !lockInPending;
   const maxCount = Math.max(
     1,
     ...question.options.map((option) => question.counts[option.id] ?? 0),
@@ -86,7 +90,7 @@ export function ParticipantQuestionCard({
                 <span className="label text-accent">Multi-select</span>
               </>
             ) : null}
-            {question.passageText ? (
+            {question.passageId != null ? (
               <>
                 <span className="text-xs text-muted/40">·</span>
                 <span className="label text-warning">Passage</span>
@@ -115,9 +119,15 @@ export function ParticipantQuestionCard({
           const meta = optionLabel(index);
           const count = question.counts[option.id] ?? 0;
           const isSelected = question.selectedOptionIds.includes(option.id);
-          const isCorrect = question.correctOptionIds.includes(option.id);
-          const isWrongSelected = resolved && isSelected && !isCorrect;
           const pointValue = question.optionPoints[option.id] ?? 0;
+          const hasReviewPoints =
+            resolved && Object.keys(question.optionPoints).length > 0;
+          const isCorrect = resolved
+            ? hasReviewPoints
+              ? pointValue > 0
+              : question.correctOptionIds.includes(option.id)
+            : false;
+          const isWrongSelected = resolved && isSelected && !isCorrect;
           const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
 
           const chosenCorrect = resolved && isCorrect && isSelected;
@@ -126,7 +136,7 @@ export function ParticipantQuestionCard({
           const bgStyle = chosenCorrect
             ? `rgba(${colorRgb.success},0.15)`
             : missedCorrect
-              ? `rgba(${colorRgb.success},0.06)`
+              ? `rgba(${colorRgb.success},0.14)`
               : isWrongSelected
                 ? `rgba(${colorRgb.danger},0.1)`
                 : isSelected
@@ -136,7 +146,7 @@ export function ParticipantQuestionCard({
           const borderColor = chosenCorrect
             ? `rgba(${colorRgb.success},0.8)`
             : missedCorrect
-              ? `rgba(${colorRgb.success},0.3)`
+              ? `rgba(${colorRgb.success},0.65)`
               : isWrongSelected
                 ? `rgba(${colorRgb.danger},0.6)`
                 : isSelected
@@ -154,7 +164,7 @@ export function ParticipantQuestionCard({
                       color: chosenCorrect
                         ? "var(--color-success)"
                         : missedCorrect
-                          ? `rgba(${colorRgb.success},0.55)`
+                          ? "var(--color-success)"
                           : isWrongSelected
                             ? "var(--color-danger)"
                             : isSelected
@@ -189,9 +199,7 @@ export function ParticipantQuestionCard({
                   {chosenCorrect ? (
                     <span className="text-success">✓</span>
                   ) : missedCorrect ? (
-                    <span style={{ color: `rgba(${colorRgb.success},0.55)` }}>
-                      ○
-                    </span>
+                    <span className="text-success">○</span>
                   ) : isWrongSelected ? (
                     <span className="text-danger">✕</span>
                   ) : null}
@@ -213,9 +221,11 @@ export function ParticipantQuestionCard({
                 />
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
-                <span>{interactive ? "Tap to change" : "Locked"}</span>
-              </div>
+              {interactive ? (
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
+                  <span>Tap to change</span>
+                </div>
+              ) : null}
             </>
           );
 
@@ -273,13 +283,16 @@ export function ParticipantQuestionCard({
           <button
             type="button"
             onClick={() => onLockIn(question.id)}
-            disabled={question.selectedOptionIds.length === 0}
-            className="border border-border px-4 py-2 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={question.selectedOptionIds.length === 0 || lockInPending}
+            className={`relative overflow-hidden border border-border px-4 py-2 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed ${lockInPending ? "btn-lock-in-pending" : "disabled:opacity-40"}`}
           >
-            Lock In
+            {lockInPending ? <LockInPendingOverlay tone="surface" /> : null}
+            <span className="relative z-[var(--z-raised)]">
+              {lockInPending ? "Locking…" : "Lock In"}
+            </span>
           </button>
-        ) : question.lockedIn ? (
-          <span className="label text-success">Locked</span>
+        ) : lifecycle === "TIMED" && question.lockedIn ? (
+          <span className="label text-success">Locked in</span>
         ) : null}
       </div>
     </article>

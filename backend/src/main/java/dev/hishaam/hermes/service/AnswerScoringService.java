@@ -55,7 +55,7 @@ public class AnswerScoringService {
             participantTotals.merge(
                 answer.getParticipantId(),
                 Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
-                Long::sum));
+                (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
     return participantTotals;
   }
 

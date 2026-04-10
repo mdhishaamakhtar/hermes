@@ -12,7 +12,12 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
-import { normalizeCounts, normalizePoints } from "@/lib/session-utils";
+import { WS_ACK_TIMEOUT_MS } from "@/lib/session-constants";
+import {
+  normalizeCounts,
+  normalizeIdList,
+  normalizePoints,
+} from "@/lib/session-utils";
 import {
   getStoredRejoinToken,
   removeStoredRejoinToken,
@@ -45,7 +50,6 @@ export interface ParticipantQuestion {
   timeLimitSeconds: number;
   questionType: QuestionType;
   effectiveDisplayMode: DisplayMode;
-  passageText: string | null;
   options: ParticipantOption[];
   selectedOptionIds: number[];
   lockedIn: boolean;
@@ -222,6 +226,8 @@ export interface PlaySessionState {
   questions: ParticipantQuestion[];
   passage: ParticipantPassage | null;
   timeLeft: number | null;
+  /** Set from TIMER_START; used for the progress bar when passage/questions still have 0/null limits. */
+  liveTimerLimitSeconds: number | null;
   leaderboard: LeaderboardEntry[];
   participantLeaderboard: ParticipantLeaderboardEntry[];
   finalLeaderboard: LeaderboardEntry[];
@@ -262,7 +268,8 @@ export type PlaySessionAction =
       message: string;
     }
   | { type: "SET_SELECTION"; questionId: number; selectedOptionIds: number[] }
-  | { type: "LOCKED_IN"; questionId: number };
+  | { type: "LOCKED_IN"; questionId: number }
+  | { type: "LOCK_IN_ROLLBACK"; questionId: number };
 
 function normalizeSelectionIds(selectedOptionIds: number[]) {
   return selectedOptionIds.toSorted((a, b) => a - b);
@@ -297,6 +304,11 @@ export function sumQuestionPoints(question: ParticipantQuestion) {
   );
 }
 
+/** Total points for every question currently visible (e.g. full passage block). */
+export function sumVisibleQuestionsPoints(questions: ParticipantQuestion[]) {
+  return questions.reduce((sum, q) => sum + sumQuestionPoints(q), 0);
+}
+
 function buildQuestionFromDisplayed(
   question: SessionQuestionDisplayedMsg,
 ): ParticipantQuestion {
@@ -309,7 +321,6 @@ function buildQuestionFromDisplayed(
     questionType: question.questionType,
     effectiveDisplayMode: question.effectiveDisplayMode,
     passageId: question.passage?.id ?? null,
-    passageText: question.passage?.text ?? null,
     options: question.options.toSorted(
       (a: { orderIndex: number }, b: { orderIndex: number }) =>
         a.orderIndex - b.orderIndex,
@@ -331,7 +342,6 @@ function buildQuestionFromPassageSubQuestion(
   question: SubQuestion,
   questionIndex: number,
   totalQuestions: number,
-  passageText: string | null,
   timeLimitSeconds: number,
   effectiveDisplayMode: DisplayMode,
   passageId: number,
@@ -344,8 +354,7 @@ function buildQuestionFromPassageSubQuestion(
     timeLimitSeconds,
     questionType: question.questionType,
     effectiveDisplayMode,
-    passageId: passageId,
-    passageText,
+    passageId,
     options: question.options.toSorted(
       (a: ParticipantOption, b: ParticipantOption) =>
         a.orderIndex - b.orderIndex,
@@ -366,7 +375,6 @@ function buildQuestionFromPassageSubQuestion(
 function buildQuestionFromRejoin(
   question: RejoinCurrentQuestion | RejoinCurrentPassageQuestion,
   totalQuestions: number,
-  passageText: string | null,
   effectiveDisplayMode: DisplayMode,
   passageIdFromContext: number | null = null,
   timeLimitSecondsOverride?: number,
@@ -384,7 +392,6 @@ function buildQuestionFromRejoin(
     questionType: question.questionType,
     effectiveDisplayMode,
     passageId: pId,
-    passageText,
     options: question.options.toSorted(
       (a: { orderIndex: number }, b: { orderIndex: number }) =>
         a.orderIndex - b.orderIndex,
@@ -436,6 +443,7 @@ export function initPlaySessionState(
     questions: [],
     passage: null,
     timeLeft: null,
+    liveTimerLimitSeconds: null,
     leaderboard: [],
     participantLeaderboard: [],
     finalLeaderboard: [],
@@ -470,7 +478,6 @@ export function playSessionReducer(
           buildQuestionFromRejoin(
             subQuestion,
             currentPassage.totalQuestions,
-            currentPassage.text,
             currentPassage.effectiveDisplayMode,
             currentPassage.id,
             currentPassage.timeLimitSeconds ?? subQuestion.timeLimitSeconds,
@@ -492,27 +499,32 @@ export function playSessionReducer(
           buildQuestionFromRejoin(
             data.currentQuestion,
             data.currentQuestion.totalQuestions,
-            data.currentQuestion.passage?.text ?? null,
             data.currentQuestion.effectiveDisplayMode,
+            data.currentQuestion.passage?.id ?? null,
           ),
         ];
       }
 
+      const questionLifecycle =
+        (data.questionLifecycle as QuestionLifecycle) || "DISPLAYED";
       return {
         ...state,
         participantId: data.participantId,
         sessionTitle: data.sessionTitle || "Live Session",
         participantCount: data.participantCount || 0,
         sessionState: (data.status as SessionState) || "LOBBY",
-        questionLifecycle:
-          (data.questionLifecycle as QuestionLifecycle) || "DISPLAYED",
-        timeLeft: data.timeLeftSeconds ?? null,
+        questionLifecycle,
+        timeLeft:
+          questionLifecycle === "DISPLAYED"
+            ? null
+            : (data.timeLeftSeconds ?? null),
         leaderboard: [],
         participantLeaderboard: [],
         finalLeaderboard: [],
         passage,
         questions,
         hydrated: true,
+        liveTimerLimitSeconds: null,
       };
     }
     case "HYDRATED":
@@ -540,7 +552,8 @@ export function playSessionReducer(
             }
           : null,
         questions: [buildQuestionFromDisplayed(data)],
-        timeLeft: 0,
+        timeLeft: null,
+        liveTimerLimitSeconds: null,
       };
     }
     case "PASSAGE_DISPLAYED": {
@@ -568,13 +581,13 @@ export function playSessionReducer(
             question,
             data.questionIndex + index,
             data.totalQuestions,
-            data.passageText,
             data.timeLimitSeconds ?? 0,
             data.effectiveDisplayMode,
             data.passageId,
           ),
         ),
-        timeLeft: 0,
+        timeLeft: null,
+        liveTimerLimitSeconds: null,
       };
     }
     case "SESSION_END":
@@ -582,6 +595,7 @@ export function playSessionReducer(
         ...state,
         sessionState: "ENDED",
         finalLeaderboard: action.leaderboard ?? state.finalLeaderboard,
+        liveTimerLimitSeconds: null,
       };
     case "TIMER_START":
       return {
@@ -589,12 +603,14 @@ export function playSessionReducer(
         sessionState: "ACTIVE",
         questionLifecycle: "TIMED",
         timeLeft: action.timeLimitSeconds,
+        liveTimerLimitSeconds: action.timeLimitSeconds,
       };
     case "QUESTION_FROZEN":
       return {
         ...state,
         questionLifecycle: "FROZEN",
         timeLeft: 0,
+        liveTimerLimitSeconds: null,
         questions: state.questions.map((question) => {
           const shouldFreeze =
             action.message.event === "PASSAGE_FROZEN" ||
@@ -602,17 +618,26 @@ export function playSessionReducer(
           return shouldFreeze ? { ...question, lockedIn: true } : question;
         }),
       };
-    case "QUESTION_REVIEWED":
+    case "QUESTION_REVIEWED": {
+      const optionPoints = normalizePoints(action.optionPoints);
+      const fromPoints = Object.entries(optionPoints)
+        .filter(([, pts]) => pts > 0)
+        .map(([id]) => Number(id));
+      const mergedCorrect =
+        fromPoints.length > 0
+          ? fromPoints
+          : normalizeIdList(action.correctOptionIds);
       return {
         ...state,
         questionLifecycle: "REVIEWING",
         questions: updateQuestion(state.questions, action.questionId, {
-          correctOptionIds: action.correctOptionIds,
-          optionPoints: normalizePoints(action.optionPoints),
+          correctOptionIds: mergedCorrect,
+          optionPoints,
           reviewed: true,
           lockedIn: true,
         }),
       };
+    }
     case "PARTICIPANT_LEADERBOARD":
       return {
         ...state,
@@ -667,6 +692,15 @@ export function playSessionReducer(
             : question,
         ),
       };
+    case "LOCK_IN_ROLLBACK":
+      return {
+        ...state,
+        questions: state.questions.map((question) =>
+          question.id === action.questionId
+            ? { ...question, lockedIn: false }
+            : question,
+        ),
+      };
   }
 }
 
@@ -690,6 +724,7 @@ export function usePlaySession(sessionId: string) {
     questions,
     passage,
     timeLeft,
+    liveTimerLimitSeconds,
     leaderboard,
     participantLeaderboard,
     finalLeaderboard,
@@ -717,6 +752,10 @@ export function usePlaySession(sessionId: string) {
       }
     >(),
   );
+
+  const [lockInPendingByQuestionId, setLockInPendingByQuestionId] = useState<
+    Record<number, true>
+  >({});
 
   const authToken = getStoredAuthToken();
 
@@ -840,9 +879,9 @@ export function usePlaySession(sessionId: string) {
       ) {
         dispatch({
           type: "QUESTION_REVIEWED",
-          questionId: data.questionId,
-          correctOptionIds: data.correctOptionIds,
-          optionPoints: data.optionPoints,
+          questionId: Number(data.questionId),
+          correctOptionIds: normalizeIdList(data.correctOptionIds ?? []),
+          optionPoints: normalizePoints(data.optionPoints ?? {}),
         });
         return;
       }
@@ -926,11 +965,17 @@ export function usePlaySession(sessionId: string) {
     0,
   );
   const timerColour =
-    timeLeft !== null && timeLeft > 0 && timeLeft <= 5
-      ? "var(--color-danger)"
-      : timeLeft !== null && timeLeft > 0 && timeLeft <= 10
-        ? "var(--color-warning)"
-        : "var(--color-foreground)";
+    questionLifecycle === "DISPLAYED" || timeLeft === null
+      ? "var(--color-muted)"
+      : questionLifecycle === "TIMED" && timeLeft > 0
+        ? timeLeft <= 5
+          ? "var(--color-danger)"
+          : timeLeft <= 10
+            ? "var(--color-warning)"
+            : "var(--color-foreground)"
+        : questionLifecycle === "TIMED" && timeLeft <= 0
+          ? "var(--color-danger)"
+          : "var(--color-muted)";
 
   const leaderboardRows = useMemo(() => {
     const source = finalLeaderboard.length ? finalLeaderboard : leaderboard;
@@ -961,6 +1006,23 @@ export function usePlaySession(sessionId: string) {
 
   const canLockAll = lockableQuestions.length > 0;
 
+  const anyLockInPending = useMemo(
+    () => Object.keys(lockInPendingByQuestionId).length > 0,
+    [lockInPendingByQuestionId],
+  );
+
+  const timerBarLimitSeconds = useMemo(() => {
+    if (liveTimerLimitSeconds != null && liveTimerLimitSeconds > 0) {
+      return liveTimerLimitSeconds;
+    }
+    const first = activeQuestions[0];
+    if (!first) return 0;
+    if (activePassage?.timerMode === "ENTIRE_PASSAGE") {
+      return activePassage.timeLimitSeconds ?? first.timeLimitSeconds ?? 0;
+    }
+    return first.timeLimitSeconds ?? 0;
+  }, [activePassage, activeQuestions, liveTimerLimitSeconds]);
+
   const waitForAnswerAck = useCallback((clientRequestId: string) => {
     return new Promise<{ success: boolean; code?: string; message?: string }>(
       (resolve) => {
@@ -971,7 +1033,7 @@ export function usePlaySession(sessionId: string) {
             code: "TIMEOUT",
             message: "Realtime confirmation timed out",
           });
-        }, 2500);
+        }, WS_ACK_TIMEOUT_MS);
 
         pendingAckResolversRef.current.set(clientRequestId, {
           resolve,
@@ -1028,10 +1090,19 @@ export function usePlaySession(sessionId: string) {
         },
       );
       if (!response.success) {
+        const err = response.error;
+        if (
+          err?.code === "CONFLICT" &&
+          typeof err.message === "string" &&
+          err.message.toLowerCase().includes("frozen")
+        ) {
+          dispatch({ type: "SYNC_STATUS", status: "idle", message: "" });
+          return true;
+        }
         dispatch({
           type: "SYNC_STATUS",
           status: "error",
-          message: response.error?.message ?? "Failed to lock in answer",
+          message: err?.message ?? "Failed to lock in answer",
         });
         void loadSessionContext();
         return false;
@@ -1092,13 +1163,15 @@ export function usePlaySession(sessionId: string) {
 
             const ack = await Promise.race([
               ackPromise,
-              new Promise<{ success: boolean; code?: string; message?: string }>(
-                (resolveInterrupt) => {
-                  syncInterruptRef.current.set(questionId, () =>
-                    resolveInterrupt({ success: true, code: "SUPERSEDED" }),
-                  );
-                },
-              ),
+              new Promise<{
+                success: boolean;
+                code?: string;
+                message?: string;
+              }>((resolveInterrupt) => {
+                syncInterruptRef.current.set(questionId, () =>
+                  resolveInterrupt({ success: true, code: "SUPERSEDED" }),
+                );
+              }),
             ]);
             if (!ack.success && ack.code === "TIMEOUT") {
               const fallbackSucceeded = await fallbackSubmitAnswer(
@@ -1156,6 +1229,7 @@ export function usePlaySession(sessionId: string) {
   const handleToggleOption = useCallback(
     (questionId: number, optionId: number) => {
       if (questionLifecycle !== "TIMED" || !rejoinToken) return;
+      if (lockInPendingByQuestionId[questionId]) return;
 
       const question = questions.find((entry) => entry.id === questionId);
       if (!question || question.lockedIn) return;
@@ -1191,7 +1265,13 @@ export function usePlaySession(sessionId: string) {
         });
       void syncAnswerSelection(questionId);
     },
-    [questionLifecycle, questions, rejoinToken, syncAnswerSelection],
+    [
+      lockInPendingByQuestionId,
+      questionLifecycle,
+      questions,
+      rejoinToken,
+      syncAnswerSelection,
+    ],
   );
 
   const handleLockIn = useCallback(
@@ -1202,49 +1282,75 @@ export function usePlaySession(sessionId: string) {
       if (
         !question ||
         question.lockedIn ||
-        question.selectedOptionIds.length === 0
+        question.selectedOptionIds.length === 0 ||
+        lockInPendingByQuestionId[questionId]
       ) {
         return;
       }
 
-      pendingSelectionsRef.current.set(
-        questionId,
-        normalizeSelectionIds(question.selectedOptionIds),
-      );
-      dispatch({
-        type: "SYNC_STATUS",
-        status: "saving",
-        message: "Saving answer.",
-      });
-      const synced = await syncAnswerSelection(questionId);
-      if (!synced) return;
-
-      const clientRequestId = createClientRequestId();
-      const ackPromise = waitForAnswerAck(clientRequestId);
-      publish(`/app/session/${sessionId}/lock-in`, {
-        rejoinToken,
-        questionId,
-        clientRequestId,
-      });
-
-      const ack = await ackPromise;
-      if (!ack.success && ack.code === "TIMEOUT") {
-        const fallbackSucceeded = await fallbackLockIn(questionId);
-        if (!fallbackSucceeded) {
-          return;
-        }
-      } else if (!ack.success) {
+      setLockInPendingByQuestionId((prev) => ({ ...prev, [questionId]: true }));
+      try {
+        pendingSelectionsRef.current.set(
+          questionId,
+          normalizeSelectionIds(question.selectedOptionIds),
+        );
         dispatch({
           type: "SYNC_STATUS",
-          status: "error",
-          message: ack.message ?? "Failed to lock in answer",
+          status: "saving",
+          message: "Saving answer.",
         });
-        void loadSessionContext();
-        return;
-      }
+        const synced = await syncAnswerSelection(questionId);
+        if (!synced) {
+          dispatch({ type: "SYNC_STATUS", status: "idle", message: "" });
+          return;
+        }
 
-      dispatch({ type: "SYNC_STATUS", status: "idle", message: "" });
-      dispatch({ type: "LOCKED_IN", questionId });
+        const clientRequestId = createClientRequestId();
+        const ackPromise = waitForAnswerAck(clientRequestId);
+        publish(`/app/session/${sessionId}/lock-in`, {
+          rejoinToken,
+          questionId,
+          clientRequestId,
+        });
+
+        dispatch({ type: "LOCKED_IN", questionId });
+        dispatch({ type: "SYNC_STATUS", status: "idle", message: "" });
+        setLockInPendingByQuestionId((prev) => {
+          const next = { ...prev };
+          delete next[questionId];
+          return next;
+        });
+
+        const ack = await ackPromise;
+        if (!ack.success && ack.code === "TIMEOUT") {
+          const fallbackSucceeded = await fallbackLockIn(questionId);
+          if (!fallbackSucceeded) {
+            dispatch({ type: "LOCK_IN_ROLLBACK", questionId });
+            dispatch({
+              type: "SYNC_STATUS",
+              status: "error",
+              message: "Could not confirm lock-in. Check your connection.",
+            });
+            void loadSessionContext();
+            return;
+          }
+        } else if (!ack.success) {
+          dispatch({ type: "LOCK_IN_ROLLBACK", questionId });
+          dispatch({
+            type: "SYNC_STATUS",
+            status: "error",
+            message: ack.message ?? "Failed to lock in answer",
+          });
+          void loadSessionContext();
+          return;
+        }
+      } finally {
+        setLockInPendingByQuestionId((prev) => {
+          const next = { ...prev };
+          delete next[questionId];
+          return next;
+        });
+      }
     },
     [
       fallbackLockIn,
@@ -1255,6 +1361,7 @@ export function usePlaySession(sessionId: string) {
       sessionId,
       syncAnswerSelection,
       waitForAnswerAck,
+      lockInPendingByQuestionId,
     ],
   );
 
@@ -1294,6 +1401,9 @@ export function usePlaySession(sessionId: string) {
     topFive,
     lockableQuestions,
     canLockAll,
+    anyLockInPending,
+    lockInPendingByQuestionId,
+    timerBarLimitSeconds,
     handleToggleOption,
     handleLockIn,
     handleLockAll,

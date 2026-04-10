@@ -210,11 +210,7 @@ export default function ResultsPage() {
                     </div>
                     <div className="divide-y divide-border/50">
                       {group.questions.map((q) => (
-                        <QuestionResultCard
-                          key={q.questionId}
-                          question={q}
-                          isInsidePassage
-                        />
+                        <QuestionResultCard key={q.questionId} question={q} />
                       ))}
                     </div>
                   </motion.div>

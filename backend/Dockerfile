@@ -1,4 +1,4 @@
-FROM eclipse-temurin:25-jdk-alpine AS builder
+FROM eclipse-temurin:25-jdk-jammy AS builder
 WORKDIR /app
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
@@ -6,9 +6,8 @@ RUN ./mvnw dependency:go-offline -q
 COPY src/ src/
 RUN ./mvnw package -DskipTests -q
 
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
-RUN apk add --no-cache wget
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

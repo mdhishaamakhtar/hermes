@@ -7,6 +7,7 @@ import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
+import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
@@ -119,7 +120,7 @@ public class SessionService {
     // Check if the first question belongs to an ENTIRE_PASSAGE passage
     if (first.passageId() != null) {
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(first.passageId());
-      if (passage != null && "ENTIRE_PASSAGE".equals(passage.timerMode())) {
+      if (passage != null && passage.timerMode() == PassageTimerMode.ENTIRE_PASSAGE) {
         // activateSession sets ACTIVE status; clear current_question so advanceSessionInternal
         // treats it as "no current question" and finds the first question (min orderIndex).
         liveStateService.activateSession(sessionId, first.id());

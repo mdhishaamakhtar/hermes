@@ -98,7 +98,7 @@ public class SessionResultsService {
             scores.merge(
                 answer.getParticipantId(),
                 (long) (answer.getScore() != null ? answer.getScore() : 0),
-                Long::sum));
+                (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
 
     List<Long> sortedIds =
         scores.entrySet().stream()
@@ -194,7 +194,14 @@ public class SessionResultsService {
                           answer
                               .getSelectedOptions()
                               .forEach(
-                                  option -> optionCounts.merge(option.getId(), 1L, Long::sum)));
+                                  option ->
+                                      optionCounts.merge(
+                                          option.getId(),
+                                          1L,
+                                          (a, b) ->
+                                              Long.sum(
+                                                  Objects.requireNonNull(a),
+                                                  Objects.requireNonNull(b)))));
 
                   long totalAnswers =
                       questionAnswers.stream()
@@ -240,7 +247,7 @@ public class SessionResultsService {
             scores.merge(
                 answer.getParticipantId(),
                 Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
-                Long::sum));
+                (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
 
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
         LeaderboardBuilder.rank(scores, displayNames);

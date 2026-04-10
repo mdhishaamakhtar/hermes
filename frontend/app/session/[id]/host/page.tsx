@@ -8,10 +8,16 @@ import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { CardBadge } from "@/components/session/CardBadge";
 import { QuestionCard } from "@/components/session/QuestionCard";
 import { ScoringDrawer } from "@/components/session/ScoringDrawer";
-import { formatTime, formatParticipantCount } from "@/lib/session-utils";
+import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import {
+  formatCountdownClock,
+  formatParticipantCountPhrase,
+} from "@/lib/session-utils";
 import { enterAnimation } from "@/lib/design-tokens";
+import type { SessionResults } from "@/lib/types";
 import {
   buildActiveQuestionCard,
+  buildResultsQuestionCard,
   useHostSession,
 } from "@/features/session/host/useHostSession";
 
@@ -40,7 +46,7 @@ export default function HostPage() {
     setScoringDraft,
     currentQuestions,
     primaryQuestion,
-    reviewQuestions,
+    sessionResults,
     currentQuestionStats,
     canAdvance,
     timerColour,
@@ -56,6 +62,7 @@ export default function HostPage() {
     handleSaveScoring,
     activeModeLabel,
     progressLabel,
+    isLastQuestion,
   } = useHostSession(id);
 
   if (!hydrated) {
@@ -74,9 +81,12 @@ export default function HostPage() {
             <Logo size="sm" />
             <div className="flex min-w-0 items-center gap-3">
               <CardBadge tone="warning">Lobby</CardBadge>
-              <span className="text-xs text-muted tabular-nums">
-                {formatParticipantCount(participantCount)}
-              </span>
+              <LiveParticipantCount
+                count={participantCount}
+                caption={formatParticipantCountPhrase(participantCount)}
+                size="sm"
+                layout="inline"
+              />
             </div>
           </div>
         </header>
@@ -97,7 +107,7 @@ export default function HostPage() {
             >
               {joinCode || "------"}
             </div>
-            <div className="mt-6 flex items-center justify-center gap-3">
+            <div className="mt-6 flex flex-col items-center gap-6">
               <button
                 onClick={handleCopyCode}
                 disabled={!joinCode}
@@ -105,9 +115,13 @@ export default function HostPage() {
               >
                 {copied ? "Copied" : "Copy code"}
               </button>
-              <span className="text-xs text-muted tabular-nums">
-                {formatParticipantCount(participantCount)} in lobby
-              </span>
+              <LiveParticipantCount
+                count={participantCount}
+                caption="in lobby"
+                size="lg"
+                layout="stack"
+                className="w-full max-w-sm"
+              />
             </div>
             <div className="mt-10 flex items-center justify-center gap-3">
               <button
@@ -145,9 +159,12 @@ export default function HostPage() {
             <Logo size="sm" />
             <div className="flex items-center gap-3">
               <CardBadge tone="muted">Ended</CardBadge>
-              <span className="text-xs text-muted tabular-nums">
-                {formatParticipantCount(participantCount)}
-              </span>
+              <LiveParticipantCount
+                count={participantCount}
+                caption={formatParticipantCountPhrase(participantCount)}
+                size="sm"
+                layout="inline"
+              />
             </div>
           </div>
         </header>
@@ -170,31 +187,31 @@ export default function HostPage() {
             </motion.div>
 
             <div className="space-y-4">
-              {reviewQuestions.length === 0 ? (
+              {!sessionResults?.questions?.length ? (
                 <div className="border border-border bg-surface p-6 text-sm text-muted">
                   Loading results...
                 </div>
               ) : (
                 (() => {
+                  type ResultQuestion = SessionResults["questions"][number];
                   type ReviewGroup =
-                    | {
-                        type: "standalone";
-                        question: (typeof reviewQuestions)[number];
-                      }
+                    | { type: "standalone"; question: ResultQuestion }
                     | {
                         type: "passage";
                         passageId: number;
-                        passageText: string;
-                        questions: (typeof reviewQuestions)[number][];
+                        questions: ResultQuestion[];
                       };
+                  const sorted = sessionResults.questions.toSorted(
+                    (a, b) => a.orderIndex - b.orderIndex,
+                  );
                   const groups: ReviewGroup[] = [];
                   let currentPassageId: number | null = null;
                   let currentGroup: Extract<
                     ReviewGroup,
                     { type: "passage" }
                   > | null = null;
-                  for (const q of reviewQuestions) {
-                    if (!q.passageId) {
+                  for (const q of sorted) {
+                    if (q.passageId == null) {
                       groups.push({ type: "standalone", question: q });
                       currentPassageId = null;
                       currentGroup = null;
@@ -208,7 +225,6 @@ export default function HostPage() {
                       currentGroup = {
                         type: "passage",
                         passageId: q.passageId,
-                        passageText: q.passageText ?? "",
                         questions: [q],
                       };
                       groups.push(currentGroup);
@@ -216,6 +232,7 @@ export default function HostPage() {
                   }
                   return groups.map((group, gIdx) => {
                     if (group.type === "standalone") {
+                      const card = buildResultsQuestionCard(group.question);
                       return (
                         <motion.div
                           key={`q-${group.question.id}`}
@@ -226,13 +243,14 @@ export default function HostPage() {
                           }}
                         >
                           <QuestionCard
-                            question={group.question}
+                            question={card}
                             mode="review"
-                            onEdit={() => openScoringDrawer(group.question)}
+                            onEdit={() => openScoringDrawer(card)}
                           />
                         </motion.div>
                       );
                     }
+                    const passageHtml = group.questions[0]?.passageText ?? "";
                     return (
                       <motion.div
                         key={`p-${group.passageId}`}
@@ -254,20 +272,22 @@ export default function HostPage() {
                           <div
                             className="prose prose-invert max-w-none text-base leading-relaxed text-foreground prose-p:my-0 prose-p:leading-relaxed"
                             dangerouslySetInnerHTML={{
-                              __html: group.passageText,
+                              __html: passageHtml,
                             }}
                           />
                         </div>
                         <div className="divide-y divide-border/50">
-                          {group.questions.map((q) => (
-                            <QuestionCard
-                              key={`q-${q.id}`}
-                              question={q}
-                              mode="review"
-                              isInsidePassage
-                              onEdit={() => openScoringDrawer(q)}
-                            />
-                          ))}
+                          {group.questions.map((q) => {
+                            const card = buildResultsQuestionCard(q);
+                            return (
+                              <QuestionCard
+                                key={`q-${q.id}`}
+                                question={card}
+                                mode="review"
+                                onEdit={() => openScoringDrawer(card)}
+                              />
+                            );
+                          })}
                         </div>
                       </motion.div>
                     );
@@ -393,9 +413,12 @@ export default function HostPage() {
               {sessionStatus}
             </CardBadge>
             <CardBadge tone="accent">{questionLifecycle}</CardBadge>
-            <span className="text-xs text-muted tabular-nums">
-              {formatParticipantCount(participantCount)}
-            </span>
+            <LiveParticipantCount
+              count={participantCount}
+              caption={formatParticipantCountPhrase(participantCount)}
+              size="sm"
+              layout="inline"
+            />
             <button
               onClick={handleCopyCode}
               disabled={!joinCode}
@@ -436,19 +459,19 @@ export default function HostPage() {
                     color: timerColour,
                   }}
                 >
-                  {formatTime(timeLeft)}
+                  {formatCountdownClock(timeLeft, questionLifecycle)}
                 </div>
               </div>
-              <div className="w-full max-w-sm">
-                <div className="h-1 bg-border">
+              <div className="min-w-0 w-full max-w-sm shrink">
+                <div className="h-1 overflow-hidden bg-border">
                   <motion.div
-                    className="h-full origin-left"
-                    animate={{ scaleX: timerPct / 100 }}
-                    transition={{ duration: 0.3 }}
-                    style={{
-                      backgroundColor: timerColour,
-                      willChange: "transform",
+                    className="h-full max-w-full"
+                    initial={false}
+                    animate={{
+                      width: `${Math.max(0, Math.min(100, timerPct))}%`,
                     }}
+                    transition={{ duration: 1, ease: "linear" }}
+                    style={{ backgroundColor: timerColour }}
                   />
                 </div>
               </div>
@@ -503,9 +526,6 @@ export default function HostPage() {
                     const card = buildActiveQuestionCard(
                       question,
                       questionStatsById[question.id],
-                      activePassage?.timerMode === "PER_SUB_QUESTION"
-                        ? activePassage.text
-                        : null,
                     );
                     return (
                       <QuestionCard
@@ -540,7 +560,6 @@ export default function HostPage() {
                       const card = buildActiveQuestionCard(
                         question,
                         questionStatsById[question.id],
-                        null,
                       );
                       return (
                         <QuestionCard
@@ -561,9 +580,6 @@ export default function HostPage() {
                     question={buildActiveQuestionCard(
                       primaryQuestion!,
                       currentQuestionStats,
-                      activePassage?.timerMode === "PER_SUB_QUESTION"
-                        ? activePassage.text
-                        : null,
                     )}
                     mode={stageMode}
                     onEdit={
@@ -573,9 +589,6 @@ export default function HostPage() {
                               buildActiveQuestionCard(
                                 primaryQuestion,
                                 currentQuestionStats,
-                                activePassage?.timerMode === "PER_SUB_QUESTION"
-                                  ? activePassage.text
-                                  : null,
                               ),
                             )
                         : undefined
@@ -672,7 +685,9 @@ export default function HostPage() {
                   {loadingAction === "next"
                     ? "Advancing..."
                     : canAdvance
-                      ? "Next Question"
+                      ? isLastQuestion
+                        ? "Finish quiz"
+                        : "Next question"
                       : "Waiting for review"}
                 </button>
               ) : null}
@@ -707,7 +722,7 @@ export default function HostPage() {
               <div className="flex items-center justify-between gap-4">
                 <span>Timer</span>
                 <span className="text-foreground tabular-nums">
-                  {formatTime(timeLeft)}
+                  {formatCountdownClock(timeLeft, questionLifecycle)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">

@@ -216,13 +216,15 @@ export default function QuestionForm({
             return (
               <div
                 key={index}
-                className="grid items-center gap-3 border-b border-border/50 py-3 md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_auto]"
+                className="grid items-center gap-x-5 gap-y-3 border-b border-border/50 py-3 md:grid-cols-[1.75rem_2.5rem_minmax(0,1fr)_5rem_auto]"
               >
-                <div className="flex items-center justify-between md:block">
-                  <span className="label text-foreground/80">
+                <div className="flex items-center gap-5 md:contents">
+                  <span className="label shrink-0 text-foreground/80">
                     {String.fromCharCode(65 + index)}
                   </span>
-                  <span className={`text-[10px] font-medium ${tone}`}>
+                  <span
+                    className={`inline-flex min-h-[1.25rem] min-w-[1.75rem] shrink-0 items-center justify-center text-[11px] font-medium ${tone}`}
+                  >
                     {isPositiveOption(option.pointValue)
                       ? "✓"
                       : isNegativeOption(option.pointValue)
@@ -234,7 +236,7 @@ export default function QuestionForm({
                   value={option.text}
                   onChange={(event) => setOptionText(index, event.target.value)}
                   placeholder={`Option ${index + 1}`}
-                  className="input-field"
+                  className="input-field min-w-0"
                 />
                 <input
                   type="text"

@@ -30,21 +30,16 @@ export function QuestionReviewCard({
             <span className="text-xs text-muted tabular-nums">
               {question.timeLimitSeconds}s time limit
             </span>
+            {question.passageId != null ? (
+              <>
+                <span className="text-muted/40 text-xs">·</span>
+                <span className="label text-warning">Passage</span>
+              </>
+            ) : null}
           </div>
           <h2 className="text-lg font-bold text-foreground leading-snug">
             {question.text}
           </h2>
-          {!isInsidePassage && question.passageText && (
-            <div className="mt-4 border border-border bg-background p-4">
-              <p className="label mb-3 text-warning">Passage</p>
-              <div
-                className="prose prose-invert max-w-none text-sm leading-7 text-muted prose-p:my-0 prose-p:leading-7"
-                dangerouslySetInnerHTML={{
-                  __html: question.passageText,
-                }}
-              />
-            </div>
-          )}
         </div>
         <div className="ml-4 shrink-0 text-right">
           <p className="label mb-2">Responses</p>

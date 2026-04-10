@@ -370,6 +370,34 @@ body {
 }
 
 /*
+ * btn-lock-in-pending
+ * Lock-in in flight: keep full opacity + wait cursor. Motion overlay is
+ * rendered by LockInPendingOverlay (Framer), not CSS.
+ */
+@utility btn-lock-in-pending {
+  position: relative;
+  overflow: hidden;
+  cursor: wait;
+
+  &:disabled {
+    opacity: 1;
+    cursor: wait;
+  }
+
+  &.btn-primary:disabled {
+    background-color: color-mix(
+      in srgb,
+      var(--color-primary) 68%,
+      var(--color-background)
+    );
+  }
+
+  &:not(.btn-primary):disabled {
+    background-color: var(--color-surface);
+  }
+}
+
+/*
  * btn-ghost
  * Secondary/ghost button — bordered, transparent background.
  * Use for: secondary actions, destructive confirms, cancel flows.

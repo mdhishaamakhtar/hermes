@@ -5,7 +5,11 @@ import { api } from "@/lib/api";
 import { sessionsApi } from "@/lib/apiClient";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
-import { normalizeCounts, normalizePoints } from "@/lib/session-utils";
+import {
+  normalizeCounts,
+  normalizeIdList,
+  normalizePoints,
+} from "@/lib/session-utils";
 import { getStoredSessionJoinCode } from "@/lib/session-storage";
 import type { CorrectionDraftOption } from "@/components/session/ScoringDrawer";
 import type { QuestionCardData } from "@/components/session/QuestionCard";
@@ -386,7 +390,15 @@ export function hostSessionReducer(
       };
     case "QUESTION_FROZEN":
       return { ...state, questionLifecycle: "FROZEN", timeLeft: 0 };
-    case "QUESTION_REVIEWED":
+    case "QUESTION_REVIEWED": {
+      const optionPoints = normalizePoints(action.optionPoints);
+      const fromPoints = Object.entries(optionPoints)
+        .filter(([, pts]) => pts > 0)
+        .map(([id]) => Number(id));
+      const mergedCorrect =
+        fromPoints.length > 0
+          ? fromPoints
+          : normalizeIdList(action.correctOptionIds);
       return {
         ...state,
         questionLifecycle: "REVIEWING",
@@ -394,12 +406,13 @@ export function hostSessionReducer(
           state.questionStatsById,
           action.questionId,
           {
-            correctOptionIds: action.correctOptionIds,
-            optionPoints: normalizePoints(action.optionPoints),
+            correctOptionIds: mergedCorrect,
+            optionPoints,
             reviewed: true,
           },
         ),
       };
+    }
     case "ANSWER_UPDATE":
       return {
         ...state,
@@ -462,12 +475,13 @@ export function hostSessionReducer(
 export function buildActiveQuestionCard(
   question: ActiveQuestion,
   stats: QuestionStats | undefined,
-  passageText?: string | null,
 ): QuestionCardData {
   const normalized = stats ?? DEFAULT_STATS();
   const counts = normalized.counts;
   const pointMap = normalized.optionPoints;
   const totalAnswers = normalized.totalAnswered;
+  const usePointMapForKey =
+    normalized.reviewed && Object.keys(pointMap).length > 0;
 
   return {
     id: question.id,
@@ -477,7 +491,7 @@ export function buildActiveQuestionCard(
     totalAnswers,
     totalLockedIn: normalized.totalLockedIn,
     totalParticipants: normalized.totalParticipants,
-    passageText,
+    passageId: question.passage?.id ?? null,
     options: question.options
       .toSorted((a, b) => a.orderIndex - b.orderIndex)
       .map((option) => ({
@@ -485,13 +499,15 @@ export function buildActiveQuestionCard(
         text: option.text,
         orderIndex: option.orderIndex,
         count: counts[option.id] ?? 0,
-        isCorrect: (normalized.correctOptionIds ?? []).includes(option.id),
+        isCorrect: usePointMapForKey
+          ? (pointMap[option.id] ?? 0) > 0
+          : (normalized.correctOptionIds ?? []).includes(option.id),
         pointValue: pointMap[option.id] ?? 0,
       })),
   };
 }
 
-function buildResultsQuestionCard(
+export function buildResultsQuestionCard(
   question: SessionResults["questions"][number],
 ): QuestionCardData {
   const totalAnswers = question.totalAnswers;
@@ -503,7 +519,6 @@ function buildResultsQuestionCard(
     timeLimitSeconds: question.timeLimitSeconds,
     totalAnswers,
     passageId: question.passageId,
-    passageText: question.passageText,
     options: question.options
       .toSorted((a, b) => a.orderIndex - b.orderIndex)
       .map((option) => ({
@@ -654,9 +669,9 @@ export function useHostSession(id: string) {
       if (data.event === "QUESTION_REVIEWED") {
         dispatch({
           type: "QUESTION_REVIEWED",
-          questionId: data.questionId,
-          correctOptionIds: data.correctOptionIds,
-          optionPoints: data.optionPoints,
+          questionId: Number(data.questionId),
+          correctOptionIds: normalizeIdList(data.correctOptionIds ?? []),
+          optionPoints: normalizePoints(data.optionPoints ?? {}),
         });
         return;
       }
@@ -664,9 +679,9 @@ export function useHostSession(id: string) {
       if (data.event === "SCORING_CORRECTED") {
         dispatch({
           type: "QUESTION_REVIEWED",
-          questionId: data.questionId,
-          correctOptionIds: data.correctOptionIds,
-          optionPoints: data.optionPoints,
+          questionId: Number(data.questionId),
+          correctOptionIds: normalizeIdList(data.correctOptionIds ?? []),
+          optionPoints: normalizePoints(data.optionPoints ?? {}),
         });
         return;
       }
@@ -743,20 +758,16 @@ export function useHostSession(id: string) {
 
   const primaryQuestion = currentQuestions[0] ?? null;
 
-  const reviewQuestions: QuestionCardData[] =
-    sessionStatus === "ENDED"
-      ? (sessionResults?.questions
+  const reviewProgressQuestionIds = useMemo(() => {
+    if (sessionStatus === "ENDED") {
+      return (
+        sessionResults?.questions
           ?.toSorted((a, b) => a.orderIndex - b.orderIndex)
-          .map(buildResultsQuestionCard) ?? [])
-      : currentQuestions.map((question) =>
-          buildActiveQuestionCard(
-            question,
-            questionStatsById[question.id],
-            activePassage?.timerMode === "PER_SUB_QUESTION"
-              ? activePassage.text
-              : null,
-          ),
-        );
+          .map((q) => q.id) ?? []
+      );
+    }
+    return currentQuestions.map((q) => q.id);
+  }, [sessionStatus, sessionResults?.questions, currentQuestions]);
 
   const currentQuestionStats = primaryQuestion
     ? (questionStatsById[primaryQuestion.id] ?? DEFAULT_STATS())
@@ -764,18 +775,20 @@ export function useHostSession(id: string) {
 
   const canAdvance =
     questionLifecycle === "REVIEWING" &&
-    reviewQuestions.length > 0 &&
-    reviewQuestions.every((question) => {
-      const stats = questionStatsById[question.id];
+    reviewProgressQuestionIds.length > 0 &&
+    reviewProgressQuestionIds.every((questionId) => {
+      const stats = questionStatsById[questionId];
       return stats?.reviewed ?? sessionStatus === "ENDED";
     });
 
   const timerColour =
-    timeLeft <= 5
-      ? "var(--color-danger)"
-      : timeLeft <= 10
-        ? "var(--color-warning)"
-        : "var(--color-foreground)";
+    questionLifecycle === "TIMED"
+      ? timeLeft <= 5
+        ? "var(--color-danger)"
+        : timeLeft <= 10
+          ? "var(--color-warning)"
+          : "var(--color-foreground)"
+      : "var(--color-muted)";
 
   const timerPct =
     timerLimitSeconds > 0 ? (timeLeft / timerLimitSeconds) * 100 : 0;
@@ -902,6 +915,9 @@ export function useHostSession(id: string) {
       ? `Q${questionIndex} / ${totalQuestions}`
       : "Awaiting question";
 
+  const isLastQuestion =
+    questionIndex > 0 && totalQuestions > 0 && questionIndex >= totalQuestions;
+
   return {
     session,
     sessionStatus,
@@ -930,7 +946,6 @@ export function useHostSession(id: string) {
     setScoringDraft,
     currentQuestions,
     primaryQuestion,
-    reviewQuestions,
     currentQuestionStats,
     canAdvance,
     timerColour,
@@ -946,5 +961,6 @@ export function useHostSession(id: string) {
     handleSaveScoring,
     activeModeLabel,
     progressLabel,
+    isLastQuestion,
   };
 }
