@@ -11,7 +11,6 @@ import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.util.WsTopics;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -84,8 +83,6 @@ public class ParticipantService {
             .build();
     participant = participantRepository.save(participant);
 
-    String sid = sessionId.toString();
-
     redis
         .opsForValue()
         .set(
@@ -93,10 +90,10 @@ public class ParticipantService {
             participant.getId().toString(),
             SessionRedisHelper.REJOIN_TTL);
 
-    long count = liveStateService.incrementParticipantCount(sid);
-    liveStateService.cacheParticipantName(sid, participant.getId(), request.displayName());
+    long count = liveStateService.incrementParticipantCount(sessionId);
+    liveStateService.cacheParticipantName(sessionId, participant.getId(), request.displayName());
     // Initialize with score 0 so zero-correct participants appear in leaderboard
-    liveStateService.initLeaderboardEntry(sid, participant.getId());
+    liveStateService.initLeaderboardEntry(sessionId, participant.getId());
 
     messaging.convertAndSend(
         WsTopics.sessionControl(sessionId), new WsPayloads.ParticipantJoined(count));
@@ -111,40 +108,22 @@ public class ParticipantService {
     Long sessionId = request.sessionId();
     Long participantId = resolveParticipantId(request.rejoinToken(), sessionId);
 
-    String sid = sessionId.toString();
-
     QuizSession session =
         sessionRepository
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
     SessionStatus status = session.getStatus();
-    String questionLifecycle = liveStateService.getQuestionState(sid);
-
-    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
-    Long currentQId =
-        (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
-    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
-    Long currentPassageId =
-        (currentPassageIdStr != null && !currentPassageIdStr.isEmpty())
-            ? Long.parseLong(currentPassageIdStr)
-            : null;
+    SessionLiveStateService.RejoinContext ctx = liveStateService.buildRejoinContext(sessionId);
 
     List<Long> answered = answerRepository.findAnsweredQuestionIds(participantId);
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    int participantCount = (int) liveStateService.getParticipantCount(sid);
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
 
     RejoinResponse.CurrentQuestion currentQuestion = null;
     RejoinResponse.CurrentPassage currentPassage = null;
-    Integer timeLeftSeconds = null;
-    if (SessionStatus.ACTIVE == status && currentQId != null) {
-      Long ttl = redis.getExpire(redisHelper.timerKey(sid), TimeUnit.SECONDS);
-      if (ttl != null && ttl > 0) {
-        timeLeftSeconds = ttl.intValue();
-      }
-
-      if (currentPassageId != null) {
-        QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(currentPassageId);
+    if (SessionStatus.ACTIVE == status && ctx.currentQuestionId() != null) {
+      if (ctx.currentPassageId() != null) {
+        QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(ctx.currentPassageId());
         if (passage != null) {
           List<RejoinResponse.QuestionInfo> subQuestions =
               passage.subQuestionIds().stream()
@@ -159,16 +138,16 @@ public class ParticipantService {
               new RejoinResponse.CurrentPassage(
                   passage.id(),
                   passage.text(),
-                  passage.timerMode(),
+                  passage.timerMode().name(),
                   snapshot.questionPosition(
-                      subQuestions.isEmpty() ? currentQId : subQuestions.get(0).id()),
+                      subQuestions.isEmpty() ? ctx.currentQuestionId() : subQuestions.get(0).id()),
                   snapshot.questions().size(),
                   passage.timeLimitSeconds(),
                   subQuestions.isEmpty() ? null : subQuestions.get(0).effectiveDisplayMode(),
                   subQuestions);
         }
       } else {
-        QuizSnapshot.QuestionSnapshot qSnap = snapshot.findQuestion(currentQId);
+        QuizSnapshot.QuestionSnapshot qSnap = snapshot.findQuestion(ctx.currentQuestionId());
         if (qSnap != null) {
           currentQuestion = buildCurrentQuestion(participantId, qSnap, snapshot);
         }
@@ -179,15 +158,15 @@ public class ParticipantService {
         participantId,
         sessionId,
         status.name(),
-        questionLifecycle,
+        ctx.questionLifecycle(),
         snapshot.title(),
-        participantCount,
-        currentQId,
-        currentPassageId,
+        ctx.participantCount(),
+        ctx.currentQuestionId(),
+        ctx.currentPassageId(),
         answered,
         currentQuestion,
         currentPassage,
-        timeLeftSeconds);
+        ctx.timeLeftSeconds());
   }
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
@@ -240,7 +219,7 @@ public class ParticipantService {
                 : new RejoinResponse.PassageInfo(
                     question.passageId(),
                     snapshot.findPassage(question.passageId()).text(),
-                    snapshot.findPassage(question.passageId()).timerMode());
+                    snapshot.findPassage(question.passageId()).timerMode().name());
 
     return new RejoinResponse.CurrentQuestion(
         question.id(),
@@ -248,8 +227,8 @@ public class ParticipantService {
         question.orderIndex(),
         snapshot.questions().size(),
         question.timeLimitSeconds(),
-        question.questionType(),
-        question.effectiveDisplayMode(),
+        question.questionType().name(),
+        question.effectiveDisplayMode().name(),
         passageInfo,
         options,
         selectedOptionIds,
@@ -268,8 +247,8 @@ public class ParticipantService {
         question.text(),
         question.orderIndex(),
         question.timeLimitSeconds(),
-        question.questionType(),
-        question.effectiveDisplayMode(),
+        question.questionType().name(),
+        question.effectiveDisplayMode().name(),
         options,
         selectedOptionIds(answer),
         answer != null && answer.isLockedIn());

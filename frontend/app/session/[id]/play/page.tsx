@@ -802,11 +802,13 @@ export default function PlayPage() {
     }
   }, [sessionId, rejoinToken, replaceQuestions]);
 
+  const handleStompConnect = useCallback(() => {
+    void loadSessionContext();
+  }, [loadSessionContext]);
+
   const { subscribe, unsubscribe, publish } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-    onConnect: () => {
-      void loadSessionContext();
-    },
+    onConnect: handleStompConnect,
   });
 
   useEffect(() => {
@@ -1164,17 +1166,19 @@ export default function PlayPage() {
   const syncAnswerSelection = useCallback(
     async (questionId: number) => {
       if (!sessionId || !rejoinToken) return false;
-      console.info("[play] syncAnswerSelection:start", {
-        questionId,
-        hasRejoinToken: Boolean(rejoinToken),
-        sessionId,
-      });
+      if (process.env.NODE_ENV === "development")
+        console.info("[play] syncAnswerSelection:start", {
+          questionId,
+          hasRejoinToken: Boolean(rejoinToken),
+          sessionId,
+        });
       const existingPromise =
         syncingQuestionPromisesRef.current.get(questionId);
       if (existingPromise) {
-        console.info("[play] syncAnswerSelection:reuse-promise", {
-          questionId,
-        });
+        if (process.env.NODE_ENV === "development")
+          console.info("[play] syncAnswerSelection:reuse-promise", {
+            questionId,
+          });
         return existingPromise;
       }
 
@@ -1191,11 +1195,12 @@ export default function PlayPage() {
             const ackPromise = waitForAnswerAck(clientRequestId);
             setSyncStatus("saving");
             setSyncMessage("Saving answer.");
-            console.info("[play] syncAnswerSelection:publish", {
-              questionId,
-              selectedOptionIds: queuedSelection,
-              clientRequestId,
-            });
+            if (process.env.NODE_ENV === "development")
+              console.info("[play] syncAnswerSelection:publish", {
+                questionId,
+                selectedOptionIds: queuedSelection,
+                clientRequestId,
+              });
             publish(`/app/session/${sessionId}/answer`, {
               rejoinToken,
               questionId,
@@ -1281,11 +1286,12 @@ export default function PlayPage() {
         questionId,
         normalizeSelectionIds(nextSelection),
       );
-      console.info("[play] toggle-option", {
-        questionId,
-        optionId,
-        nextSelection: normalizeSelectionIds(nextSelection),
-      });
+      if (process.env.NODE_ENV === "development")
+        console.info("[play] toggle-option", {
+          questionId,
+          optionId,
+          nextSelection: normalizeSelectionIds(nextSelection),
+        });
       void syncAnswerSelection(questionId);
     },
     [questionLifecycle, questions, rejoinToken, syncAnswerSelection],

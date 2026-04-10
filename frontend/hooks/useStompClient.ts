@@ -37,7 +37,8 @@ export function useStompClient(options: UseStompOptions = {}) {
       reconnectDelay: 3000,
       onConnect: () => {
         connectedRef.current = true;
-        console.info("[stomp] connected");
+        if (process.env.NODE_ENV === "development")
+          console.info("[stomp] connected");
         subscriptionsRef.current.clear();
         desiredSubscriptionsRef.current.forEach((callback, destination) => {
           if (!subscriptionsRef.current.has(destination)) {
@@ -62,13 +63,15 @@ export function useStompClient(options: UseStompOptions = {}) {
       },
       onDisconnect: () => {
         connectedRef.current = false;
-        console.info("[stomp] disconnected");
+        if (process.env.NODE_ENV === "development")
+          console.info("[stomp] disconnected");
         subscriptionsRef.current.clear();
         optionsRef.current.onDisconnect?.();
       },
       onWebSocketClose: () => {
         connectedRef.current = false;
-        console.info("[stomp] websocket-closed");
+        if (process.env.NODE_ENV === "development")
+          console.info("[stomp] websocket-closed");
         subscriptionsRef.current.clear();
       },
       onStompError: (frame) => {
@@ -108,11 +111,12 @@ export function useStompClient(options: UseStompOptions = {}) {
 
   const publish = useCallback((destination: string, body: unknown) => {
     const client = clientRef.current;
-    console.info("[stomp] publish", {
-      destination,
-      connected: Boolean(client?.connected),
-      active: Boolean(client?.active),
-    });
+    if (process.env.NODE_ENV === "development")
+      console.info("[stomp] publish", {
+        destination,
+        connected: Boolean(client?.connected),
+        active: Boolean(client?.active),
+      });
     if (client?.connected) {
       client.publish({
         destination,

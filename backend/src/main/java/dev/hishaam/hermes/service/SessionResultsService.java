@@ -9,6 +9,7 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import dev.hishaam.hermes.util.LeaderboardBuilder;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -141,7 +142,7 @@ public class SessionResultsService {
                       q.id(),
                       q.text(),
                       q.orderIndex(),
-                      q.questionType(),
+                      q.questionType().name(),
                       passageText,
                       selectedOptionIds,
                       correctOptionIds,
@@ -230,26 +231,15 @@ public class SessionResultsService {
     // Build leaderboard — include ALL participants (zero-score get score 0)
     Map<Long, Long> scores = new LinkedHashMap<>();
     participants.forEach(p -> scores.put(p.getId(), 0L));
-    allAnswers.stream()
-        .forEach(
-            answer -> {
-              scores.merge(
-                  answer.getParticipantId(),
-                  Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
-                  Long::sum);
-            });
+    allAnswers.forEach(
+        answer ->
+            scores.merge(
+                answer.getParticipantId(),
+                Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
+                Long::sum));
 
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard = new ArrayList<>();
-    scores.entrySet().stream()
-        .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
-        .forEach(
-            e ->
-                leaderboard.add(
-                    new SessionResultsResponse.LeaderboardEntry(
-                        leaderboard.size() + 1,
-                        e.getKey(),
-                        displayNames.getOrDefault(e.getKey(), "Unknown"),
-                        e.getValue())));
+    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
+        LeaderboardBuilder.rank(scores, displayNames);
 
     return new SessionResultsResponse(
         sessionId,

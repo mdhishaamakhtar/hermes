@@ -1,5 +1,8 @@
 package dev.hishaam.hermes.dto;
 
+import dev.hishaam.hermes.entity.enums.DisplayMode;
+import dev.hishaam.hermes.entity.enums.PassageTimerMode;
+import dev.hishaam.hermes.entity.enums.QuestionType;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -11,11 +14,11 @@ public record QuizSnapshot(
   public record QuestionSnapshot(
       Long id,
       String text,
-      String questionType,
+      QuestionType questionType,
       int orderIndex,
       int timeLimitSeconds,
       Long passageId,
-      String effectiveDisplayMode,
+      DisplayMode effectiveDisplayMode,
       List<OptionSnapshot> options,
       OffsetDateTime correctedAt) {}
 
@@ -25,7 +28,7 @@ public record QuizSnapshot(
       Long id,
       String text,
       int orderIndex,
-      String timerMode,
+      PassageTimerMode timerMode,
       Integer timeLimitSeconds,
       List<Long> subQuestionIds) {}
 

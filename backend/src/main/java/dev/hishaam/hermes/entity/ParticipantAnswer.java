@@ -57,7 +57,8 @@ public class ParticipantAnswer {
   @Column(name = "answered_at")
   private OffsetDateTime answeredAt;
 
-  /** Computed by the grading engine after the question is frozen. Null until graded. */
+  /** Computed by the grading engine after the question is frozen. Initializes to 0. */
   @Column(name = "score")
-  private Integer score;
+  @Builder.Default
+  private Integer score = 0;
 }

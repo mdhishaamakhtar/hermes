@@ -1,10 +1,13 @@
 package dev.hishaam.hermes.service;
 
+import dev.hishaam.hermes.dto.AnswerStats;
 import dev.hishaam.hermes.dto.QuizSnapshot;
 import dev.hishaam.hermes.dto.SessionResultsResponse;
 import dev.hishaam.hermes.dto.WsPayloads;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.DisplayMode;
+import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
@@ -59,11 +62,11 @@ public class SessionEngine {
   @Transactional
   public void advanceSessionInternal(Long sessionId) {
     String sid = sessionId.toString();
-    String status = liveStateService.getStatus(sid);
+    String status = liveStateService.getStatus(sessionId);
     if (!SessionStatus.ACTIVE.name().equals(status)) return;
 
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
+    String currentQIdStr = liveStateService.getCurrentQuestionId(sessionId);
     Long currentQId =
         (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
 
@@ -76,18 +79,18 @@ public class SessionEngine {
     // Check if the next question belongs to an ENTIRE_PASSAGE passage
     if (next.passageId() != null) {
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(next.passageId());
-      if (passage != null && "ENTIRE_PASSAGE".equals(passage.timerMode())) {
-        displayEntirePassage(sessionId, sid, passage, snapshot);
+      if (passage != null && PassageTimerMode.ENTIRE_PASSAGE == passage.timerMode()) {
+        displayEntirePassage(sessionId, passage, snapshot);
         updateDbCurrentQuestion(sessionId, findLastSubQuestion(passage, snapshot));
         return;
       }
     }
 
     // Regular (standalone or PER_SUB_QUESTION) question display
-    liveStateService.setCurrentQuestion(sid, next.id());
-    liveStateService.clearCurrentPassage(sid);
-    liveStateService.setQuestionState(sid, QuestionLifecycleState.DISPLAYED.name());
-    liveStateService.initQuestionCounts(sid, next);
+    liveStateService.setCurrentQuestion(sessionId, next.id());
+    liveStateService.clearCurrentPassage(sessionId);
+    liveStateService.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
+    liveStateService.initQuestionCounts(sessionId, next);
     broadcastQuestionDisplayed(sessionId, next, snapshot);
     updateDbCurrentQuestion(sessionId, next);
   }
@@ -95,19 +98,19 @@ public class SessionEngine {
   @Transactional
   public void startTimerInternal(Long sessionId) {
     String sid = sessionId.toString();
-    String status = liveStateService.getStatus(sid);
+    String status = liveStateService.getStatus(sessionId);
     if (!SessionStatus.ACTIVE.name().equals(status)) {
       throw AppException.conflict("Session is not active");
     }
 
-    String questionState = liveStateService.getQuestionState(sid);
+    String questionState = liveStateService.getQuestionState(sessionId);
     if (!QuestionLifecycleState.DISPLAYED.name().equals(questionState)) {
       throw AppException.conflict("Timer can only be started when question is in DISPLAYED state");
     }
 
     // Determine timer target and duration
-    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
-    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
+    String currentPassageIdStr = liveStateService.getCurrentPassageId(sessionId);
+    String currentQIdStr = liveStateService.getCurrentQuestionId(sessionId);
 
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
       // ENTIRE_PASSAGE mode — use passage timer
@@ -118,15 +121,15 @@ public class SessionEngine {
         throw AppException.conflict("Passage has no time limit configured");
       }
 
-      liveStateService.setQuestionState(sid, QuestionLifecycleState.TIMED.name());
-      liveStateService.setTimer(sid, passage.timeLimitSeconds());
-      liveStateService.recordTimerStartedAt(sid, Instant.now().toEpochMilli());
+      liveStateService.setQuestionState(sessionId, QuestionLifecycleState.TIMED.name());
+      liveStateService.setTimer(sessionId, passage.timeLimitSeconds());
+      liveStateService.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
 
       messaging.convertAndSend(
           WsTopics.sessionQuestion(sessionId),
           new WsPayloads.TimerStart(null, passageId, passage.timeLimitSeconds()));
 
-      long seqAtStart = liveStateService.getQuestionSequence(sid);
+      long seqAtStart = liveStateService.getQuestionSequence(sessionId);
       Long anchorQuestionId = Long.parseLong(currentQIdStr);
       timerScheduler.scheduleQuestionTimer(
           sessionId, anchorQuestionId, passage.timeLimitSeconds(), seqAtStart);
@@ -143,15 +146,15 @@ public class SessionEngine {
         throw AppException.notFound("Question not found in session snapshot");
       }
 
-      liveStateService.setQuestionState(sid, QuestionLifecycleState.TIMED.name());
-      liveStateService.setTimer(sid, question.timeLimitSeconds());
-      liveStateService.recordTimerStartedAt(sid, Instant.now().toEpochMilli());
+      liveStateService.setQuestionState(sessionId, QuestionLifecycleState.TIMED.name());
+      liveStateService.setTimer(sessionId, question.timeLimitSeconds());
+      liveStateService.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
 
       messaging.convertAndSend(
           WsTopics.sessionQuestion(sessionId),
           new WsPayloads.TimerStart(questionId, null, question.timeLimitSeconds()));
 
-      long seqAtStart = liveStateService.getQuestionSequence(sid);
+      long seqAtStart = liveStateService.getQuestionSequence(sessionId);
       timerScheduler.scheduleQuestionTimer(
           sessionId, questionId, question.timeLimitSeconds(), seqAtStart);
     }
@@ -160,15 +163,15 @@ public class SessionEngine {
   @Transactional
   public void onTimerExpired(Long sessionId) {
     String sid = sessionId.toString();
-    String status = liveStateService.getStatus(sid);
+    String status = liveStateService.getStatus(sessionId);
     if (!SessionStatus.ACTIVE.name().equals(status)) return;
 
     // Only act if still in TIMED state (guard against double-fire)
-    String questionState = liveStateService.getQuestionState(sid);
+    String questionState = liveStateService.getQuestionState(sessionId);
     if (!QuestionLifecycleState.TIMED.name().equals(questionState)) return;
 
-    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
-    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
+    String currentPassageIdStr = liveStateService.getCurrentPassageId(sessionId);
+    String currentQIdStr = liveStateService.getCurrentQuestionId(sessionId);
 
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
       // ENTIRE_PASSAGE mode — freeze all sub-questions, then grade passage
@@ -199,7 +202,7 @@ public class SessionEngine {
       }
     }
 
-    liveStateService.setQuestionState(sid, QuestionLifecycleState.REVIEWING.name());
+    liveStateService.setQuestionState(sessionId, QuestionLifecycleState.REVIEWING.name());
   }
 
   @Transactional
@@ -214,9 +217,9 @@ public class SessionEngine {
     timerScheduler.cancelQuestionTimer(sessionId);
 
     // Freeze and GRADE any outstanding answers before ending
-    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
-    String currentQIdStr = liveStateService.getCurrentQuestionId(sid);
-    String qState = liveStateService.getQuestionState(sid);
+    String currentPassageIdStr = liveStateService.getCurrentPassageId(sessionId);
+    String currentQIdStr = liveStateService.getCurrentQuestionId(sessionId);
+    String qState = liveStateService.getQuestionState(sessionId);
     boolean shouldGrade =
         QuestionLifecycleState.TIMED.name().equals(qState)
             || QuestionLifecycleState.FROZEN.name().equals(qState);
@@ -251,11 +254,11 @@ public class SessionEngine {
 
     if (session.getStatus() != SessionStatus.LOBBY) {
       List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-          liveStateService.buildLeaderboard(sid);
+          liveStateService.buildLeaderboard(sessionId);
 
       messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
 
-      long participantCount = liveStateService.getParticipantCount(sid);
+      long participantCount = liveStateService.getParticipantCount(sessionId);
       messaging.convertAndSend(
           WsTopics.sessionAnalytics(sessionId),
           new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
@@ -266,7 +269,7 @@ public class SessionEngine {
     session.setCurrentQuestion(null);
     sessionRepository.save(session);
 
-    liveStateService.cleanupSessionKeys(sid, snapshot, joinCode);
+    liveStateService.cleanupSessionKeys(sessionId, snapshot, joinCode);
   }
 
   public void broadcastQuestionDisplayed(
@@ -293,49 +296,47 @@ public class SessionEngine {
         new WsPayloads.QuestionDisplayed(
             question.id(),
             question.text(),
-            question.questionType(),
+            question.questionType().name(),
             options,
             questionIndex,
             totalQuestions,
             passageContext,
-            question.effectiveDisplayMode()));
+            question.effectiveDisplayMode().name()));
   }
 
-  public void broadcastLeaderboardUpdate(Long sessionId, String sid) {
+  public void broadcastLeaderboardUpdate(Long sessionId) {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        liveStateService.buildLeaderboard(sid);
+        liveStateService.buildLeaderboard(sessionId);
     messaging.convertAndSend(
         WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
   }
 
-  public void broadcastAnswerUpdate(
-      Long sessionId,
-      Long questionId,
-      Map<Long, Long> counts,
-      long totalAnswered,
-      long totalParticipants,
-      long totalLockedIn) {
+  public void broadcastAnswerUpdate(Long sessionId, Long questionId, AnswerStats stats) {
     String sid = sessionId.toString();
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
     QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
-    String mode = question != null ? question.effectiveDisplayMode() : "LIVE";
+    DisplayMode mode = question != null ? question.effectiveDisplayMode() : DisplayMode.LIVE;
 
-    if ("CODE_DISPLAY".equals(mode)) {
+    if (mode == DisplayMode.CODE_DISPLAY) {
       // Suppress entirely during TIMED state
       return;
     }
 
-    Map<Long, Long> broadcastCounts = "BLIND".equals(mode) ? Map.of() : counts;
+    Map<Long, Long> broadcastCounts = mode == DisplayMode.BLIND ? Map.of() : stats.optionCounts();
     var answerUpdate =
         new WsPayloads.AnswerUpdate(
-            questionId, broadcastCounts, totalAnswered, totalParticipants, totalLockedIn);
+            questionId,
+            broadcastCounts,
+            stats.totalAnswered(),
+            stats.totalParticipants(),
+            stats.totalLockedIn());
     messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerUpdate);
     // Also broadcast to .question so participants (unauthenticated) can receive live counts
     messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerUpdate);
   }
 
   private void displayEntirePassage(
-      Long sessionId, String sid, QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
+      Long sessionId, QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
     List<QuizSnapshot.QuestionSnapshot> subQuestions =
         passage.subQuestionIds().stream()
             .map(snapshot::findQuestion)
@@ -345,11 +346,11 @@ public class SessionEngine {
 
     // last sub-question is the "current" pointer so findNextQuestion advances past the passage
     QuizSnapshot.QuestionSnapshot lastSub = subQuestions.get(subQuestions.size() - 1);
-    liveStateService.setCurrentQuestion(sid, lastSub.id());
-    liveStateService.setCurrentPassage(sid, passage.id());
-    liveStateService.setQuestionState(sid, QuestionLifecycleState.DISPLAYED.name());
+    liveStateService.setCurrentQuestion(sessionId, lastSub.id());
+    liveStateService.setCurrentPassage(sessionId, passage.id());
+    liveStateService.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
 
-    subQuestions.forEach(q -> liveStateService.initQuestionCounts(sid, q));
+    subQuestions.forEach(q -> liveStateService.initQuestionCounts(sessionId, q));
 
     int questionIndex = snapshot.questionPosition(subQuestions.get(0).id());
     int totalQuestions = snapshot.questions().size();
@@ -362,14 +363,16 @@ public class SessionEngine {
                       q.options().stream()
                           .map(o -> new WsPayloads.Option(o.id(), o.text(), o.orderIndex()))
                           .toList();
-                  return new WsPayloads.SubQuestion(q.id(), q.text(), q.questionType(), opts);
+                  return new WsPayloads.SubQuestion(q.id(), q.text(), q.questionType().name(), opts);
                 })
             .toList();
 
     // Use the first sub-question's effective display mode for the passage (sub-questions share
     // mode)
     String effectiveDisplayMode =
-        subQuestions.isEmpty() ? "LIVE" : subQuestions.get(0).effectiveDisplayMode();
+        subQuestions.isEmpty()
+            ? DisplayMode.LIVE.name()
+            : subQuestions.get(0).effectiveDisplayMode().name();
 
     messaging.convertAndSend(
         WsTopics.sessionQuestion(sessionId),

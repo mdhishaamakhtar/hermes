@@ -1,12 +1,14 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.AnswerRequest;
+import dev.hishaam.hermes.dto.AnswerStats;
 import dev.hishaam.hermes.dto.LockInRequest;
 import dev.hishaam.hermes.dto.QuizSnapshot;
 import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
+import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import jakarta.persistence.EntityManager;
@@ -44,11 +46,10 @@ public class AnswerService {
 
   @Transactional
   public void submitAnswer(Long sessionId, AnswerRequest request) {
-    String sid = sessionId.toString();
     Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);
 
     QuizSnapshot.QuestionSnapshot question =
-        requireMutableCurrentQuestion(sid, request.questionId());
+        requireMutableCurrentQuestion(sessionId, request.questionId());
     Set<Long> selectedOptionIds = normalizeSelectedOptionIds(request.selectedOptionIds());
     validateSelections(question, selectedOptionIds);
 
@@ -65,22 +66,21 @@ public class AnswerService {
 
     ensureAnswerMutable(answer);
 
-    Set<Long> previousSelectionIds = previousSelectionIds(sid, participantId, answer);
+    Set<Long> previousSelectionIds = previousSelectionIds(sessionId, participantId, answer);
     answer.setSelectedOptions(toAnswerOptionReferences(selectedOptionIds));
     answer.setAnsweredAt(selectedOptionIds.isEmpty() ? null : OffsetDateTime.now());
     answerRepository.save(answer);
 
     liveStateService.replaceParticipantSelections(
-        sid, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
+        sessionId, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
     broadcastAnswerState(sessionId, request.questionId());
   }
 
   @Transactional
   public void lockInAnswer(Long sessionId, LockInRequest request) {
-    String sid = sessionId.toString();
     Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);
 
-    requireMutableCurrentQuestion(sid, request.questionId());
+    requireMutableCurrentQuestion(sessionId, request.questionId());
 
     ParticipantAnswer answer =
         answerRepository
@@ -97,25 +97,27 @@ public class AnswerService {
     answer.setFrozenAt(frozenAt);
     answerRepository.save(answer);
 
-    liveStateService.markLockedIn(sid, request.questionId(), participantId);
+    liveStateService.markLockedIn(sessionId, request.questionId(), participantId);
     broadcastAnswerState(sessionId, request.questionId());
   }
 
-  private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(String sid, Long questionId) {
-    String status = liveStateService.getStatus(sid);
+  private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(
+      Long sessionId, Long questionId) {
+    String status = liveStateService.getStatus(sessionId);
     if (!SessionStatus.ACTIVE.name().equals(status)) {
       throw AppException.conflict("Session is not accepting answers");
     }
 
-    String questionState = liveStateService.getQuestionState(sid);
+    String questionState = liveStateService.getQuestionState(sessionId);
     if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
       throw AppException.conflict("Question is not currently accepting answers");
     }
 
+    String sid = sessionId.toString();
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
 
     // For ENTIRE_PASSAGE mode: accept answers for any sub-question in the current passage
-    String currentPassageIdStr = liveStateService.getCurrentPassageId(sid);
+    String currentPassageIdStr = liveStateService.getCurrentPassageId(sessionId);
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
       Long passageId = Long.parseLong(currentPassageIdStr);
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
@@ -123,7 +125,7 @@ public class AnswerService {
         throw AppException.conflict("Question does not belong to the current passage");
       }
     } else {
-      String currentQuestionId = liveStateService.getCurrentQuestionId(sid);
+      String currentQuestionId = liveStateService.getCurrentQuestionId(sessionId);
       if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
         throw AppException.conflict("Question is no longer active");
       }
@@ -159,7 +161,7 @@ public class AnswerService {
           "Selection contains an option that does not belong to the question");
     }
 
-    if ("SINGLE_SELECT".equals(question.questionType()) && selectedOptionIds.size() > 1) {
+    if (QuestionType.SINGLE_SELECT == question.questionType() && selectedOptionIds.size() > 1) {
       throw AppException.badRequest("SINGLE_SELECT questions require exactly one selected option");
     }
   }
@@ -170,9 +172,11 @@ public class AnswerService {
     }
   }
 
-  private Set<Long> previousSelectionIds(String sid, Long participantId, ParticipantAnswer answer) {
+  private Set<Long> previousSelectionIds(
+      Long sessionId, Long participantId, ParticipantAnswer answer) {
     Set<Long> previousSelectionIds =
-        liveStateService.getParticipantSelectionIds(sid, answer.getQuestionId(), participantId);
+        liveStateService.getParticipantSelectionIds(
+            sessionId, answer.getQuestionId(), participantId);
     if (!previousSelectionIds.isEmpty()) {
       return previousSelectionIds;
     }
@@ -190,13 +194,14 @@ public class AnswerService {
   }
 
   private void broadcastAnswerState(Long sessionId, Long questionId) {
-    String sid = sessionId.toString();
-    Map<Long, Long> counts = liveStateService.getQuestionCounts(sid, questionId);
-    long totalAnswered = liveStateService.getTotalAnswered(sid, questionId);
-    long totalParticipants = liveStateService.getParticipantCount(sid);
-    long totalLockedIn = liveStateService.getTotalLockedIn(sid, questionId);
+    Map<Long, Long> counts = liveStateService.getQuestionCounts(sessionId, questionId);
+    long totalAnswered = liveStateService.getTotalAnswered(sessionId, questionId);
+    long totalParticipants = liveStateService.getParticipantCount(sessionId);
+    long totalLockedIn = liveStateService.getTotalLockedIn(sessionId, questionId);
 
     engine.broadcastAnswerUpdate(
-        sessionId, questionId, counts, totalAnswered, totalParticipants, totalLockedIn);
+        sessionId,
+        questionId,
+        new AnswerStats(counts, totalAnswered, totalParticipants, totalLockedIn));
   }
 }

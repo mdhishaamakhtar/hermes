@@ -6,6 +6,7 @@ import dev.hishaam.hermes.entity.Question;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
@@ -88,9 +89,8 @@ public class SessionService {
             .build();
     session = sessionRepository.save(session);
 
-    String sid = session.getId().toString();
     // Pipeline overwrites the "reserving" placeholder with actual session data
-    liveStateService.initSessionKeys(sid, joinCode, snapshotJson);
+    liveStateService.initSessionKeys(session.getId(), joinCode, snapshotJson);
 
     return toResponse(session);
   }
@@ -115,24 +115,22 @@ public class SessionService {
     session.setCurrentQuestion(questionRepository.getReferenceById(first.id()));
     sessionRepository.save(session);
 
-    String sid = sessionId.toString();
-
     // Check if the first question belongs to an ENTIRE_PASSAGE passage
     if (first.passageId() != null) {
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(first.passageId());
       if (passage != null && "ENTIRE_PASSAGE".equals(passage.timerMode())) {
         // activateSession sets ACTIVE status; clear current_question so advanceSessionInternal
         // treats it as "no current question" and finds the first question (min orderIndex).
-        liveStateService.activateSession(sid, first.id());
-        liveStateService.clearCurrentQuestion(sid);
+        liveStateService.activateSession(sessionId, first.id());
+        liveStateService.clearCurrentQuestion(sessionId);
         engine.advanceSessionInternal(sessionId);
         return;
       }
     }
 
-    liveStateService.activateSession(sid, first.id());
-    liveStateService.initQuestionCounts(sid, first);
-    liveStateService.setQuestionState(sid, QuestionLifecycleState.DISPLAYED.name());
+    liveStateService.activateSession(sessionId, first.id());
+    liveStateService.initQuestionCounts(sessionId, first);
+    liveStateService.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
     engine.broadcastQuestionDisplayed(sessionId, first, snapshot);
     // Timer is NOT started — host will call /start-timer
   }
@@ -146,14 +144,13 @@ public class SessionService {
 
   public void endTimerEarly(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    String sid = sessionId.toString();
-    String questionState = liveStateService.getQuestionState(sid);
+    String questionState = liveStateService.getQuestionState(sessionId);
     if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
       throw AppException.conflict("Timer can only be ended while question is in TIMED state");
     }
 
     timerScheduler.cancelQuestionTimer(sessionId);
-    liveStateService.clearTimer(sid);
+    liveStateService.clearTimer(sessionId);
     engine.onTimerExpired(sessionId);
   }
 
@@ -161,35 +158,32 @@ public class SessionService {
 
   public void advanceSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    String sid = sessionId.toString();
-    String questionState = liveStateService.getQuestionState(sid);
+    String questionState = liveStateService.getQuestionState(sessionId);
     if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
       throw AppException.conflict("Cannot advance: current question is not in REVIEWING state");
     }
-    liveStateService.incrementQuestionSequence(sid);
+    liveStateService.incrementQuestionSequence(sessionId);
     engine.advanceSessionInternal(sessionId);
   }
 
   public void endSessionByOrganiser(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
-    liveStateService.clearTimer(sid);
-    liveStateService.incrementQuestionSequence(sid);
+    liveStateService.clearTimer(sessionId);
+    liveStateService.incrementQuestionSequence(sessionId);
     engine.doEndSession(sessionId);
   }
 
   @Transactional
   public void abandonSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    String sid = sessionId.toString();
     timerScheduler.cancelQuestionTimer(sessionId);
-    liveStateService.clearTimer(sid);
+    liveStateService.clearTimer(sessionId);
 
     // Attempt best-effort cleanup of Redis keys
     try {
-      QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-      liveStateService.cleanupSessionKeys(sid, snapshot, null);
+      QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+      liveStateService.cleanupSessionKeys(sessionId, snapshot, null);
     } catch (Exception e) {
       // Ignore if already gone or invalid
     }
@@ -206,8 +200,7 @@ public class SessionService {
 
   public LobbyStateResponse getLobbyState(Long sessionId, Long userId) {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
-    String sid = sessionId.toString();
-    long participantCount = liveStateService.getParticipantCount(sid);
+    long participantCount = liveStateService.getParticipantCount(sessionId);
     if (participantCount == 0) {
       participantCount = participantRepository.countBySessionId(sessionId);
     }
@@ -225,7 +218,7 @@ public class SessionService {
 
     // Allow correction during REVIEWING state or after session ends
     if (session.getStatus() == SessionStatus.ACTIVE) {
-      String questionState = liveStateService.getQuestionState(sid);
+      String questionState = liveStateService.getQuestionState(sessionId);
       if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
         throw AppException.conflict(
             "Scoring can only be corrected while reviewing or after session ends");
@@ -271,7 +264,7 @@ public class SessionService {
                   return new QuizSnapshot.QuestionSnapshot(
                       q.getId(),
                       q.getText(),
-                      q.getQuestionType().name(),
+                      q.getQuestionType(),
                       q.getOrderIndex(),
                       q.getTimeLimitSeconds(),
                       q.getPassage() != null ? q.getPassage().getId() : null,
@@ -291,16 +284,15 @@ public class SessionService {
         passage.getId(),
         passage.getText(),
         passage.getOrderIndex(),
-        passage.getTimerMode().name(),
+        passage.getTimerMode(),
         passage.getTimeLimitSeconds(),
         subQuestionIds);
   }
 
-  private String resolveEffectiveDisplayMode(Quiz quiz, Question question) {
-    return (question.getDisplayModeOverride() != null
-            ? question.getDisplayModeOverride()
-            : quiz.getDisplayMode())
-        .name();
+  private DisplayMode resolveEffectiveDisplayMode(Quiz quiz, Question question) {
+    return question.getDisplayModeOverride() != null
+        ? question.getDisplayModeOverride()
+        : quiz.getDisplayMode();
   }
 
   private SessionResponse toResponse(QuizSession session) {

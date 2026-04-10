@@ -30,7 +30,7 @@ public class SessionTimeoutJob implements Job {
           applicationContext.getBean(SessionLiveStateService.class);
       SessionEngine sessionEngine = applicationContext.getBean(SessionEngine.class);
 
-      long currentSequence = liveStateService.getQuestionSequence(sessionId.toString());
+      long currentSequence = liveStateService.getQuestionSequence(sessionId);
       if (currentSequence != expectedQuestionSequence) {
         return;
       }

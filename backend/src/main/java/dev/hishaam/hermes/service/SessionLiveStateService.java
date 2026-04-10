@@ -29,7 +29,40 @@ public class SessionLiveStateService {
     this.redisHelper = redisHelper;
   }
 
-  public void initSessionKeys(String sid, String joinCode, String snapshotJson) {
+  public record RejoinContext(
+      String questionLifecycle,
+      Long currentQuestionId,
+      Long currentPassageId,
+      int participantCount,
+      Integer timeLeftSeconds) {}
+
+  /**
+   * Reads all volatile session state needed to reconstruct a participant's view on rejoin. Avoids
+   * repeated round-trips from the caller.
+   */
+  public RejoinContext buildRejoinContext(Long sessionId) {
+    String questionLifecycle = getQuestionState(sessionId);
+
+    String currentQIdStr = getCurrentQuestionId(sessionId);
+    Long currentQId =
+        (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
+
+    String currentPassageIdStr = getCurrentPassageId(sessionId);
+    Long currentPassageId =
+        (currentPassageIdStr != null && !currentPassageIdStr.isEmpty())
+            ? Long.parseLong(currentPassageIdStr)
+            : null;
+
+    int participantCount = (int) getParticipantCount(sessionId);
+
+    Long ttl = getTimerTtlSeconds(sessionId);
+    Integer timeLeftSeconds = (ttl != null && ttl > 0) ? ttl.intValue() : null;
+
+    return new RejoinContext(questionLifecycle, currentQId, currentPassageId, participantCount, timeLeftSeconds);
+  }
+
+  public void initSessionKeys(Long sessionId, String joinCode, String snapshotJson) {
+    String sid = sessionId.toString();
     Expiration ttl = Expiration.from(SessionRedisHelper.SESSION_TTL);
     redis.executePipelined(
         (RedisConnection conn) -> {
@@ -73,7 +106,8 @@ public class SessionLiveStateService {
         });
   }
 
-  public void activateSession(String sid, Long firstQuestionId) {
+  public void activateSession(Long sessionId, Long firstQuestionId) {
+    String sid = sessionId.toString();
     redis
         .opsForValue()
         .set(
@@ -88,17 +122,20 @@ public class SessionLiveStateService {
             SessionRedisHelper.SESSION_TTL);
   }
 
-  public void setQuestionState(String sid, String state) {
+  public void setQuestionState(Long sessionId, String state) {
+    String sid = sessionId.toString();
     redis
         .opsForValue()
         .set(redisHelper.questionStateKey(sid), state, SessionRedisHelper.SESSION_TTL);
   }
 
-  public String getQuestionState(String sid) {
+  public String getQuestionState(Long sessionId) {
+    String sid = sessionId.toString();
     return redis.opsForValue().get(redisHelper.questionStateKey(sid));
   }
 
-  public void setCurrentPassage(String sid, Long passageId) {
+  public void setCurrentPassage(Long sessionId, Long passageId) {
+    String sid = sessionId.toString();
     redis
         .opsForValue()
         .set(
@@ -107,61 +144,74 @@ public class SessionLiveStateService {
             SessionRedisHelper.SESSION_TTL);
   }
 
-  public String getCurrentPassageId(String sid) {
+  public String getCurrentPassageId(Long sessionId) {
+    String sid = sessionId.toString();
     return redis.opsForValue().get(redisHelper.currentPassageKey(sid));
   }
 
-  public void clearCurrentPassage(String sid) {
+  public void clearCurrentPassage(Long sessionId) {
+    String sid = sessionId.toString();
     redis.delete(redisHelper.currentPassageKey(sid));
   }
 
-  public String getStatus(String sid) {
+  public String getStatus(Long sessionId) {
+    String sid = sessionId.toString();
     return redis.opsForValue().get(redisHelper.statusKey(sid));
   }
 
-  public String getCurrentQuestionId(String sid) {
+  public String getCurrentQuestionId(Long sessionId) {
+    String sid = sessionId.toString();
     return redis.opsForValue().get(redisHelper.currentQuestionKey(sid));
   }
 
-  public void setCurrentQuestion(String sid, Long questionId) {
+  public void setCurrentQuestion(Long sessionId, Long questionId) {
+    String sid = sessionId.toString();
     redis.opsForValue().set(redisHelper.currentQuestionKey(sid), questionId.toString());
   }
 
   /** Resets current_question to empty so the next advance finds the first question. */
-  public void clearCurrentQuestion(String sid) {
+  public void clearCurrentQuestion(Long sessionId) {
+    String sid = sessionId.toString();
     redis
         .opsForValue()
         .set(redisHelper.currentQuestionKey(sid), "", SessionRedisHelper.SESSION_TTL);
   }
 
-  public void clearTimer(String sid) {
+  public void clearTimer(Long sessionId) {
+    String sid = sessionId.toString();
     redis.delete(redisHelper.timerKey(sid));
   }
 
-  public void setTimer(String sid, int timeLimitSeconds) {
+  public void setTimer(Long sessionId, int timeLimitSeconds) {
+    String sid = sessionId.toString();
     redis.opsForValue().set(redisHelper.timerKey(sid), "1", Duration.ofSeconds(timeLimitSeconds));
   }
 
-  public Long getTimerTtlSeconds(String sid) {
+  public Long getTimerTtlSeconds(Long sessionId) {
+    String sid = sessionId.toString();
     return redis.getExpire(redisHelper.timerKey(sid));
   }
 
-  public long incrementQuestionSequence(String sid) {
+  public long incrementQuestionSequence(Long sessionId) {
+    String sid = sessionId.toString();
     Long next = redis.opsForValue().increment(redisHelper.questionSequenceKey(sid));
     return next != null ? next : 0L;
   }
 
-  public long getQuestionSequence(String sid) {
+  public long getQuestionSequence(Long sessionId) {
+    String sid = sessionId.toString();
     String raw = redis.opsForValue().get(redisHelper.questionSequenceKey(sid));
     return raw != null ? Long.parseLong(raw) : 0L;
   }
 
-  public long incrementParticipantCount(String sid) {
+  public long incrementParticipantCount(Long sessionId) {
+    String sid = sessionId.toString();
     Long count = redis.opsForValue().increment(redisHelper.participantCountKey(sid));
     return count != null ? count : 0L;
   }
 
-  public long getParticipantCount(String sid) {
+  public long getParticipantCount(Long sessionId) {
+    String sid = sessionId.toString();
     String val = redis.opsForValue().get(redisHelper.participantCountKey(sid));
     return val != null ? Long.parseLong(val) : 0L;
   }
@@ -170,30 +220,35 @@ public class SessionLiveStateService {
     return redis.opsForValue().get(redisHelper.joinCodeKey(joinCode));
   }
 
-  public void cacheParticipantName(String sid, Long participantId, String displayName) {
+  public void cacheParticipantName(Long sessionId, Long participantId, String displayName) {
+    String sid = sessionId.toString();
     redis
         .opsForHash()
         .put(redisHelper.participantNamesKey(sid), participantId.toString(), displayName);
     redis.expire(redisHelper.participantNamesKey(sid), SessionRedisHelper.SESSION_TTL);
   }
 
-  public void initLeaderboardEntry(String sid, Long participantId) {
+  public void initLeaderboardEntry(Long sessionId, Long participantId) {
+    String sid = sessionId.toString();
     redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), 0);
     redis.expire(redisHelper.leaderboardKey(sid), SessionRedisHelper.SESSION_TTL);
   }
 
-  public void incrementLeaderboardScore(String sid, Long participantId, long deltaPoints) {
+  public void incrementLeaderboardScore(Long sessionId, Long participantId, long deltaPoints) {
+    String sid = sessionId.toString();
     redis
         .opsForZSet()
         .incrementScore(redisHelper.leaderboardKey(sid), participantId.toString(), deltaPoints);
   }
 
   /** Replaces a participant's leaderboard score (used during regrading). */
-  public void setLeaderboardScore(String sid, Long participantId, long newScore) {
+  public void setLeaderboardScore(Long sessionId, Long participantId, long newScore) {
+    String sid = sessionId.toString();
     redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), newScore);
   }
 
-  public void recordTimerStartedAt(String sid, long epochMillis) {
+  public void recordTimerStartedAt(Long sessionId, long epochMillis) {
+    String sid = sessionId.toString();
     redis
         .opsForValue()
         .set(
@@ -202,19 +257,22 @@ public class SessionLiveStateService {
             SessionRedisHelper.SESSION_TTL);
   }
 
-  public Long getTimerStartedAt(String sid) {
+  public Long getTimerStartedAt(Long sessionId) {
+    String sid = sessionId.toString();
     String val = redis.opsForValue().get(redisHelper.timerStartedAtKey(sid));
     return val != null ? Long.parseLong(val) : null;
   }
 
-  public void incrementCumulativeTime(String sid, Long participantId, long millis) {
+  public void incrementCumulativeTime(Long sessionId, Long participantId, long millis) {
+    String sid = sessionId.toString();
     redis
         .opsForHash()
         .increment(redisHelper.cumulativeTimeKey(sid), participantId.toString(), millis);
     redis.expire(redisHelper.cumulativeTimeKey(sid), SessionRedisHelper.SESSION_TTL);
   }
 
-  public List<SessionResultsResponse.LeaderboardEntry> buildLeaderboard(String sid) {
+  public List<SessionResultsResponse.LeaderboardEntry> buildLeaderboard(Long sessionId) {
+    String sid = sessionId.toString();
     Set<ZSetOperations.TypedTuple<String>> data =
         redis.opsForZSet().reverseRangeWithScores(redisHelper.leaderboardKey(sid), 0, -1);
     if (data == null || data.isEmpty()) {
@@ -253,14 +311,16 @@ public class SessionLiveStateService {
         .toList();
   }
 
-  public void initQuestionCounts(String sid, QuizSnapshot.QuestionSnapshot question) {
+  public void initQuestionCounts(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
+    String sid = sessionId.toString();
     Map<String, String> initial = new LinkedHashMap<>();
     question.options().forEach(option -> initial.put(option.id().toString(), "0"));
     redis.opsForHash().putAll(redisHelper.questionCountsKey(sid, question.id()), initial);
     redis.expire(redisHelper.questionCountsKey(sid, question.id()), SessionRedisHelper.SESSION_TTL);
   }
 
-  public Set<Long> getParticipantSelectionIds(String sid, Long questionId, Long participantId) {
+  public Set<Long> getParticipantSelectionIds(Long sessionId, Long questionId, Long participantId) {
+    String sid = sessionId.toString();
     Set<String> raw =
         redis
             .opsForSet()
@@ -274,11 +334,12 @@ public class SessionLiveStateService {
   }
 
   public void replaceParticipantSelections(
-      String sid,
+      Long sessionId,
       Long questionId,
       Long participantId,
       Set<Long> previousSelectionIds,
       Set<Long> nextSelectionIds) {
+    String sid = sessionId.toString();
     String countsKey = redisHelper.questionCountsKey(sid, questionId);
     String selectionKey = redisHelper.participantSelectionKey(sid, questionId, participantId);
     String answeredKey = redisHelper.questionAnsweredKey(sid, questionId);
@@ -303,7 +364,8 @@ public class SessionLiveStateService {
     }
   }
 
-  public Map<Long, Long> getQuestionCounts(String sid, Long questionId) {
+  public Map<Long, Long> getQuestionCounts(Long sessionId, Long questionId) {
+    String sid = sessionId.toString();
     Map<Object, Object> rawCounts =
         redis.opsForHash().entries(redisHelper.questionCountsKey(sid, questionId));
     Map<Long, Long> counts = new LinkedHashMap<>();
@@ -313,25 +375,31 @@ public class SessionLiveStateService {
     return counts;
   }
 
-  public long getTotalAnswered(String sid, Long questionId) {
+  public long getTotalAnswered(Long sessionId, Long questionId) {
+    String sid = sessionId.toString();
     Long total = redis.opsForSet().size(redisHelper.questionAnsweredKey(sid, questionId));
     return total != null ? total : 0L;
   }
 
-  public void markLockedIn(String sid, Long questionId, Long participantId) {
+  public void markLockedIn(Long sessionId, Long questionId, Long participantId) {
+    String sid = sessionId.toString();
     redis
         .opsForSet()
         .add(redisHelper.questionLockedInKey(sid, questionId), participantId.toString());
     redis.expire(redisHelper.questionLockedInKey(sid, questionId), SessionRedisHelper.SESSION_TTL);
   }
 
-  public long getTotalLockedIn(String sid, Long questionId) {
+  public long getTotalLockedIn(Long sessionId, Long questionId) {
+    String sid = sessionId.toString();
     Long total = redis.opsForSet().size(redisHelper.questionLockedInKey(sid, questionId));
     return total != null ? total : 0L;
   }
 
-  public void cleanupSessionKeys(String sid, QuizSnapshot snapshot, String joinCode) {
-    redis.delete(redisHelper.joinCodeKey(joinCode));
+  public void cleanupSessionKeys(Long sessionId, QuizSnapshot snapshot, String joinCode) {
+    String sid = sessionId.toString();
+    if (joinCode != null) {
+      redis.delete(redisHelper.joinCodeKey(joinCode));
+    }
 
     snapshot
         .questions()
