@@ -308,23 +308,23 @@ export function useQuizEditor({
   };
 
   const handleAbandonAll = () => {
-    const lobbyIds = sessions
-      .filter((session) => session.status === "LOBBY")
+    const nonEndedIds = sessions
+      .filter((session) => session.status !== "ENDED")
       .map((session) => session.id);
-    if (!lobbyIds.length) return;
+    if (!nonEndedIds.length) return;
 
     setConfirmMessage(
-      `Abandon all ${lobbyIds.length} lobby session(s)? The quiz will become editable again.`,
+      `Abandon all ${nonEndedIds.length} active session(s)? The quiz will become editable again.`,
     );
     setConfirmLabel("Abandon");
     setConfirmVariant("warning");
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
-      await Promise.all(lobbyIds.map((id) => sessionsApi.abandon(id)));
+      await Promise.all(nonEndedIds.map((id) => sessionsApi.abandon(id)));
       mutateSessions(
         sessions.map((session) =>
-          lobbyIds.includes(session.id)
+          nonEndedIds.includes(session.id)
             ? { ...session, status: "ENDED" }
             : session,
         ),

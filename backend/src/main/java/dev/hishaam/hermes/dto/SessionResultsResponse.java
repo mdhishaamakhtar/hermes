@@ -19,6 +19,7 @@ public record SessionResultsResponse(
       String text,
       int orderIndex,
       int timeLimitSeconds,
+      Long passageId,
       String passageText,
       long totalAnswers,
       List<OptionInfo> options) {}

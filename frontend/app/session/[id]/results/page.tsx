@@ -134,20 +134,93 @@ export default function ResultsPage() {
 
         <div className="mt-8 space-y-4">
           <AnimatePresence mode="wait">
-            {results.questions
-              .toSorted((a, b) => a.orderIndex - b.orderIndex)
-              .map((question, index) => (
-                <motion.div
-                  key={question.questionId}
-                  {...enterAnimation}
-                  transition={{
-                    ...enterAnimation.transition,
-                    delay: index * 0.03,
-                  }}
-                >
-                  <QuestionResultCard question={question} />
-                </motion.div>
-              ))}
+            {(() => {
+              type ResultQuestion = MyResults["questions"][number];
+              type ResultGroup =
+                | { type: "standalone"; question: ResultQuestion }
+                | {
+                    type: "passage";
+                    passageId: number;
+                    passageText: string;
+                    questions: ResultQuestion[];
+                  };
+              const sorted = results.questions.toSorted(
+                (a, b) => a.orderIndex - b.orderIndex,
+              );
+              const groups: ResultGroup[] = [];
+              let currentPassageId: number | null = null;
+              let currentGroup: Extract<
+                ResultGroup,
+                { type: "passage" }
+              > | null = null;
+              for (const q of sorted) {
+                if (!q.passageId) {
+                  groups.push({ type: "standalone", question: q });
+                  currentPassageId = null;
+                  currentGroup = null;
+                } else if (q.passageId === currentPassageId && currentGroup) {
+                  currentGroup.questions.push(q);
+                } else {
+                  currentPassageId = q.passageId;
+                  currentGroup = {
+                    type: "passage",
+                    passageId: q.passageId,
+                    passageText: q.passageText ?? "",
+                    questions: [q],
+                  };
+                  groups.push(currentGroup);
+                }
+              }
+              return groups.map((group, gIdx) => {
+                if (group.type === "standalone") {
+                  return (
+                    <motion.div
+                      key={group.question.questionId}
+                      {...enterAnimation}
+                      transition={{
+                        ...enterAnimation.transition,
+                        delay: gIdx * 0.03,
+                      }}
+                    >
+                      <QuestionResultCard question={group.question} />
+                    </motion.div>
+                  );
+                }
+                return (
+                  <motion.div
+                    key={`p-${group.passageId}`}
+                    {...enterAnimation}
+                    transition={{
+                      ...enterAnimation.transition,
+                      delay: gIdx * 0.03,
+                    }}
+                    className="border border-border bg-surface overflow-hidden"
+                  >
+                    <div className="bg-background/50 border-b border-border p-6 pb-8">
+                      <div className="mb-4 flex items-center gap-2">
+                        <span className="label text-warning">Passage</span>
+                        <span className="text-muted/40 text-xs">·</span>
+                        <span className="text-xs text-muted">
+                          {group.questions.length} questions
+                        </span>
+                      </div>
+                      <p className="text-sm leading-7 text-muted">
+                        {group.passageText}
+                      </p>
+                    </div>
+                    <div className="divide-y divide-border/50">
+                      {group.questions.map((q) => (
+                        <QuestionResultCard
+                          key={q.questionId}
+                          question={q}
+                          isInsidePassage
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+              });
+            })()}
           </AnimatePresence>
         </div>
       </main>

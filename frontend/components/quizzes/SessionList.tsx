@@ -19,14 +19,14 @@ export default function SessionList({
 }: Props) {
   if (sessions.length === 0) return null;
 
-  const hasLobby = sessions.some((s) => s.status === "LOBBY");
+  const hasNonEnded = sessions.some((s) => s.status !== "ENDED");
 
   return (
     <>
       <div className="h-px bg-border mb-6" />
       <div className="flex items-center justify-between mb-4">
         <h2 className="label">Past Sessions</h2>
-        {hasLobby && (
+        {hasNonEnded && (
           <button
             onClick={onAbandonAll}
             disabled={abandoning}
@@ -77,7 +77,7 @@ export default function SessionList({
               </Link>
             )}
 
-            {session.status === "LOBBY" && (
+            {session.status !== "ENDED" && (
               <button
                 onClick={() => onAbandon(session.id)}
                 disabled={abandoning}

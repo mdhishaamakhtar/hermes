@@ -6,8 +6,10 @@ import type { MyResults } from "@/lib/types";
 
 export function QuestionResultCard({
   question,
+  isInsidePassage,
 }: {
   question: MyResults["questions"][number];
+  isInsidePassage?: boolean;
 }) {
   const selectedCount = question.selectedOptionIds.length;
   const score = question.pointsEarned;
@@ -48,7 +50,7 @@ export function QuestionResultCard({
         </div>
       </div>
 
-      {question.passageText ? (
+      {question.passageText && !isInsidePassage ? (
         <div className="mt-4 border border-border bg-background p-4">
           <p className="label mb-2 text-warning">Passage</p>
           <p className="text-sm leading-7 text-muted">{question.passageText}</p>

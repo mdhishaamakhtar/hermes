@@ -110,7 +110,7 @@ public class SessionResultsService {
 
     List<MyResultsResponse.QuestionResult> questions =
         snapshot.questions().stream()
-            .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+            .sorted(Comparator.comparingDouble(snapshot::globalSortKey))
             .map(
                 q -> {
                   ParticipantAnswer ans = answerMap.get(q.id());
@@ -143,8 +143,9 @@ public class SessionResultsService {
                   return new MyResultsResponse.QuestionResult(
                       q.id(),
                       q.text(),
-                      q.orderIndex(),
+                      snapshot.questionPosition(q.id()),
                       q.questionType().name(),
+                      q.passageId(),
                       passageText,
                       selectedOptionIds,
                       correctOptionIds,
@@ -181,7 +182,7 @@ public class SessionResultsService {
     // Build per-question results
     List<SessionResultsResponse.QuestionResult> questionResults =
         snapshot.questions().stream()
-            .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+            .sorted(Comparator.comparingDouble(snapshot::globalSortKey))
             .map(
                 q -> {
                   List<ParticipantAnswer> questionAnswers =
@@ -222,8 +223,9 @@ public class SessionResultsService {
                   return new SessionResultsResponse.QuestionResult(
                       q.id(),
                       q.text(),
-                      q.orderIndex(),
+                      snapshot.questionPosition(q.id()),
                       q.timeLimitSeconds(),
+                      q.passageId(),
                       passageText,
                       totalAnswers,
                       options);

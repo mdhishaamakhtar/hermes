@@ -15,6 +15,7 @@ export function ScoringDrawer({
   questionTitle,
   draftOptions,
   saving,
+  error,
   onClose,
   onChange,
   onSave,
@@ -23,6 +24,7 @@ export function ScoringDrawer({
   questionTitle: string;
   draftOptions: CorrectionDraftOption[];
   saving: boolean;
+  error?: string;
   onClose: () => void;
   onChange: (index: number, value: string) => void;
   onSave: () => void;
@@ -76,6 +78,9 @@ export function ScoringDrawer({
               </div>
 
               <div className="border-t border-border px-6 py-5">
+                {error ? (
+                  <p className="mb-4 text-sm text-danger">{error}</p>
+                ) : null}
                 <div className="flex items-center gap-3">
                   <button
                     type="button"

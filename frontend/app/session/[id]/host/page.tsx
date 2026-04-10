@@ -36,6 +36,7 @@ export default function HostPage() {
     scoringQuestionId,
     scoringQuestionTitle,
     scoringDraft,
+    scoringError,
     setScoringDraft,
     currentQuestions,
     primaryQuestion,
@@ -71,17 +72,11 @@ export default function HostPage() {
         <header className="border-b border-border px-4 sm:px-6 py-4">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <Logo size="sm" />
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <CardBadge tone="warning">Lobby</CardBadge>
-              <div className="border border-border bg-surface px-4 py-2 text-right">
-                <p className="label mb-1">Audience</p>
-                <p className="text-lg font-bold tabular-nums text-foreground">
-                  {participantCount}
-                </p>
-                <p className="text-[11px] text-muted">
-                  {formatParticipantCount(participantCount)}
-                </p>
-              </div>
+              <span className="text-xs text-muted tabular-nums">
+                {formatParticipantCount(participantCount)}
+              </span>
             </div>
           </div>
         </header>
@@ -180,22 +175,104 @@ export default function HostPage() {
                   Loading results...
                 </div>
               ) : (
-                reviewQuestions.map((question, index) => (
-                  <motion.div
-                    key={question.id}
-                    {...enterAnimation}
-                    transition={{
-                      ...enterAnimation.transition,
-                      delay: index * 0.03,
-                    }}
-                  >
-                    <QuestionCard
-                      question={question}
-                      mode="review"
-                      onEdit={() => openScoringDrawer(question)}
-                    />
-                  </motion.div>
-                ))
+                (() => {
+                  type ReviewGroup =
+                    | {
+                        type: "standalone";
+                        question: (typeof reviewQuestions)[number];
+                      }
+                    | {
+                        type: "passage";
+                        passageId: number;
+                        passageText: string;
+                        questions: (typeof reviewQuestions)[number][];
+                      };
+                  const groups: ReviewGroup[] = [];
+                  let currentPassageId: number | null = null;
+                  let currentGroup: Extract<
+                    ReviewGroup,
+                    { type: "passage" }
+                  > | null = null;
+                  for (const q of reviewQuestions) {
+                    if (!q.passageId) {
+                      groups.push({ type: "standalone", question: q });
+                      currentPassageId = null;
+                      currentGroup = null;
+                    } else if (
+                      q.passageId === currentPassageId &&
+                      currentGroup
+                    ) {
+                      currentGroup.questions.push(q);
+                    } else {
+                      currentPassageId = q.passageId;
+                      currentGroup = {
+                        type: "passage",
+                        passageId: q.passageId,
+                        passageText: q.passageText ?? "",
+                        questions: [q],
+                      };
+                      groups.push(currentGroup);
+                    }
+                  }
+                  return groups.map((group, gIdx) => {
+                    if (group.type === "standalone") {
+                      return (
+                        <motion.div
+                          key={`q-${group.question.id}`}
+                          {...enterAnimation}
+                          transition={{
+                            ...enterAnimation.transition,
+                            delay: gIdx * 0.03,
+                          }}
+                        >
+                          <QuestionCard
+                            question={group.question}
+                            mode="review"
+                            onEdit={() => openScoringDrawer(group.question)}
+                          />
+                        </motion.div>
+                      );
+                    }
+                    return (
+                      <motion.div
+                        key={`p-${group.passageId}`}
+                        {...enterAnimation}
+                        transition={{
+                          ...enterAnimation.transition,
+                          delay: gIdx * 0.03,
+                        }}
+                        className="border border-border bg-surface overflow-hidden"
+                      >
+                        <div className="bg-background/50 border-b border-border p-6 pb-8">
+                          <div className="mb-4 flex items-center gap-2">
+                            <span className="label text-warning">Passage</span>
+                            <span className="text-muted/40 text-xs">·</span>
+                            <span className="text-xs text-muted">
+                              {group.questions.length} questions
+                            </span>
+                          </div>
+                          <div
+                            className="prose prose-invert max-w-none text-base leading-relaxed text-foreground prose-p:my-0 prose-p:leading-relaxed"
+                            dangerouslySetInnerHTML={{
+                              __html: group.passageText,
+                            }}
+                          />
+                        </div>
+                        <div className="divide-y divide-border/50">
+                          {group.questions.map((q) => (
+                            <QuestionCard
+                              key={`q-${q.id}`}
+                              question={q}
+                              mode="review"
+                              isInsidePassage
+                              onEdit={() => openScoringDrawer(q)}
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+                    );
+                  });
+                })()
               )}
             </div>
           </div>
@@ -265,6 +342,7 @@ export default function HostPage() {
           questionTitle={scoringQuestionTitle}
           draftOptions={scoringDraft}
           saving={drawerSaving}
+          error={scoringError}
           onClose={closeDrawer}
           onChange={(index, value) =>
             setScoringDraft((current) =>
@@ -306,24 +384,18 @@ export default function HostPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             <CardBadge
               tone={sessionStatus === "ACTIVE" ? "success" : "warning"}
             >
               {sessionStatus}
             </CardBadge>
             <CardBadge tone="accent">{questionLifecycle}</CardBadge>
-            <div className="border border-border bg-surface px-4 py-2 text-right">
-              <p className="label mb-1">Live audience</p>
-              <p className="text-lg font-bold tabular-nums text-foreground">
-                {participantCount}
-              </p>
-              <p className="text-[11px] text-muted">
-                {formatParticipantCount(participantCount)}
-              </p>
-            </div>
+            <span className="text-xs text-muted tabular-nums">
+              {formatParticipantCount(participantCount)}
+            </span>
             <button
               onClick={handleCopyCode}
               disabled={!joinCode}
@@ -662,6 +734,7 @@ export default function HostPage() {
         questionTitle={scoringQuestionTitle}
         draftOptions={scoringDraft}
         saving={drawerSaving}
+        error={scoringError}
         onClose={closeDrawer}
         onChange={(index, value) => {
           setScoringDraft((current) =>

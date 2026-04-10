@@ -117,7 +117,7 @@ public class ParticipantService {
                   .filter(java.util.Objects::nonNull)
                   .sorted(
                       java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-                  .map(qSnap -> buildQuestionInfo(participantId, qSnap))
+                  .map(qSnap -> buildQuestionInfo(participantId, qSnap, snapshot))
                   .toList();
 
           currentPassage =
@@ -181,7 +181,7 @@ public class ParticipantService {
     return new RejoinResponse.CurrentQuestion(
         question.id(),
         question.text(),
-        question.orderIndex(),
+        snapshot.questionPosition(question.id()),
         snapshot.questions().size(),
         question.timeLimitSeconds(),
         question.questionType().name(),
@@ -193,7 +193,7 @@ public class ParticipantService {
   }
 
   private RejoinResponse.QuestionInfo buildQuestionInfo(
-      Long participantId, QuizSnapshot.QuestionSnapshot question) {
+      Long participantId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
     ParticipantAnswer answer = currentAnswer(participantId, question.id());
     List<RejoinResponse.OptionInfo> options =
         question.options().stream()
@@ -202,7 +202,7 @@ public class ParticipantService {
     return new RejoinResponse.QuestionInfo(
         question.id(),
         question.text(),
-        question.orderIndex(),
+        snapshot.questionPosition(question.id()),
         question.timeLimitSeconds(),
         question.questionType().name(),
         question.effectiveDisplayMode().name(),

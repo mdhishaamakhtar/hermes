@@ -502,6 +502,7 @@ function buildResultsQuestionCard(
     orderIndex: question.orderIndex,
     timeLimitSeconds: question.timeLimitSeconds,
     totalAnswers,
+    passageId: question.passageId,
     passageText: question.passageText,
     options: question.options
       .toSorted((a, b) => a.orderIndex - b.orderIndex)
@@ -555,6 +556,7 @@ export function useHostSession(id: string) {
   );
   const [scoringQuestionTitle, setScoringQuestionTitle] = useState("");
   const [scoringDraft, setScoringDraft] = useState<CorrectionDraftOption[]>([]);
+  const [scoringError, setScoringError] = useState("");
 
   const authToken = getStoredAuthToken();
 
@@ -779,6 +781,7 @@ export function useHostSession(id: string) {
     timerLimitSeconds > 0 ? (timeLeft / timerLimitSeconds) * 100 : 0;
 
   const openScoringDrawer = useCallback((question: QuestionCardData) => {
+    setScoringError("");
     setScoringQuestionId(question.id);
     setScoringQuestionTitle(question.text);
     setScoringDraft(
@@ -792,6 +795,7 @@ export function useHostSession(id: string) {
   }, []);
 
   const closeDrawer = useCallback(() => {
+    setScoringError("");
     setScoringQuestionId(null);
     setScoringQuestionTitle("");
     setScoringDraft([]);
@@ -849,41 +853,47 @@ export function useHostSession(id: string) {
   const handleSaveScoring = useCallback(async () => {
     if (!id || scoringQuestionId == null) return;
     setDrawerSaving(true);
+    setScoringError("");
 
-    const payload = scoringDraft.map((option) => ({
-      optionId: option.optionId,
-      pointValue: Number(option.pointValue) || 0,
-    }));
-    const response = await sessionsApi.correctScoring(
-      id,
-      scoringQuestionId,
-      payload,
-    );
+    try {
+      const payload = scoringDraft.map((option) => ({
+        optionId: option.optionId,
+        pointValue: Number(option.pointValue) || 0,
+      }));
+      const response = await sessionsApi.correctScoring(
+        id,
+        scoringQuestionId,
+        payload,
+      );
 
-    if (response.success) {
-      const nextPoints = Object.fromEntries(
-        payload.map((option) => [option.optionId, option.pointValue]),
-      ) as Record<number, number>;
-      const nextCorrectIds = payload
-        .filter((option) => option.pointValue > 0)
-        .map((option) => option.optionId);
+      if (response.success) {
+        const nextPoints = Object.fromEntries(
+          payload.map((option) => [option.optionId, option.pointValue]),
+        ) as Record<number, number>;
+        const nextCorrectIds = payload
+          .filter((option) => option.pointValue > 0)
+          .map((option) => option.optionId);
 
-      dispatch({
-        type: "SCORING_CORRECTED_LOCAL",
-        questionId: scoringQuestionId,
-        optionPoints: nextPoints,
-        correctOptionIds: nextCorrectIds,
-      });
+        dispatch({
+          type: "SCORING_CORRECTED_LOCAL",
+          questionId: scoringQuestionId,
+          optionPoints: nextPoints,
+          correctOptionIds: nextCorrectIds,
+        });
 
-      if (sessionStatus === "ENDED") {
-        await loadResults();
+        if (sessionStatus === "ENDED") {
+          await loadResults();
+        }
+        setScoringQuestionId(null);
+        setScoringQuestionTitle("");
+        setScoringDraft([]);
+        return;
       }
-      setScoringQuestionId(null);
-      setScoringQuestionTitle("");
-      setScoringDraft([]);
-    }
 
-    setDrawerSaving(false);
+      setScoringError(response.error?.message ?? "Failed to update scoring.");
+    } finally {
+      setDrawerSaving(false);
+    }
   }, [id, loadResults, scoringDraft, scoringQuestionId, sessionStatus]);
 
   const activeModeLabel = displayModeLabel(effectiveDisplayMode);
@@ -916,6 +926,7 @@ export function useHostSession(id: string) {
     scoringQuestionId,
     scoringQuestionTitle,
     scoringDraft,
+    scoringError,
     setScoringDraft,
     currentQuestions,
     primaryQuestion,

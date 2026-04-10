@@ -8,6 +8,7 @@ import BackLink from "@/components/ui/BackLink";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
+import { QuestionReviewCard } from "@/components/session/QuestionReviewCard";
 import { formatParticipantCount } from "@/lib/session-utils";
 import type { SessionResults } from "@/lib/types";
 
@@ -77,31 +78,20 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
         }
       />
 
-      <section className="mb-8 border border-border bg-surface p-6">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-2xl">
-            <p className="label mb-2">Ended session</p>
-            <h2 className="text-2xl font-bold text-foreground">
-              Final standings and question-by-question response shape
-            </h2>
-          </div>
-          <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2">
-            <div className="border border-border bg-background px-4 py-3">
-              <p className="label mb-2">Question set</p>
-              <p className="text-2xl font-black tabular-nums text-foreground">
-                {sortedQuestions.length}
-              </p>
-              <p className="mt-1 text-xs text-muted">reviewed items</p>
-            </div>
-            <div className="border border-border bg-background px-4 py-3">
-              <p className="label mb-2">Audience</p>
-              <p className="text-2xl font-black tabular-nums text-foreground">
-                {results.participantCount}
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                {formatParticipantCount(results.participantCount)}
-              </p>
-            </div>
+      <section className="mb-8 border border-border bg-surface px-6 py-5">
+        <p className="label mb-2">Ended session</p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <h2 className="max-w-2xl text-2xl font-bold text-foreground">
+            Final standings and response shape
+          </h2>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+            <span className="tabular-nums">
+              {sortedQuestions.length} questions
+            </span>
+            <span className="text-muted/40">·</span>
+            <span className="tabular-nums">
+              {formatParticipantCount(results.participantCount)}
+            </span>
           </div>
         </div>
       </section>
@@ -165,117 +155,97 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="space-y-4"
+            className="space-y-8"
           >
-            {sortedQuestions.map((question) => {
-              const maxCount = Math.max(
-                ...question.options.map((o) => o.count),
-                1,
-              );
-              return (
-                <div
-                  key={question.id}
-                  className="border border-border bg-surface p-6"
-                >
-                  <div className="mb-6 flex items-start justify-between gap-6">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="label tabular-nums">
-                          Q{question.orderIndex}
-                        </p>
+            {(() => {
+              const groups: (
+                | {
+                    type: "standalone";
+                    question: (typeof sortedQuestions)[number];
+                  }
+                | {
+                    type: "passage";
+                    passageId: number;
+                    passageText: string;
+                    questions: typeof sortedQuestions;
+                  }
+              )[] = [];
+
+              let currentPassageId: number | null = null;
+              let currentPassageGroup: {
+                type: "passage";
+                passageId: number;
+                passageText: string;
+                questions: typeof sortedQuestions;
+              } | null = null;
+
+              for (const q of sortedQuestions) {
+                if (q.passageId == null) {
+                  groups.push({ type: "standalone", question: q });
+                  currentPassageId = null;
+                  currentPassageGroup = null;
+                } else if (
+                  q.passageId === currentPassageId &&
+                  currentPassageGroup
+                ) {
+                  currentPassageGroup.questions.push(q);
+                } else {
+                  currentPassageId = q.passageId;
+                  currentPassageGroup = {
+                    type: "passage",
+                    passageId: q.passageId,
+                    passageText: q.passageText || "",
+                    questions: [q],
+                  };
+                  groups.push(currentPassageGroup);
+                }
+              }
+
+              return groups.map((group) => {
+                if (group.type === "standalone") {
+                  return (
+                    <QuestionReviewCard
+                      key={`q-${group.question.id}`}
+                      question={group.question}
+                      participantCount={results.participantCount}
+                    />
+                  );
+                }
+
+                return (
+                  <div
+                    key={`p-${group.passageId}`}
+                    className="border border-border bg-surface overflow-hidden"
+                  >
+                    <div className="bg-background/50 border-b border-border p-6 pb-8">
+                      <div className="mb-4 flex items-center gap-2">
+                        <span className="label text-warning">Passage</span>
                         <span className="text-muted/40 text-xs">·</span>
-                        <span className="text-xs text-muted tabular-nums">
-                          {question.timeLimitSeconds}s time limit
+                        <span className="text-xs text-muted">
+                          {group.questions.length} questions
                         </span>
                       </div>
-                      <h2 className="text-lg font-bold text-foreground leading-snug">
-                        {question.text}
-                      </h2>
-                      {question.passageText ? (
-                        <div className="mt-4 border border-border bg-background p-4">
-                          <p className="label mb-3 text-warning">Passage</p>
-                          <div
-                            className="prose prose-invert max-w-none text-sm leading-7 text-muted prose-p:my-0 prose-p:leading-7"
-                            dangerouslySetInnerHTML={{
-                              __html: question.passageText,
-                            }}
-                          />
-                        </div>
-                      ) : null}
+                      <div
+                        className="prose prose-invert max-w-none text-base leading-relaxed text-foreground prose-p:my-0 prose-p:leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: group.passageText,
+                        }}
+                      />
                     </div>
-                    <div className="ml-4 shrink-0 text-right">
-                      <p className="label mb-2">Responses</p>
-                      <p className="text-lg font-bold tabular-nums text-foreground">
-                        {question.totalAnswers}/{results.participantCount}
-                      </p>
-                      <p className="text-xs text-muted tabular-nums">
-                        {results.participantCount > 0
-                          ? `${Math.round(
-                              (question.totalAnswers /
-                                results.participantCount) *
-                                100,
-                            )}% participation`
-                          : "No participants"}
-                      </p>
+                    <div className="divide-y divide-border/50">
+                      {group.questions.map((q) => (
+                        <QuestionReviewCard
+                          key={`q-${q.id}`}
+                          question={q}
+                          participantCount={results.participantCount}
+                          isInsidePassage
+                        />
+                      ))}
                     </div>
                   </div>
-
-                  <div className="space-y-3">
-                    {question.options
-                      .toSorted((a, b) => a.orderIndex - b.orderIndex)
-                      .map((option) => {
-                        const pct =
-                          question.totalAnswers > 0
-                            ? Math.round(
-                                (option.count / question.totalAnswers) * 100,
-                              )
-                            : 0;
-                        const barWidth = (option.count / maxCount) * 100;
-
-                        return (
-                          <div key={option.id}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span
-                                className={`text-sm ${
-                                  option.isCorrect
-                                    ? "text-success font-medium"
-                                    : "text-muted"
-                                }`}
-                              >
-                                {option.isCorrect && (
-                                  <span className="mr-2 text-xs">✓</span>
-                                )}
-                                {option.text}
-                              </span>
-                              <span className="text-xs tabular-nums text-muted">
-                                {option.count} ({pct}%)
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-border overflow-hidden relative">
-                              <motion.div
-                                initial={{ scaleX: 0 }}
-                                animate={{ scaleX: barWidth / 100 }}
-                                transition={{
-                                  type: "spring",
-                                  stiffness: 300,
-                                  damping: 32,
-                                }}
-                                className="h-full absolute inset-0 origin-left"
-                                style={{
-                                  background: option.isCorrect
-                                    ? "var(--color-success)"
-                                    : "var(--color-primary)",
-                                  willChange: "transform",
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </motion.div>
         )}
       </AnimatePresence>

@@ -703,6 +703,7 @@ export function usePlaySession(sessionId: string) {
   const syncingQuestionPromisesRef = useRef(
     new Map<number, Promise<boolean>>(),
   );
+  const syncInterruptRef = useRef(new Map<number, () => void>());
   const pendingAckResolversRef = useRef(
     new Map<
       string,
@@ -1089,7 +1090,16 @@ export function usePlaySession(sessionId: string) {
               clientRequestId,
             });
 
-            const ack = await ackPromise;
+            const ack = await Promise.race([
+              ackPromise,
+              new Promise<{ success: boolean; code?: string }>(
+                (resolveInterrupt) => {
+                  syncInterruptRef.current.set(questionId, () =>
+                    resolveInterrupt({ success: true, code: "SUPERSEDED" }),
+                  );
+                },
+              ),
+            ]);
             if (!ack.success && ack.code === "TIMEOUT") {
               const fallbackSucceeded = await fallbackSubmitAnswer(
                 questionId,
@@ -1126,6 +1136,7 @@ export function usePlaySession(sessionId: string) {
           }
         } finally {
           syncingQuestionPromisesRef.current.delete(questionId);
+          syncInterruptRef.current.delete(questionId);
         }
       })();
 
@@ -1171,6 +1182,7 @@ export function usePlaySession(sessionId: string) {
         questionId,
         normalizeSelectionIds(nextSelection),
       );
+      syncInterruptRef.current.get(questionId)?.();
       if (process.env.NODE_ENV === "development")
         console.info("[play] toggle-option", {
           questionId,

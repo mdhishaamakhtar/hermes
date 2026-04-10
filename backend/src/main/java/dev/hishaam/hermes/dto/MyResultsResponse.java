@@ -17,6 +17,7 @@ public record MyResultsResponse(
       String questionText,
       int orderIndex,
       String questionType,
+      Long passageId,
       String passageText,
       List<Long> selectedOptionIds,
       List<Long> correctOptionIds,

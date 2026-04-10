@@ -130,17 +130,11 @@ export default function PlayPage() {
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             <span className="label">{headerStatus}</span>
-            <div className="border border-border bg-surface px-4 py-2 text-right">
-              <p className="label mb-1">Live audience</p>
-              <p className="text-lg font-bold tabular-nums text-foreground">
-                {participantCount}
-              </p>
-              <p className="text-[11px] text-muted">
-                {formatParticipantCount(participantCount)}
-              </p>
-            </div>
+            <span className="text-xs text-muted tabular-nums">
+              {formatParticipantCount(participantCount)}
+            </span>
           </div>
         </div>
       </header>
@@ -216,40 +210,29 @@ export default function PlayPage() {
               {...enterAnimation}
               className="border border-border bg-surface p-6"
             >
-              <div className="flex flex-wrap items-start justify-between gap-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="label mb-2">Passage</p>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <p className="label">Passage</p>
+                    <span className="text-xs text-muted/40">·</span>
+                    <span className="text-xs text-muted tabular-nums">
+                      Q{activePassage.questionIndex}
+                      {maxQuestionIndex > activePassage.questionIndex
+                        ? `-Q${maxQuestionIndex}`
+                        : ""}{" "}
+                      of {activePassage.totalQuestions}
+                    </span>
+                    <span className="text-xs text-muted/40">·</span>
+                    <span className="text-xs text-muted">
+                      {activePassage.timerMode === "ENTIRE_PASSAGE"
+                        ? "All sub-questions together"
+                        : "Passage stays pinned"}
+                    </span>
+                  </div>
                   <div
                     className="prose prose-invert max-w-4xl text-lg leading-relaxed text-foreground prose-p:my-0 prose-p:leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: activePassage.text }}
                   />
-                </div>
-                <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-1">
-                  <div className="border border-border bg-background px-4 py-3">
-                    <p className="label mb-2">Active span</p>
-                    <p className="text-lg font-bold tabular-nums text-foreground">
-                      Q{activePassage.questionIndex}
-                      {maxQuestionIndex > activePassage.questionIndex
-                        ? `-Q${maxQuestionIndex}`
-                        : ""}
-                    </p>
-                    <p className="mt-1 text-xs text-muted tabular-nums">
-                      of {activePassage.totalQuestions} total questions
-                    </p>
-                  </div>
-                  <div className="border border-border bg-background px-4 py-3">
-                    <p className="label mb-2">Mode</p>
-                    <p className="text-sm font-medium text-foreground">
-                      {activePassage.timerMode === "ENTIRE_PASSAGE"
-                        ? "All sub-questions together"
-                        : "Passage stays pinned"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">
-                      {activePassage.timerMode === "ENTIRE_PASSAGE"
-                        ? "Answer any visible question in any order."
-                        : "The passage remains fixed while each sub-question rotates below."}
-                    </p>
-                  </div>
                 </div>
               </div>
             </motion.section>
@@ -318,23 +301,14 @@ export default function PlayPage() {
                         : "Results revealed"}
                 </h3>
               </div>
-              <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:min-w-[15rem]">
-                <div className="border border-border bg-background px-4 py-3 text-right">
-                  <p className="label mb-2">Ready</p>
-                  <p className="text-lg font-bold tabular-nums text-foreground">
-                    {selectedQuestionCount}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">with a selection</p>
-                </div>
-                <div className="border border-border bg-background px-4 py-3 text-right">
-                  <p className="label mb-2">Visible</p>
-                  <p className="text-lg font-bold tabular-nums text-foreground">
-                    {activeQuestions.length}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">
-                    question{activeQuestions.length === 1 ? "" : "s"} on screen
-                  </p>
-                </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+                <span className="tabular-nums">
+                  {selectedQuestionCount} ready
+                </span>
+                <span className="text-muted/40">·</span>
+                <span className="tabular-nums">
+                  {activeQuestions.length} visible
+                </span>
               </div>
             </div>
 

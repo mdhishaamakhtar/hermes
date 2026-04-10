@@ -23,15 +23,18 @@ export interface QuestionCardData {
   totalParticipants?: number;
   options: QuestionCardOption[];
   passageText?: string | null;
+  passageId?: number | null;
 }
 
 export function QuestionCard({
   question,
   mode,
+  isInsidePassage,
   onEdit,
 }: {
   question: QuestionCardData;
   mode: "display" | "timed-live" | "timed-summary" | "review";
+  isInsidePassage?: boolean;
   onEdit?: () => void;
 }) {
   const showMetrics = mode !== "display";
@@ -59,7 +62,7 @@ export function QuestionCard({
           <h2 className="text-2xl font-bold leading-snug text-foreground">
             {question.text}
           </h2>
-          {question.passageText && mode === "review" ? (
+          {question.passageText && mode === "review" && !isInsidePassage ? (
             <div className="mt-4 border border-border bg-background p-4">
               <p className="label mb-3 text-warning">Passage</p>
               <div
@@ -96,13 +99,13 @@ export function QuestionCard({
       </div>
 
       {mode === "display" ? (
-        <div className="mt-6 grid gap-2 sm:grid-cols-2">
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
           {question.options.map((option, index) => {
             const meta = OPTION_META[index % OPTION_META.length];
             return (
               <div
                 key={option.id}
-                className="border border-border px-4 py-3 text-sm text-foreground"
+                className="border border-border px-3 py-2 text-sm text-foreground"
               >
                 <span
                   className="mr-3 inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
@@ -119,13 +122,13 @@ export function QuestionCard({
           })}
         </div>
       ) : mode === "timed-summary" ? (
-        <div className="mt-6 grid gap-2 sm:grid-cols-2">
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
           {question.options.map((option, index) => {
             const meta = OPTION_META[index % OPTION_META.length];
             return (
               <div
                 key={option.id}
-                className="border border-border bg-background px-4 py-3 text-sm text-foreground"
+                className="border border-border bg-background px-3 py-2 text-sm text-foreground"
               >
                 <div className="flex items-center gap-3">
                   <span
@@ -196,7 +199,7 @@ export function QuestionCard({
                 </div>
                 <div className="h-3 bg-background overflow-hidden border border-border">
                   <motion.div
-                    initial={mode === "review" ? { scaleX: 0 } : false}
+                    initial={false}
                     animate={{ scaleX: pct / 100 }}
                     transition={{
                       type: "spring",

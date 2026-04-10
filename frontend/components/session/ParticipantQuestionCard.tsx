@@ -110,7 +110,7 @@ export function ParticipantQuestionCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {question.options.map((option, index) => {
           const meta = optionLabel(index);
           const count = question.counts[option.id] ?? 0;
@@ -198,7 +198,7 @@ export function ParticipantQuestionCard({
                 </div>
               </div>
 
-              <div className="mt-3 h-1.5 overflow-hidden border border-border bg-background">
+              <div className="mt-2 h-1 overflow-hidden border border-border bg-background">
                 <motion.div
                   className="h-full origin-left"
                   animate={{ scaleX: barWidth / 100 }}
@@ -213,19 +213,14 @@ export function ParticipantQuestionCard({
                 />
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted">
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
                 <span>{interactive ? "Tap to change" : "Locked"}</span>
-                {resolved && isSelected && questionScore !== null ? (
-                  <span className="tabular-nums text-foreground">
-                    {questionScore > 0 ? `+${questionScore} pts` : "0 pts"}
-                  </span>
-                ) : null}
               </div>
             </>
           );
 
           const sharedClasses =
-            "w-full border px-4 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+            "w-full border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
           if (interactive) {
             return (

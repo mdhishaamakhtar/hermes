@@ -152,6 +152,7 @@ export interface QuestionResult {
   text: string;
   orderIndex: number;
   timeLimitSeconds: number;
+  passageId: number | null;
   passageText: string | null;
   options: ResultOption[];
   totalAnswers: number;
@@ -182,6 +183,7 @@ export interface MyResultsQuestionResult {
   questionText: string;
   orderIndex: number;
   questionType: QuestionType;
+  passageId: number | null;
   passageText: string | null;
   selectedOptionIds: number[];
   correctOptionIds: number[];
