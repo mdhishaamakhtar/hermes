@@ -50,7 +50,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   public void configureMessageBroker(MessageBrokerRegistry config) {
     config.setApplicationDestinationPrefixes("/app");
     config
-        .enableStompBrokerRelay("/topic")
+        .enableStompBrokerRelay("/topic", "/queue")
         .setRelayHost(brokerRelayHost)
         .setRelayPort(brokerRelayPort)
         .setVirtualHost(brokerRelayVirtualHost)
