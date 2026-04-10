@@ -65,4 +65,9 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
       @Param("sessionId") Long sessionId,
       @Param("questionId") Long questionId,
       @Param("frozenAt") OffsetDateTime frozenAt);
+
+  @Query(
+      value = "SELECT COUNT(*) FROM participant_answer_selections WHERE option_id IN :optionIds",
+      nativeQuery = true)
+  long countSelectionsForOptions(@Param("optionIds") List<Long> optionIds);
 }

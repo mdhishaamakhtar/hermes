@@ -13,10 +13,15 @@ import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
+import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +34,17 @@ public class QuestionService {
   private final QuestionRepository questionRepository;
   private final QuizSessionRepository sessionRepository;
   private final OwnershipService ownershipService;
+  private final ParticipantAnswerRepository participantAnswerRepository;
 
   public QuestionService(
       QuestionRepository questionRepository,
       QuizSessionRepository sessionRepository,
-      OwnershipService ownershipService) {
+      OwnershipService ownershipService,
+      ParticipantAnswerRepository participantAnswerRepository) {
     this.questionRepository = questionRepository;
     this.sessionRepository = sessionRepository;
     this.ownershipService = ownershipService;
+    this.participantAnswerRepository = participantAnswerRepository;
   }
 
   @Transactional
@@ -84,8 +92,7 @@ public class QuestionService {
     question.setQuestionType(questionType);
     question.setDisplayModeOverride(request.displayModeOverride());
 
-    question.getOptions().clear();
-    question.getOptions().addAll(buildOptions(question, request.options()));
+    mergeOptions(question, request.options());
 
     question = questionRepository.save(question);
     return toResponse(question);
@@ -171,6 +178,59 @@ public class QuestionService {
               .build());
     }
     return options;
+  }
+
+  /**
+   * Merges the requested options into the existing collection without deleting options that have
+   * historical participant answer selections. Options matching by orderIndex are updated in-place,
+   * preserving their database IDs. New options are added. Options removed from the request are only
+   * deleted if no participant has ever selected them; otherwise a conflict error is thrown.
+   */
+  private void mergeOptions(Question question, List<OptionRequest> optionRequests) {
+    Map<Integer, AnswerOption> existingByOrderIndex = new HashMap<>();
+    for (AnswerOption o : question.getOptions()) {
+      existingByOrderIndex.put(o.getOrderIndex(), o);
+    }
+
+    Set<Integer> requestedOrderIndexes = new HashSet<>();
+    for (int i = 0; i < optionRequests.size(); i++) {
+      OptionRequest req = optionRequests.get(i);
+      int orderIndex = req.orderIndex() != null ? req.orderIndex() : i;
+      requestedOrderIndexes.add(orderIndex);
+
+      AnswerOption existing = existingByOrderIndex.get(orderIndex);
+      if (existing != null) {
+        // Update in-place — preserves the database ID so historical answers remain valid
+        existing.setText(req.normalizedText());
+        existing.setPointValue(req.pointValue());
+      } else {
+        question
+            .getOptions()
+            .add(
+                AnswerOption.builder()
+                    .question(question)
+                    .text(req.normalizedText())
+                    .orderIndex(orderIndex)
+                    .pointValue(req.pointValue())
+                    .build());
+      }
+    }
+
+    // Remove options that are no longer in the request, but only if they have no historical answers
+    List<AnswerOption> toRemove =
+        question.getOptions().stream()
+            .filter(o -> !requestedOrderIndexes.contains(o.getOrderIndex()))
+            .toList();
+
+    if (!toRemove.isEmpty()) {
+      List<Long> toRemoveIds = toRemove.stream().map(AnswerOption::getId).toList();
+      long referenced = participantAnswerRepository.countSelectionsForOptions(toRemoveIds);
+      if (referenced > 0) {
+        throw AppException.conflict(
+            "Cannot remove options that have been selected in past sessions");
+      }
+      question.getOptions().removeAll(toRemove);
+    }
   }
 
   private void validateQuestionRequest(
