@@ -1,47 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import useSWR from "swr";
 import Logo from "@/components/Logo";
 import { ResultsPageSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";
 import { QuestionResultCard } from "@/components/session/QuestionResultCard";
 import { enterAnimation } from "@/lib/design-tokens";
 import { getStoredRejoinToken } from "@/lib/session-storage";
+import { fetchMyResults } from "@/lib/fetcher";
 import type { MyResults } from "@/lib/types";
 
 export default function ResultsPage() {
   const { id: sessionId } = useParams<{ id: string }>();
-  const [results, setResults] = useState<MyResults | null>(null);
-  const [error, setError] = useState("");
+  const rejoinToken = sessionId ? getStoredRejoinToken(sessionId) : null;
 
-  useEffect(() => {
-    void (async () => {
-      const rejoinToken = getStoredRejoinToken(sessionId);
-      if (!rejoinToken) {
-        setError("Session not found");
-        return;
-      }
+  const {
+    data: results,
+    error,
+    isLoading,
+  } = useSWR(
+    sessionId && rejoinToken
+      ? (["my-results", sessionId, rejoinToken] as const)
+      : null,
+    ([, sid, token]) => fetchMyResults(sid, token),
+  );
 
-      const response = await api.get<MyResults>(
-        `/api/sessions/${sessionId}/my-results`,
-        {
-          "X-Rejoin-Token": rejoinToken,
-        },
-      );
-
-      if (response.success) {
-        setResults(response.data);
-      } else {
-        setError(response.error?.message || "Failed to load results");
-      }
-    })().catch(() => {
-      setError("Connection failed");
-    });
-  }, [sessionId]);
+  const fetchErrorMessage =
+    error instanceof Error
+      ? error.message
+      : error
+        ? "Failed to load results"
+        : "";
 
   const accuracy = useMemo(
     () =>
@@ -51,11 +44,15 @@ export default function ResultsPage() {
     [results],
   );
 
-  if (error) {
+  if (!sessionId) {
+    return <ResultsPageSkeleton />;
+  }
+
+  if (!rejoinToken) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
         <p className="label mb-6 text-danger" role="alert">
-          {error}
+          Session not found
         </p>
         <Link
           href="/"
@@ -68,7 +65,26 @@ export default function ResultsPage() {
     );
   }
 
-  if (!results) return <ResultsPageSkeleton />;
+  if (isLoading || (!results && !error)) {
+    return <ResultsPageSkeleton />;
+  }
+
+  if (error || !results) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
+        <p className="label mb-6 text-danger" role="alert">
+          {fetchErrorMessage || "Failed to load results"}
+        </p>
+        <Link
+          href="/"
+          prefetch
+          className="label transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          Go Home
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

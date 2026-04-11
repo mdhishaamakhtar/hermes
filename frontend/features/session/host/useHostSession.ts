@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { api } from "@/lib/api";
 import { sessionsApi } from "@/lib/apiClient";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
@@ -19,8 +18,9 @@ import type {
   PassageTimerMode,
   SessionResults,
 } from "@/lib/types";
+import type { SessionLifecycleStatus } from "@/lib/apiClient";
 
-export type SessionStatus = "LOBBY" | "ACTIVE" | "ENDED";
+export type SessionStatus = SessionLifecycleStatus;
 export type QuestionLifecycle = "DISPLAYED" | "TIMED" | "FROZEN" | "REVIEWING";
 
 export interface ActiveOption {
@@ -681,9 +681,7 @@ export function useHostSession(id: string) {
 
   const loadResults = useCallback(async () => {
     if (!id) return;
-    const response = await api.get<SessionResults>(
-      `/api/sessions/${id}/results`,
-    );
+    const response = await sessionsApi.results(id);
     if (response.success) {
       dispatch({ type: "RESULTS_LOADED", results: response.data });
     }
@@ -694,12 +692,8 @@ export function useHostSession(id: string) {
 
     const [syncResponse, lobbyResponse, statusResponse] = await Promise.all([
       sessionsApi.hostSync(id),
-      api.get<{
-        status: SessionStatus;
-        participantCount: number;
-        joinCode: string;
-      }>(`/api/sessions/${id}/lobby`),
-      api.get<SessionStatus>(`/api/sessions/${id}/status`),
+      sessionsApi.lobby(id),
+      sessionsApi.sessionStatus(id),
     ]);
 
     if (syncResponse.success) {

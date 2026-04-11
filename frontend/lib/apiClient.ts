@@ -9,7 +9,17 @@ import type {
   Question,
   QuestionOptionInput,
   HostSessionSync,
+  SessionResults,
 } from "@/lib/types";
+
+/** Matches GET `/api/sessions/{id}/status` and `SessionLobbySnapshot.status`. */
+export type SessionLifecycleStatus = "LOBBY" | "ACTIVE" | "ENDED";
+
+export interface SessionLobbySnapshot {
+  status: SessionLifecycleStatus;
+  participantCount: number;
+  joinCode: string;
+}
 
 export const eventsApi = {
   create: (data: { title: string; description: string }) =>
@@ -108,6 +118,13 @@ export const sessionsApi = {
   abandon: (id: number | string) => api.delete(`/api/sessions/${id}`),
   hostSync: (id: number | string) =>
     api.get<HostSessionSync>(`/api/sessions/${id}/host-sync`),
+  /** Organizer-facing results snapshot (JWT). Same resource as review / SWR `/api/sessions/{id}/results`. */
+  results: (id: number | string) =>
+    api.get<SessionResults>(`/api/sessions/${id}/results`),
+  lobby: (id: number | string) =>
+    api.get<SessionLobbySnapshot>(`/api/sessions/${id}/lobby`),
+  sessionStatus: (id: number | string) =>
+    api.get<SessionLifecycleStatus>(`/api/sessions/${id}/status`),
   correctScoring: (
     id: number | string,
     questionId: number,
