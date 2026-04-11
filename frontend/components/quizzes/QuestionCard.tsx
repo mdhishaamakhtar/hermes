@@ -262,7 +262,7 @@ export default function QuestionCard({
             <p className="label text-warning">
               Editing {nested ? "Sub-question" : "Question"}
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="w-40">
                 <CustomSelect
                   value={editQuestionType}
@@ -326,13 +326,13 @@ export default function QuestionCard({
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               {editOptions.map((option, optionIndex) => (
                 <div
                   key={optionIndex}
-                  className="grid items-center gap-3 border border-border px-3 py-2 md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_auto]"
+                  className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_1.75rem] items-center gap-2 border-b border-border/50 py-2"
                 >
-                  <span className="label self-center text-foreground/80">
+                  <span className="label shrink-0 text-foreground/80">
                     {String.fromCharCode(65 + optionIndex)}
                   </span>
                   <input
@@ -340,7 +340,7 @@ export default function QuestionCard({
                     onChange={(event) =>
                       setOptionText(optionIndex, event.target.value)
                     }
-                    className="input-field"
+                    className="input-field min-w-0 py-2 px-3 text-sm"
                     placeholder={`Option ${optionIndex + 1}`}
                   />
                   <input
@@ -357,13 +357,13 @@ export default function QuestionCard({
                         setOptionPoints(optionIndex, parsed);
                       }
                     }}
-                    className="input-field font-mono tabular-nums"
+                    className="input-field py-2 px-2 text-center font-mono tabular-nums text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => removeOption(optionIndex)}
                     disabled={editOptions.length <= 2}
-                    className="label self-center text-muted transition-colors hover:text-danger disabled:opacity-30"
+                    className="flex items-center justify-center label text-muted transition-colors hover:text-danger disabled:opacity-30"
                   >
                     ✕
                   </button>
