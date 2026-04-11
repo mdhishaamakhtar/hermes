@@ -11,11 +11,11 @@ import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
-import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.service.*;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,6 @@ public class SessionService {
 
   private final QuizSessionRepository sessionRepository;
   private final QuizRepository quizRepository;
-  private final QuestionRepository questionRepository;
   private final ParticipantRepository participantRepository;
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
@@ -47,7 +46,6 @@ public class SessionService {
   public SessionService(
       QuizSessionRepository sessionRepository,
       QuizRepository quizRepository,
-      QuestionRepository questionRepository,
       ParticipantRepository participantRepository,
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
@@ -64,7 +62,6 @@ public class SessionService {
       ScoringCorrectionService scoringCorrectionService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
-    this.questionRepository = questionRepository;
     this.participantRepository = participantRepository;
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
@@ -133,7 +130,7 @@ public class SessionService {
 
     session.setStatus(SessionStatus.ACTIVE);
     session.setStartedAt(OffsetDateTime.now());
-    session.setCurrentQuestion(questionRepository.getReferenceById(first.id()));
+    session.setCurrentQuestionId(first.id());
     sessionRepository.save(session);
 
     // Check if the first question belongs to an ENTIRE_PASSAGE passage
@@ -255,8 +252,7 @@ public class SessionService {
               passage.subQuestionIds().stream()
                   .map(snapshot::findQuestion)
                   .filter(Objects::nonNull)
-                  .sorted(
-                      java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+                  .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
                   .map(
                       q -> {
                         questionStatsById.put(

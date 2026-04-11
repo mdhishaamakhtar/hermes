@@ -4,7 +4,6 @@ import dev.hishaam.hermes.dto.session.AnswerRequest;
 import dev.hishaam.hermes.dto.session.AnswerStats;
 import dev.hishaam.hermes.dto.session.LockInRequest;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
-import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
@@ -12,7 +11,6 @@ import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.service.session.*;
-import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -29,7 +27,6 @@ public class AnswerService {
   private final SessionStateStore stateStore;
   private final SessionAnswerStatsStore answerStatsStore;
   private final SessionEventPublisher eventPublisher;
-  private final EntityManager entityManager;
 
   public AnswerService(
       ParticipantAnswerRepository answerRepository,
@@ -37,15 +34,13 @@ public class AnswerService {
       SessionSnapshotService snapshotService,
       SessionStateStore stateStore,
       SessionAnswerStatsStore answerStatsStore,
-      SessionEventPublisher eventPublisher,
-      EntityManager entityManager) {
+      SessionEventPublisher eventPublisher) {
     this.answerRepository = answerRepository;
     this.participantService = participantService;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
     this.answerStatsStore = answerStatsStore;
     this.eventPublisher = eventPublisher;
-    this.entityManager = entityManager;
   }
 
   @Transactional
@@ -71,7 +66,7 @@ public class AnswerService {
     ensureAnswerMutable(answer);
 
     Set<Long> previousSelectionIds = previousSelectionIds(sessionId, participantId, answer);
-    answer.setSelectedOptions(toAnswerOptionReferences(selectedOptionIds));
+    answer.setSelectedOptionIds(selectedOptionIds);
     answer.setAnsweredAt(selectedOptionIds.isEmpty() ? null : OffsetDateTime.now());
     answerRepository.save(answer);
 
@@ -92,7 +87,7 @@ public class AnswerService {
             .orElseThrow(() -> AppException.conflict("Cannot lock in before submitting an answer"));
 
     ensureAnswerMutable(answer);
-    if (answer.getSelectedOptions().isEmpty()) {
+    if (answer.getSelectedOptionIds().isEmpty()) {
       throw AppException.conflict("Cannot lock in without a selection");
     }
 
@@ -185,16 +180,7 @@ public class AnswerService {
       return previousSelectionIds;
     }
 
-    return answer.getSelectedOptions().stream()
-        .map(AnswerOption::getId)
-        .collect(LinkedHashSet::new, Set::add, Set::addAll);
-  }
-
-  private Set<AnswerOption> toAnswerOptionReferences(Set<Long> selectedOptionIds) {
-    Set<AnswerOption> selectedOptions = new LinkedHashSet<>();
-    selectedOptionIds.forEach(
-        optionId -> selectedOptions.add(entityManager.getReference(AnswerOption.class, optionId)));
-    return selectedOptions;
+    return new LinkedHashSet<>(answer.getSelectedOptionIds());
   }
 
   private void broadcastAnswerState(Long sessionId, Long questionId) {

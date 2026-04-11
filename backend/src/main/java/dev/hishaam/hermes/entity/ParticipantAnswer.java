@@ -5,6 +5,8 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -39,13 +41,10 @@ public class ParticipantAnswer {
   @Column(name = "question_id", nullable = false)
   private Long questionId;
 
-  @ManyToMany
-  @JoinTable(
-      name = "participant_answer_selections",
-      joinColumns = @JoinColumn(name = "participant_answer_id", nullable = false),
-      inverseJoinColumns = @JoinColumn(name = "option_id", nullable = false))
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "selected_option_ids", columnDefinition = "jsonb")
   @Builder.Default
-  private Set<AnswerOption> selectedOptions = new LinkedHashSet<>();
+  private Set<Long> selectedOptionIds = new LinkedHashSet<>();
 
   @Column(name = "locked_in", nullable = false)
   @Builder.Default

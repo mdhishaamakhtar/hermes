@@ -13,16 +13,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAnswer, Long> {
 
-  @Query(
-      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions WHERE a.sessionId = :sessionId")
+  @Query("SELECT a FROM ParticipantAnswer a WHERE a.sessionId = :sessionId")
   List<ParticipantAnswer> findBySessionId(Long sessionId);
 
-  @Query(
-      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions WHERE a.participantId = :participantId")
+  @Query("SELECT a FROM ParticipantAnswer a WHERE a.participantId = :participantId")
   List<ParticipantAnswer> findByParticipantId(Long participantId);
 
   @Query(
-      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions"
+      "SELECT a FROM ParticipantAnswer a"
           + " WHERE a.participantId = :participantId AND a.questionId = :questionId")
   Optional<ParticipantAnswer> findByParticipantIdAndQuestionId(
       @Param("participantId") Long participantId, @Param("questionId") Long questionId);
@@ -38,21 +36,11 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
   @Query("DELETE FROM ParticipantAnswer a WHERE a.sessionId IN :sessionIds")
   void deleteBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
 
-  @Modifying
-  @Query(
-      value =
-          "DELETE FROM participant_answer_selections"
-              + " WHERE participant_answer_id IN ("
-              + "   SELECT id FROM participant_answers WHERE session_id IN (:sessionIds)"
-              + " )",
-      nativeQuery = true)
-  void deleteSelectionsBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
-
   @Query("SELECT a FROM ParticipantAnswer a WHERE a.sessionId = :sessionId AND a.score IS NOT NULL")
   List<ParticipantAnswer> findGradedBySessionId(@Param("sessionId") Long sessionId);
 
   @Query(
-      "SELECT DISTINCT a FROM ParticipantAnswer a LEFT JOIN FETCH a.selectedOptions"
+      "SELECT a FROM ParticipantAnswer a"
           + " WHERE a.sessionId = :sessionId AND a.questionId = :questionId AND a.frozenAt IS NOT NULL")
   List<ParticipantAnswer> findFrozenBySessionIdAndQuestionId(
       @Param("sessionId") Long sessionId, @Param("questionId") Long questionId);
@@ -65,9 +53,4 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
       @Param("sessionId") Long sessionId,
       @Param("questionId") Long questionId,
       @Param("frozenAt") OffsetDateTime frozenAt);
-
-  @Query(
-      value = "SELECT COUNT(*) FROM participant_answer_selections WHERE option_id IN :optionIds",
-      nativeQuery = true)
-  long countSelectionsForOptions(@Param("optionIds") List<Long> optionIds);
 }

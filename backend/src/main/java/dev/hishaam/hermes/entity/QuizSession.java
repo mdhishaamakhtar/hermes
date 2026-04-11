@@ -35,9 +35,8 @@ public class QuizSession {
   @Column(nullable = false)
   private SessionStatus status;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = true)
-  @JoinColumn(name = "current_question_id")
-  private Question currentQuestion;
+  @Column(name = "current_question_id")
+  private Long currentQuestionId;
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(columnDefinition = "jsonb", nullable = false)

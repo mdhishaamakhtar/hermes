@@ -13,7 +13,6 @@ import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
-import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import java.util.ArrayList;
@@ -34,17 +33,14 @@ public class QuestionService {
   private final QuestionRepository questionRepository;
   private final QuizSessionRepository sessionRepository;
   private final OwnershipService ownershipService;
-  private final ParticipantAnswerRepository participantAnswerRepository;
 
   public QuestionService(
       QuestionRepository questionRepository,
       QuizSessionRepository sessionRepository,
-      OwnershipService ownershipService,
-      ParticipantAnswerRepository participantAnswerRepository) {
+      OwnershipService ownershipService) {
     this.questionRepository = questionRepository;
     this.sessionRepository = sessionRepository;
     this.ownershipService = ownershipService;
-    this.participantAnswerRepository = participantAnswerRepository;
   }
 
   @Transactional
@@ -216,19 +212,13 @@ public class QuestionService {
       }
     }
 
-    // Remove options that are no longer in the request, but only if they have no historical answers
+    // Remove options that are no longer in the request
     List<AnswerOption> toRemove =
         question.getOptions().stream()
             .filter(o -> !requestedOrderIndexes.contains(o.getOrderIndex()))
             .toList();
 
     if (!toRemove.isEmpty()) {
-      List<Long> toRemoveIds = toRemove.stream().map(AnswerOption::getId).toList();
-      long referenced = participantAnswerRepository.countSelectionsForOptions(toRemoveIds);
-      if (referenced > 0) {
-        throw AppException.conflict(
-            "Cannot remove options that have been selected in past sessions");
-      }
       question.getOptions().removeAll(toRemove);
     }
   }

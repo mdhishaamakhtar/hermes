@@ -193,11 +193,11 @@ public class SessionResultsService {
                   questionAnswers.forEach(
                       answer ->
                           answer
-                              .getSelectedOptions()
+                              .getSelectedOptionIds()
                               .forEach(
-                                  option ->
+                                  optionId ->
                                       optionCounts.merge(
-                                          option.getId(),
+                                          optionId,
                                           1L,
                                           (a, b) ->
                                               Long.sum(
@@ -266,12 +266,9 @@ public class SessionResultsService {
   }
 
   private List<Long> selectedOptionIds(ParticipantAnswer answer) {
-    if (answer == null || answer.getSelectedOptions().isEmpty()) {
+    if (answer == null || answer.getSelectedOptionIds().isEmpty()) {
       return List.of();
     }
-    return answer.getSelectedOptions().stream()
-        .sorted(Comparator.comparingInt(option -> option.getOrderIndex()))
-        .map(option -> option.getId())
-        .toList();
+    return new ArrayList<>(answer.getSelectedOptionIds());
   }
 }

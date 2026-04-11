@@ -87,7 +87,6 @@ public class QuizService {
             .map(QuizSession::getId)
             .toList();
     if (!sessionIds.isEmpty()) {
-      participantAnswerRepository.deleteSelectionsBySessionIdIn(sessionIds);
       participantAnswerRepository.deleteBySessionIdIn(sessionIds);
       participantRepository.deleteBySessionIdIn(sessionIds);
       sessionRepository.deleteAllByIdInBatch(sessionIds);

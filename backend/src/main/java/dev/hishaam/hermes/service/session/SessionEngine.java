@@ -7,7 +7,6 @@ import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import dev.hishaam.hermes.repository.QuestionRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.service.*;
 import java.time.OffsetDateTime;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SessionEngine {
 
   private final QuizSessionRepository sessionRepository;
-  private final QuestionRepository questionRepository;
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
   private final SessionStateStore stateStore;
@@ -36,7 +34,6 @@ public class SessionEngine {
 
   public SessionEngine(
       QuizSessionRepository sessionRepository,
-      QuestionRepository questionRepository,
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
       SessionStateStore stateStore,
@@ -45,7 +42,6 @@ public class SessionEngine {
       SessionTimerScheduler timerScheduler,
       GradingService gradingService) {
     this.sessionRepository = sessionRepository;
-    this.questionRepository = questionRepository;
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
@@ -141,7 +137,7 @@ public class SessionEngine {
 
     session.setStatus(SessionStatus.ENDED);
     session.setEndedAt(OffsetDateTime.now());
-    session.setCurrentQuestion(null);
+    session.setCurrentQuestionId(null);
     sessionRepository.save(session);
 
     stateStore.cleanupSessionKeys(sessionId, snapshot, joinCode);
@@ -178,7 +174,7 @@ public class SessionEngine {
         .findById(sessionId)
         .ifPresent(
             s -> {
-              s.setCurrentQuestion(questionRepository.getReferenceById(question.id()));
+              s.setCurrentQuestionId(question.id());
               sessionRepository.save(s);
             });
   }

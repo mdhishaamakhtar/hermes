@@ -19,7 +19,10 @@ import dev.hishaam.hermes.service.session.SessionLeaderboardStore;
 import dev.hishaam.hermes.service.session.SessionLiveStateService;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import dev.hishaam.hermes.service.session.SessionStateStore;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,9 +132,8 @@ public class ParticipantService {
           List<RejoinResponse.QuestionInfo> subQuestions =
               passage.subQuestionIds().stream()
                   .map(snapshot::findQuestion)
-                  .filter(java.util.Objects::nonNull)
-                  .sorted(
-                      java.util.Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
+                  .filter(Objects::nonNull)
+                  .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
                   .map(qSnap -> buildQuestionInfo(participantId, qSnap, snapshot))
                   .toList();
 
@@ -233,12 +235,9 @@ public class ParticipantService {
   }
 
   private List<Long> selectedOptionIds(ParticipantAnswer answer) {
-    if (answer == null || answer.getSelectedOptions().isEmpty()) {
+    if (answer == null || answer.getSelectedOptionIds().isEmpty()) {
       return List.of();
     }
-    return answer.getSelectedOptions().stream()
-        .sorted(java.util.Comparator.comparingInt(option -> option.getOrderIndex()))
-        .map(option -> option.getId())
-        .toList();
+    return new ArrayList<>(answer.getSelectedOptionIds());
   }
 }

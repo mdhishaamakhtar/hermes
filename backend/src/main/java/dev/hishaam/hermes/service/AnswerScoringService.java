@@ -1,10 +1,10 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
-import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,8 +19,7 @@ public class AnswerScoringService {
     question.options().forEach(o -> pointsByOptionId.put(o.id(), o.pointValue()));
 
     int rawScore =
-        answer.getSelectedOptions().stream()
-            .map(AnswerOption::getId)
+        answer.getSelectedOptionIds().stream()
             .map(pointsByOptionId::get)
             .filter(Objects::nonNull)
             .mapToInt(Integer::intValue)
@@ -35,15 +34,12 @@ public class AnswerScoringService {
       return false;
     }
 
-    Set<Long> selectedOptionIds =
-        answer.getSelectedOptions().stream()
-            .map(AnswerOption::getId)
-            .collect(java.util.LinkedHashSet::new, Set::add, Set::addAll);
+    Set<Long> selectedOptionIds = new LinkedHashSet<>(answer.getSelectedOptionIds());
     Set<Long> correctOptionIds =
         question.options().stream()
             .filter(option -> option.pointValue() > 0)
             .map(QuizSnapshot.OptionSnapshot::id)
-            .collect(java.util.LinkedHashSet::new, Set::add, Set::addAll);
+            .collect(LinkedHashSet::new, Set::add, Set::addAll);
 
     return !selectedOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds);
   }
