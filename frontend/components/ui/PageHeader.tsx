@@ -23,19 +23,21 @@ export default function PageHeader({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className={`mb-6 sm:mb-10 ${action ? "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between" : ""}`}
+      className="mb-6 sm:mb-10"
     >
-      <div>
-        <p className="label mb-1">{label}</p>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
-          {title}
-        </h1>
-        {description && (
-          <p className="text-sm text-muted mt-2">{description}</p>
-        )}
-        {meta && <div className="mt-2">{meta}</div>}
+      <div className={action ? "flex items-start justify-between gap-4" : ""}>
+        <div className="min-w-0">
+          <p className="label mb-1">{label}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
+            {title}
+          </h1>
+          {description && (
+            <p className="text-sm text-muted mt-2">{description}</p>
+          )}
+        </div>
+        {action && <div className="shrink-0 pt-1">{action}</div>}
       </div>
-      {action && <div>{action}</div>}
+      {meta && <div className="mt-3">{meta}</div>}
     </motion.div>
   );
 }

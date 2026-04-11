@@ -1,6 +1,10 @@
 package dev.hishaam.hermes.service;
 
-import dev.hishaam.hermes.dto.*;
+import dev.hishaam.hermes.dto.session.JoinResponse;
+import dev.hishaam.hermes.dto.session.JoinSessionRequest;
+import dev.hishaam.hermes.dto.session.QuizSnapshot;
+import dev.hishaam.hermes.dto.session.RejoinRequest;
+import dev.hishaam.hermes.dto.session.RejoinResponse;
 import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
@@ -9,6 +13,12 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import dev.hishaam.hermes.service.session.SessionCodeService;
+import dev.hishaam.hermes.service.session.SessionEventPublisher;
+import dev.hishaam.hermes.service.session.SessionLeaderboardStore;
+import dev.hishaam.hermes.service.session.SessionLiveStateService;
+import dev.hishaam.hermes.service.session.SessionSnapshotService;
+import dev.hishaam.hermes.service.session.SessionStateStore;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +30,8 @@ public class ParticipantService {
   private final ParticipantRepository participantRepository;
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
+  private final SessionStateStore stateStore;
+  private final SessionLeaderboardStore leaderboardStore;
   private final SessionLiveStateService liveStateService;
   private final SessionCodeService sessionCodeService;
   private final SessionEventPublisher eventPublisher;
@@ -30,6 +42,8 @@ public class ParticipantService {
       ParticipantRepository participantRepository,
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
+      SessionStateStore stateStore,
+      SessionLeaderboardStore leaderboardStore,
       SessionLiveStateService liveStateService,
       SessionCodeService sessionCodeService,
       SessionEventPublisher eventPublisher,
@@ -38,6 +52,8 @@ public class ParticipantService {
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
+    this.stateStore = stateStore;
+    this.leaderboardStore = leaderboardStore;
     this.liveStateService = liveStateService;
     this.sessionCodeService = sessionCodeService;
     this.eventPublisher = eventPublisher;
@@ -46,8 +62,7 @@ public class ParticipantService {
 
   @Transactional
   public JoinResponse joinSession(JoinSessionRequest request) {
-    String sessionIdStr =
-        liveStateService.getSessionIdForJoinCode(request.joinCode().toUpperCase());
+    String sessionIdStr = stateStore.getSessionIdForJoinCode(request.joinCode().toUpperCase());
     if (sessionIdStr == null) {
       throw AppException.notFound("Invalid or expired join code");
     }
@@ -79,10 +94,10 @@ public class ParticipantService {
 
     rejoinTokenStore.store(rejoinToken, participant.getId());
 
-    long count = liveStateService.incrementParticipantCount(sessionId);
-    liveStateService.cacheParticipantName(sessionId, participant.getId(), request.displayName());
+    long count = stateStore.incrementParticipantCount(sessionId);
+    stateStore.cacheParticipantName(sessionId, participant.getId(), request.displayName());
     // Initialize with score 0 so zero-correct participants appear in leaderboard
-    liveStateService.initLeaderboardEntry(sessionId, participant.getId());
+    leaderboardStore.initEntry(sessionId, participant.getId());
 
     eventPublisher.publishParticipantJoined(sessionId, count);
 

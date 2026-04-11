@@ -34,7 +34,22 @@ import type {
 } from "@/lib/types";
 
 export type SessionState = "LOBBY" | "ACTIVE" | "ENDED";
-export type QuestionLifecycle = "DISPLAYED" | "TIMED" | "FROZEN" | "REVIEWING";
+export type { QuestionLifecycle } from "@/features/session/shared/session-types";
+import type {
+  QuestionLifecycle,
+  TimerStartMsg,
+  QuestionFrozenMsg,
+  PassageFrozenMsg,
+  QuestionReviewedMsg,
+  ScoringCorrectedMsg,
+} from "@/features/session/shared/session-types";
+
+// Local aliases kept for the QuestionEventMsg union below
+type SessionTimerStartMsg = TimerStartMsg;
+type SessionQuestionFrozenMsg = QuestionFrozenMsg;
+type SessionPassageFrozenMsg = PassageFrozenMsg;
+type SessionQuestionReviewedMsg = QuestionReviewedMsg;
+type SessionScoringCorrectedMsg = ScoringCorrectedMsg;
 
 export interface ParticipantOption {
   id: number;
@@ -108,38 +123,6 @@ export interface SessionPassageDisplayedMsg {
   questionIndex: number;
   totalQuestions: number;
   effectiveDisplayMode: DisplayMode;
-}
-
-export interface SessionTimerStartMsg {
-  event: "TIMER_START";
-  questionId: number | null;
-  passageId: number | null;
-  timeLimitSeconds: number;
-}
-
-export interface SessionQuestionFrozenMsg {
-  event: "QUESTION_FROZEN";
-  questionId: number;
-}
-
-export interface SessionPassageFrozenMsg {
-  event: "PASSAGE_FROZEN";
-  passageId: number;
-  subQuestionIds: number[];
-}
-
-export interface SessionQuestionReviewedMsg {
-  event: "QUESTION_REVIEWED";
-  questionId: number;
-  correctOptionIds: number[];
-  optionPoints: Record<number, number>;
-}
-
-export interface SessionScoringCorrectedMsg {
-  event: "SCORING_CORRECTED";
-  questionId: number;
-  correctOptionIds: number[];
-  optionPoints: Record<number, number>;
 }
 
 export interface SessionAnswerUpdateMsg {

@@ -1,12 +1,13 @@
 package dev.hishaam.hermes.controller;
 
 import dev.hishaam.hermes.dto.*;
+import dev.hishaam.hermes.dto.session.*;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.security.AuthenticatedUser;
 import dev.hishaam.hermes.service.AnswerService;
 import dev.hishaam.hermes.service.ParticipantService;
-import dev.hishaam.hermes.service.SessionResultsService;
-import dev.hishaam.hermes.service.SessionService;
+import dev.hishaam.hermes.service.session.SessionResultsService;
+import dev.hishaam.hermes.service.session.SessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

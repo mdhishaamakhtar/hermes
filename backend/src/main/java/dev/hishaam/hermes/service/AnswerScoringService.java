@@ -1,6 +1,6 @@
 package dev.hishaam.hermes.service;
 
-import dev.hishaam.hermes.dto.QuizSnapshot;
+import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import java.time.OffsetDateTime;

@@ -1,11 +1,12 @@
 package dev.hishaam.hermes.service;
 
-import dev.hishaam.hermes.dto.QuizSnapshot;
-import dev.hishaam.hermes.dto.ScoringCorrectionRequest;
+import dev.hishaam.hermes.dto.session.QuizSnapshot;
+import dev.hishaam.hermes.dto.session.ScoringCorrectionRequest;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
+import dev.hishaam.hermes.service.session.*;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,17 +18,17 @@ public class ScoringCorrectionService {
 
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
-  private final SessionLiveStateService liveStateService;
+  private final SessionStateStore stateStore;
   private final GradingService gradingService;
 
   public ScoringCorrectionService(
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
-      SessionLiveStateService liveStateService,
+      SessionStateStore stateStore,
       GradingService gradingService) {
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
-    this.liveStateService = liveStateService;
+    this.stateStore = stateStore;
     this.gradingService = gradingService;
   }
 
@@ -37,7 +38,7 @@ public class ScoringCorrectionService {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
 
     if (session.getStatus() == SessionStatus.ACTIVE) {
-      String questionState = liveStateService.getQuestionState(sessionId);
+      String questionState = stateStore.getQuestionState(sessionId);
       if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
         throw AppException.conflict(
             "Scoring can only be corrected while reviewing or after session ends");

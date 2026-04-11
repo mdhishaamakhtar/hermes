@@ -19,9 +19,17 @@ import type {
   SessionResults,
 } from "@/lib/types";
 import type { SessionLifecycleStatus } from "@/lib/apiClient";
+import type {
+  QuestionLifecycle,
+  TimerStartMsg,
+  QuestionFrozenMsg,
+  PassageFrozenMsg,
+  QuestionReviewedMsg,
+  ScoringCorrectedMsg,
+} from "@/features/session/shared/session-types";
 
 export type SessionStatus = SessionLifecycleStatus;
-export type QuestionLifecycle = "DISPLAYED" | "TIMED" | "FROZEN" | "REVIEWING";
+export type { QuestionLifecycle };
 
 export interface ActiveOption {
   id: number;
@@ -97,37 +105,13 @@ export interface PassageDisplayedMsg {
   effectiveDisplayMode: DisplayMode;
 }
 
-export interface TimerStartMsg {
-  event: "TIMER_START";
-  questionId: number | null;
-  passageId: number | null;
-  timeLimitSeconds: number;
-}
-
-export interface QuestionFrozenMsg {
-  event: "QUESTION_FROZEN";
-  questionId: number;
-}
-
-export interface PassageFrozenMsg {
-  event: "PASSAGE_FROZEN";
-  passageId: number;
-  subQuestionIds: number[];
-}
-
-export interface QuestionReviewedMsg {
-  event: "QUESTION_REVIEWED";
-  questionId: number;
-  correctOptionIds: number[];
-  optionPoints: Record<number, number>;
-}
-
-export interface ScoringCorrectedMsg {
-  event: "SCORING_CORRECTED";
-  questionId: number;
-  correctOptionIds: number[];
-  optionPoints: Record<number, number>;
-}
+export type {
+  TimerStartMsg,
+  QuestionFrozenMsg,
+  PassageFrozenMsg,
+  QuestionReviewedMsg,
+  ScoringCorrectedMsg,
+} from "@/features/session/shared/session-types";
 
 export interface AnswerUpdateMsg {
   event: "ANSWER_UPDATE";

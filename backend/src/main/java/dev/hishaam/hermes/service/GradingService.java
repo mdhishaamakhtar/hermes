@@ -1,8 +1,9 @@
 package dev.hishaam.hermes.service;
 
-import dev.hishaam.hermes.dto.QuizSnapshot;
+import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
+import dev.hishaam.hermes.service.session.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,19 +16,22 @@ public class GradingService {
 
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
-  private final SessionLiveStateService liveStateService;
+  private final SessionTimerStateStore timerStore;
+  private final SessionLeaderboardStore leaderboardStore;
   private final SessionEventPublisher eventPublisher;
   private final AnswerScoringService scoringService;
 
   public GradingService(
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
-      SessionLiveStateService liveStateService,
+      SessionTimerStateStore timerStore,
+      SessionLeaderboardStore leaderboardStore,
       SessionEventPublisher eventPublisher,
       AnswerScoringService scoringService) {
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
-    this.liveStateService = liveStateService;
+    this.timerStore = timerStore;
+    this.leaderboardStore = leaderboardStore;
     this.eventPublisher = eventPublisher;
     this.scoringService = scoringService;
   }
@@ -40,14 +44,13 @@ public class GradingService {
     QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
     if (question == null) return;
 
-    Long timerStartedAt = liveStateService.getTimerStartedAt(sessionId);
+    Long timerStartedAt = timerStore.getTimerStartedAt(sessionId);
     Map<Long, Integer> participantScores =
         gradeAndSave(sessionId, questionId, question, timerStartedAt);
 
     // Update leaderboard
     participantScores.forEach(
-        (participantId, score) ->
-            liveStateService.incrementLeaderboardScore(sessionId, participantId, score));
+        (participantId, score) -> leaderboardStore.incrementScore(sessionId, participantId, score));
 
     eventPublisher.publishQuestionReviewed(sessionId, questionId, question);
     eventPublisher.publishLeaderboardUpdates(sessionId);
@@ -61,7 +64,7 @@ public class GradingService {
     QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
     if (passage == null) return;
 
-    Long timerStartedAt = liveStateService.getTimerStartedAt(sessionId);
+    Long timerStartedAt = timerStore.getTimerStartedAt(sessionId);
 
     // Grade each sub-question; accumulate per-participant totals for one leaderboard update
     Map<Long, Integer> totalScores = new HashMap<>();
@@ -80,8 +83,7 @@ public class GradingService {
 
     // Single leaderboard update for the whole passage
     totalScores.forEach(
-        (participantId, score) ->
-            liveStateService.incrementLeaderboardScore(sessionId, participantId, score));
+        (participantId, score) -> leaderboardStore.incrementScore(sessionId, participantId, score));
 
     // Broadcast QUESTION_REVIEWED for each sub-question
     for (Long subQuestionId : passage.subQuestionIds()) {
@@ -117,8 +119,7 @@ public class GradingService {
     Map<Long, Long> participantTotals = scoringService.sumScoresByParticipant(allGraded);
 
     // Update Redis ZSet (best-effort — no-op if Redis state was already cleaned up)
-    participantTotals.forEach(
-        (pid, total) -> liveStateService.setLeaderboardScore(sessionId, pid, total));
+    participantTotals.forEach((pid, total) -> leaderboardStore.setScore(sessionId, pid, total));
 
     eventPublisher.publishScoringCorrected(sessionId, questionId, question);
     eventPublisher.publishLeaderboardFromDb(sessionId, participantTotals);
@@ -146,7 +147,7 @@ public class GradingService {
         long answerTimeMs =
             scoringService.computeAnswerTimeMs(
                 answer.getAnsweredAt(), timerStartedAt, question.timeLimitSeconds());
-        liveStateService.incrementCumulativeTime(
+        leaderboardStore.incrementCumulativeTime(
             sessionId, answer.getParticipantId(), answerTimeMs);
       }
 

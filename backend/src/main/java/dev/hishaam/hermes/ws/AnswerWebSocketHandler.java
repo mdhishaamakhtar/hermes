@@ -1,10 +1,10 @@
 package dev.hishaam.hermes.ws;
 
-import dev.hishaam.hermes.dto.AnswerRequest;
-import dev.hishaam.hermes.dto.LockInRequest;
+import dev.hishaam.hermes.dto.session.AnswerRequest;
+import dev.hishaam.hermes.dto.session.LockInRequest;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.service.AnswerService;
-import dev.hishaam.hermes.service.SessionEventPublisher;
+import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import java.security.Principal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

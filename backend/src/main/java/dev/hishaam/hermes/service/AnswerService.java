@@ -1,9 +1,9 @@
 package dev.hishaam.hermes.service;
 
-import dev.hishaam.hermes.dto.AnswerRequest;
-import dev.hishaam.hermes.dto.AnswerStats;
-import dev.hishaam.hermes.dto.LockInRequest;
-import dev.hishaam.hermes.dto.QuizSnapshot;
+import dev.hishaam.hermes.dto.session.AnswerRequest;
+import dev.hishaam.hermes.dto.session.AnswerStats;
+import dev.hishaam.hermes.dto.session.LockInRequest;
+import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.AnswerOption;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.SessionStatus;
@@ -11,6 +11,7 @@ import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
+import dev.hishaam.hermes.service.session.*;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
@@ -25,7 +26,8 @@ public class AnswerService {
   private final ParticipantAnswerRepository answerRepository;
   private final ParticipantService participantService;
   private final SessionSnapshotService snapshotService;
-  private final SessionLiveStateService liveStateService;
+  private final SessionStateStore stateStore;
+  private final SessionAnswerStatsStore answerStatsStore;
   private final SessionEventPublisher eventPublisher;
   private final EntityManager entityManager;
 
@@ -33,13 +35,15 @@ public class AnswerService {
       ParticipantAnswerRepository answerRepository,
       ParticipantService participantService,
       SessionSnapshotService snapshotService,
-      SessionLiveStateService liveStateService,
+      SessionStateStore stateStore,
+      SessionAnswerStatsStore answerStatsStore,
       SessionEventPublisher eventPublisher,
       EntityManager entityManager) {
     this.answerRepository = answerRepository;
     this.participantService = participantService;
     this.snapshotService = snapshotService;
-    this.liveStateService = liveStateService;
+    this.stateStore = stateStore;
+    this.answerStatsStore = answerStatsStore;
     this.eventPublisher = eventPublisher;
     this.entityManager = entityManager;
   }
@@ -71,7 +75,7 @@ public class AnswerService {
     answer.setAnsweredAt(selectedOptionIds.isEmpty() ? null : OffsetDateTime.now());
     answerRepository.save(answer);
 
-    liveStateService.replaceParticipantSelections(
+    answerStatsStore.replaceParticipantSelections(
         sessionId, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
     broadcastAnswerState(sessionId, request.questionId());
   }
@@ -97,18 +101,18 @@ public class AnswerService {
     answer.setFrozenAt(frozenAt);
     answerRepository.save(answer);
 
-    liveStateService.markLockedIn(sessionId, request.questionId(), participantId);
+    answerStatsStore.markLockedIn(sessionId, request.questionId(), participantId);
     broadcastAnswerState(sessionId, request.questionId());
   }
 
   private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(
       Long sessionId, Long questionId) {
-    String status = liveStateService.getStatus(sessionId);
+    String status = stateStore.getStatus(sessionId);
     if (!SessionStatus.ACTIVE.name().equals(status)) {
       throw AppException.conflict("Session is not accepting answers");
     }
 
-    String questionState = liveStateService.getQuestionState(sessionId);
+    String questionState = stateStore.getQuestionState(sessionId);
     if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
       throw AppException.conflict("Question is not currently accepting answers");
     }
@@ -117,7 +121,7 @@ public class AnswerService {
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
 
     // For ENTIRE_PASSAGE mode: accept answers for any sub-question in the current passage
-    String currentPassageIdStr = liveStateService.getCurrentPassageId(sessionId);
+    String currentPassageIdStr = stateStore.getCurrentPassageId(sessionId);
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
       Long passageId = Long.parseLong(currentPassageIdStr);
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
@@ -125,7 +129,7 @@ public class AnswerService {
         throw AppException.conflict("Question does not belong to the current passage");
       }
     } else {
-      String currentQuestionId = liveStateService.getCurrentQuestionId(sessionId);
+      String currentQuestionId = stateStore.getCurrentQuestionId(sessionId);
       if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
         throw AppException.conflict("Question is no longer active");
       }
@@ -175,7 +179,7 @@ public class AnswerService {
   private Set<Long> previousSelectionIds(
       Long sessionId, Long participantId, ParticipantAnswer answer) {
     Set<Long> previousSelectionIds =
-        liveStateService.getParticipantSelectionIds(
+        answerStatsStore.getParticipantSelectionIds(
             sessionId, answer.getQuestionId(), participantId);
     if (!previousSelectionIds.isEmpty()) {
       return previousSelectionIds;
@@ -194,10 +198,10 @@ public class AnswerService {
   }
 
   private void broadcastAnswerState(Long sessionId, Long questionId) {
-    Map<Long, Long> counts = liveStateService.getQuestionCounts(sessionId, questionId);
-    long totalAnswered = liveStateService.getTotalAnswered(sessionId, questionId);
-    long totalParticipants = liveStateService.getParticipantCount(sessionId);
-    long totalLockedIn = liveStateService.getTotalLockedIn(sessionId, questionId);
+    Map<Long, Long> counts = answerStatsStore.getQuestionCounts(sessionId, questionId);
+    long totalAnswered = answerStatsStore.getTotalAnswered(sessionId, questionId);
+    long totalParticipants = stateStore.getParticipantCount(sessionId);
+    long totalLockedIn = answerStatsStore.getTotalLockedIn(sessionId, questionId);
 
     eventPublisher.publishAnswerUpdate(
         sessionId,

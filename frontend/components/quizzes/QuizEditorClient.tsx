@@ -108,7 +108,7 @@ export default function QuizEditorClient({
         title={quiz.title}
         description="Standalone questions and passage blocks, in order."
         meta={
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
             <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
               {canvasItems.length} blocks
             </span>
