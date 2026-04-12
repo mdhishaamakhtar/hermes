@@ -6,7 +6,8 @@ import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
-import dev.hishaam.hermes.service.session.*;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -18,13 +19,13 @@ public class ScoringCorrectionService {
 
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
-  private final SessionStateStore stateStore;
+  private final SessionStateRedisRepository stateStore;
   private final GradingService gradingService;
 
   public ScoringCorrectionService(
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
-      SessionStateStore stateStore,
+      SessionStateRedisRepository stateStore,
       GradingService gradingService) {
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;

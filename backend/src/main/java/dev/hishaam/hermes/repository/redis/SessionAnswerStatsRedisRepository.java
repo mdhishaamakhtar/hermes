@@ -1,33 +1,31 @@
-package dev.hishaam.hermes.service.session;
+package dev.hishaam.hermes.repository.redis;
 
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
+import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
 
-/**
- * Owns per-question answer statistics in Redis: option counts, participant selections, lock-ins.
- */
-@Service
-public class SessionAnswerStatsStore {
+/** Per-question answer statistics in Redis: option counts, participant selections, lock-ins. */
+@Repository
+public class SessionAnswerStatsRedisRepository {
 
   private final StringRedisTemplate redis;
-  private final SessionRedisHelper redisHelper;
 
-  public SessionAnswerStatsStore(StringRedisTemplate redis, SessionRedisHelper redisHelper) {
+  public SessionAnswerStatsRedisRepository(StringRedisTemplate redis) {
     this.redis = redis;
-    this.redisHelper = redisHelper;
   }
 
   public void initQuestionCounts(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
     String sid = sessionId.toString();
     Map<String, String> initial = new LinkedHashMap<>();
     question.options().forEach(option -> initial.put(option.id().toString(), "0"));
-    redis.opsForHash().putAll(redisHelper.questionCountsKey(sid, question.id()), initial);
-    redis.expire(redisHelper.questionCountsKey(sid, question.id()), SessionRedisHelper.SESSION_TTL);
+    redis.opsForHash().putAll(SessionRedisKeys.questionCountsKey(sid, question.id()), initial);
+    redis.expire(
+        SessionRedisKeys.questionCountsKey(sid, question.id()), SessionRedisKeys.SESSION_TTL);
   }
 
   public Set<Long> getParticipantSelectionIds(Long sessionId, Long questionId, Long participantId) {
@@ -35,7 +33,7 @@ public class SessionAnswerStatsStore {
     Set<String> raw =
         redis
             .opsForSet()
-            .members(redisHelper.participantSelectionKey(sid, questionId, participantId));
+            .members(SessionRedisKeys.participantSelectionKey(sid, questionId, participantId));
     if (raw == null || raw.isEmpty()) {
       return Set.of();
     }
@@ -49,9 +47,9 @@ public class SessionAnswerStatsStore {
       Set<Long> previousSelectionIds,
       Set<Long> nextSelectionIds) {
     String sid = sessionId.toString();
-    String countsKey = redisHelper.questionCountsKey(sid, questionId);
-    String selectionKey = redisHelper.participantSelectionKey(sid, questionId, participantId);
-    String answeredKey = redisHelper.questionAnsweredKey(sid, questionId);
+    String countsKey = SessionRedisKeys.questionCountsKey(sid, questionId);
+    String selectionKey = SessionRedisKeys.participantSelectionKey(sid, questionId, participantId);
+    String answeredKey = SessionRedisKeys.questionAnsweredKey(sid, questionId);
 
     previousSelectionIds.stream()
         .filter(optionId -> !nextSelectionIds.contains(optionId))
@@ -65,9 +63,9 @@ public class SessionAnswerStatsStore {
       redis
           .opsForSet()
           .add(selectionKey, nextSelectionIds.stream().map(String::valueOf).toArray(String[]::new));
-      redis.expire(selectionKey, SessionRedisHelper.SESSION_TTL);
+      redis.expire(selectionKey, SessionRedisKeys.SESSION_TTL);
       redis.opsForSet().add(answeredKey, participantId.toString());
-      redis.expire(answeredKey, SessionRedisHelper.SESSION_TTL);
+      redis.expire(answeredKey, SessionRedisKeys.SESSION_TTL);
     } else {
       redis.opsForSet().remove(answeredKey, participantId.toString());
     }
@@ -76,7 +74,7 @@ public class SessionAnswerStatsStore {
   public Map<Long, Long> getQuestionCounts(Long sessionId, Long questionId) {
     String sid = sessionId.toString();
     Map<Object, Object> rawCounts =
-        redis.opsForHash().entries(redisHelper.questionCountsKey(sid, questionId));
+        redis.opsForHash().entries(SessionRedisKeys.questionCountsKey(sid, questionId));
     Map<Long, Long> counts = new LinkedHashMap<>();
     rawCounts.forEach(
         (key, value) ->
@@ -86,7 +84,9 @@ public class SessionAnswerStatsStore {
 
   public long getTotalAnswered(Long sessionId, Long questionId) {
     Long total =
-        redis.opsForSet().size(redisHelper.questionAnsweredKey(sessionId.toString(), questionId));
+        redis
+            .opsForSet()
+            .size(SessionRedisKeys.questionAnsweredKey(sessionId.toString(), questionId));
     return total != null ? total : 0L;
   }
 
@@ -94,13 +94,16 @@ public class SessionAnswerStatsStore {
     String sid = sessionId.toString();
     redis
         .opsForSet()
-        .add(redisHelper.questionLockedInKey(sid, questionId), participantId.toString());
-    redis.expire(redisHelper.questionLockedInKey(sid, questionId), SessionRedisHelper.SESSION_TTL);
+        .add(SessionRedisKeys.questionLockedInKey(sid, questionId), participantId.toString());
+    redis.expire(
+        SessionRedisKeys.questionLockedInKey(sid, questionId), SessionRedisKeys.SESSION_TTL);
   }
 
   public long getTotalLockedIn(Long sessionId, Long questionId) {
     Long total =
-        redis.opsForSet().size(redisHelper.questionLockedInKey(sessionId.toString(), questionId));
+        redis
+            .opsForSet()
+            .size(SessionRedisKeys.questionLockedInKey(sessionId.toString(), questionId));
     return total != null ? total : 0L;
   }
 }

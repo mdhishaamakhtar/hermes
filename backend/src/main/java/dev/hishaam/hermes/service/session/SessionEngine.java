@@ -8,6 +8,8 @@ import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.*;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
@@ -26,8 +28,8 @@ public class SessionEngine {
   private final QuizSessionRepository sessionRepository;
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
-  private final SessionStateStore stateStore;
-  private final SessionAnswerStatsStore answerStatsStore;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionAnswerStatsRedisRepository answerStatsStore;
   private final SessionEventPublisher eventPublisher;
   private final SessionTimerScheduler timerScheduler;
   private final GradingService gradingService;
@@ -36,8 +38,8 @@ public class SessionEngine {
       QuizSessionRepository sessionRepository,
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
-      SessionStateStore stateStore,
-      SessionAnswerStatsStore answerStatsStore,
+      SessionStateRedisRepository stateStore,
+      SessionAnswerStatsRedisRepository answerStatsStore,
       SessionEventPublisher eventPublisher,
       SessionTimerScheduler timerScheduler,
       GradingService gradingService) {

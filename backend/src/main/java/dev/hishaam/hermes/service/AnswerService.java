@@ -10,7 +10,10 @@ import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import dev.hishaam.hermes.service.session.*;
+import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.service.session.SessionEventPublisher;
+import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -24,16 +27,16 @@ public class AnswerService {
   private final ParticipantAnswerRepository answerRepository;
   private final ParticipantService participantService;
   private final SessionSnapshotService snapshotService;
-  private final SessionStateStore stateStore;
-  private final SessionAnswerStatsStore answerStatsStore;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionAnswerStatsRedisRepository answerStatsStore;
   private final SessionEventPublisher eventPublisher;
 
   public AnswerService(
       ParticipantAnswerRepository answerRepository,
       ParticipantService participantService,
       SessionSnapshotService snapshotService,
-      SessionStateStore stateStore,
-      SessionAnswerStatsStore answerStatsStore,
+      SessionStateRedisRepository stateStore,
+      SessionAnswerStatsRedisRepository answerStatsStore,
       SessionEventPublisher eventPublisher) {
     this.answerRepository = answerRepository;
     this.participantService = participantService;

@@ -13,6 +13,10 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
+import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionTimerRedisRepository;
 import dev.hishaam.hermes.service.*;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
@@ -31,12 +35,12 @@ public class SessionService {
   private final ParticipantRepository participantRepository;
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
-  private final SessionStateStore stateStore;
-  private final SessionTimerStateStore timerStore;
-  private final SessionAnswerStatsStore answerStatsStore;
-  private final SessionLeaderboardStore leaderboardStore;
-  private final SessionLiveStateService liveStateService;
-  private final SessionCodeService sessionCodeService;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionTimerRedisRepository timerStore;
+  private final SessionAnswerStatsRedisRepository answerStatsStore;
+  private final SessionLeaderboardRedisRepository leaderboardStore;
+  private final SessionRejoinContextService rejoinContextService;
+  private final SessionJoinCodeService joinCodeService;
   private final SessionEngine engine;
   private final SessionTimerOrchestrator timerOrchestrator;
   private final SessionEventPublisher eventPublisher;
@@ -49,12 +53,12 @@ public class SessionService {
       ParticipantRepository participantRepository,
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
-      SessionStateStore stateStore,
-      SessionTimerStateStore timerStore,
-      SessionAnswerStatsStore answerStatsStore,
-      SessionLeaderboardStore leaderboardStore,
-      SessionLiveStateService liveStateService,
-      SessionCodeService sessionCodeService,
+      SessionStateRedisRepository stateStore,
+      SessionTimerRedisRepository timerStore,
+      SessionAnswerStatsRedisRepository answerStatsStore,
+      SessionLeaderboardRedisRepository leaderboardStore,
+      SessionRejoinContextService rejoinContextService,
+      SessionJoinCodeService joinCodeService,
       SessionEngine engine,
       SessionTimerOrchestrator timerOrchestrator,
       SessionEventPublisher eventPublisher,
@@ -69,8 +73,8 @@ public class SessionService {
     this.timerStore = timerStore;
     this.answerStatsStore = answerStatsStore;
     this.leaderboardStore = leaderboardStore;
-    this.liveStateService = liveStateService;
-    this.sessionCodeService = sessionCodeService;
+    this.rejoinContextService = rejoinContextService;
+    this.joinCodeService = joinCodeService;
     this.engine = engine;
     this.timerOrchestrator = timerOrchestrator;
     this.eventPublisher = eventPublisher;
@@ -96,7 +100,7 @@ public class SessionService {
     String snapshotJson = snapshotService.serialize(snapshot);
 
     // Generate join code with atomic Redis reservation (fixes TOCTOU race)
-    String joinCode = sessionCodeService.generateJoinCode();
+    String joinCode = joinCodeService.generateJoinCode();
 
     QuizSession session =
         QuizSession.builder()
@@ -233,7 +237,8 @@ public class SessionService {
             ? snapshotService.deserialize(session.getSnapshot())
             : snapshotService.loadSnapshot(sessionId.toString());
 
-    SessionLiveStateService.RejoinContext ctx = liveStateService.buildRejoinContext(sessionId);
+    SessionRejoinContextService.SessionRejoinContext ctx =
+        rejoinContextService.buildRejoinContext(sessionId);
     int participantCount = ctx.participantCount();
     if (participantCount == 0) {
       participantCount = (int) participantRepository.countBySessionId(sessionId);

@@ -1,6 +1,7 @@
-package dev.hishaam.hermes.service.session;
+package dev.hishaam.hermes.repository.redis;
 
 import dev.hishaam.hermes.dto.session.SessionResultsResponse;
+import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -9,55 +10,58 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
 
-@Service
-public class SessionLeaderboardStore {
+@Repository
+public class SessionLeaderboardRedisRepository {
 
   private final StringRedisTemplate redis;
-  private final SessionRedisHelper redisHelper;
 
-  public SessionLeaderboardStore(StringRedisTemplate redis, SessionRedisHelper redisHelper) {
+  public SessionLeaderboardRedisRepository(StringRedisTemplate redis) {
     this.redis = redis;
-    this.redisHelper = redisHelper;
   }
 
   public void initEntry(Long sessionId, Long participantId) {
     String sid = sessionId.toString();
-    redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), 0);
-    redis.expire(redisHelper.leaderboardKey(sid), SessionRedisHelper.SESSION_TTL);
+    redis.opsForZSet().add(SessionRedisKeys.leaderboardKey(sid), participantId.toString(), 0);
+    redis.expire(SessionRedisKeys.leaderboardKey(sid), SessionRedisKeys.SESSION_TTL);
   }
 
   public void incrementScore(Long sessionId, Long participantId, long deltaPoints) {
     String sid = sessionId.toString();
     redis
         .opsForZSet()
-        .incrementScore(redisHelper.leaderboardKey(sid), participantId.toString(), deltaPoints);
+        .incrementScore(
+            SessionRedisKeys.leaderboardKey(sid), participantId.toString(), deltaPoints);
   }
 
   public void setScore(Long sessionId, Long participantId, long newScore) {
     String sid = sessionId.toString();
-    redis.opsForZSet().add(redisHelper.leaderboardKey(sid), participantId.toString(), newScore);
+    redis
+        .opsForZSet()
+        .add(SessionRedisKeys.leaderboardKey(sid), participantId.toString(), newScore);
   }
 
   public void incrementCumulativeTime(Long sessionId, Long participantId, long millis) {
     String sid = sessionId.toString();
     redis
         .opsForHash()
-        .increment(redisHelper.cumulativeTimeKey(sid), participantId.toString(), millis);
-    redis.expire(redisHelper.cumulativeTimeKey(sid), SessionRedisHelper.SESSION_TTL);
+        .increment(SessionRedisKeys.cumulativeTimeKey(sid), participantId.toString(), millis);
+    redis.expire(SessionRedisKeys.cumulativeTimeKey(sid), SessionRedisKeys.SESSION_TTL);
   }
 
   public List<SessionResultsResponse.LeaderboardEntry> buildLeaderboard(Long sessionId) {
     String sid = sessionId.toString();
     Set<ZSetOperations.TypedTuple<String>> data =
-        redis.opsForZSet().reverseRangeWithScores(redisHelper.leaderboardKey(sid), 0, -1);
+        redis.opsForZSet().reverseRangeWithScores(SessionRedisKeys.leaderboardKey(sid), 0, -1);
     if (data == null || data.isEmpty()) {
       return List.of();
     }
 
-    Map<Object, Object> namesMap = redis.opsForHash().entries(redisHelper.participantNamesKey(sid));
-    Map<Object, Object> timesMap = redis.opsForHash().entries(redisHelper.cumulativeTimeKey(sid));
+    Map<Object, Object> namesMap =
+        redis.opsForHash().entries(SessionRedisKeys.participantNamesKey(sid));
+    Map<Object, Object> timesMap =
+        redis.opsForHash().entries(SessionRedisKeys.cumulativeTimeKey(sid));
 
     List<ZSetOperations.TypedTuple<String>> sorted =
         data.stream()

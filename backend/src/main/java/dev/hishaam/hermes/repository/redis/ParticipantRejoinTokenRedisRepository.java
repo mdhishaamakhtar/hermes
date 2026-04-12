@@ -1,25 +1,21 @@
-package dev.hishaam.hermes.service;
+package dev.hishaam.hermes.repository.redis;
 
 import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantRepository;
-import dev.hishaam.hermes.service.session.*;
+import dev.hishaam.hermes.util.SessionRedisKeys;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
 
-@Service
-public class ParticipantRejoinTokenStore {
+@Repository
+public class ParticipantRejoinTokenRedisRepository {
 
   private final StringRedisTemplate redis;
-  private final SessionRedisHelper redisHelper;
   private final ParticipantRepository participantRepository;
 
-  public ParticipantRejoinTokenStore(
-      StringRedisTemplate redis,
-      SessionRedisHelper redisHelper,
-      ParticipantRepository participantRepository) {
+  public ParticipantRejoinTokenRedisRepository(
+      StringRedisTemplate redis, ParticipantRepository participantRepository) {
     this.redis = redis;
-    this.redisHelper = redisHelper;
     this.participantRepository = participantRepository;
   }
 
@@ -27,13 +23,14 @@ public class ParticipantRejoinTokenStore {
     redis
         .opsForValue()
         .set(
-            redisHelper.participantTokenKey(rejoinToken),
+            SessionRedisKeys.participantTokenKey(rejoinToken),
             participantId.toString(),
-            SessionRedisHelper.REJOIN_TTL);
+            SessionRedisKeys.REJOIN_TTL);
   }
 
   public Long resolveParticipantId(String rejoinToken, Long sessionId) {
-    String participantIdStr = redis.opsForValue().get(redisHelper.participantTokenKey(rejoinToken));
+    String participantIdStr =
+        redis.opsForValue().get(SessionRedisKeys.participantTokenKey(rejoinToken));
     Long participantId;
 
     if (participantIdStr != null) {

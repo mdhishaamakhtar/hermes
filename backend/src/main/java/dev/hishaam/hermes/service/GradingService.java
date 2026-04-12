@@ -3,7 +3,10 @@ package dev.hishaam.hermes.service;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import dev.hishaam.hermes.service.session.*;
+import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionTimerRedisRepository;
+import dev.hishaam.hermes.service.session.SessionEventPublisher;
+import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,16 +19,16 @@ public class GradingService {
 
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
-  private final SessionTimerStateStore timerStore;
-  private final SessionLeaderboardStore leaderboardStore;
+  private final SessionTimerRedisRepository timerStore;
+  private final SessionLeaderboardRedisRepository leaderboardStore;
   private final SessionEventPublisher eventPublisher;
   private final AnswerScoringService scoringService;
 
   public GradingService(
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
-      SessionTimerStateStore timerStore,
-      SessionLeaderboardStore leaderboardStore,
+      SessionTimerRedisRepository timerStore,
+      SessionLeaderboardRedisRepository leaderboardStore,
       SessionEventPublisher eventPublisher,
       AnswerScoringService scoringService) {
     this.answerRepository = answerRepository;

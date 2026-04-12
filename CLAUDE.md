@@ -67,8 +67,8 @@ Frontend WebSocket is managed by `frontend/hooks/useStompClient.ts` with automat
 | Service | Responsibility |
 |---|---|
 | `SessionService` | Session lifecycle (create/start/next/end) |
-| `SessionEngine` | Transactional ops and timer scheduling for questions |
-| `SessionRedisHelper` | Redis read/write for ephemeral session state |
+| `SessionEngine` | Transactional question advance and session end; timers in `SessionTimerOrchestrator` |
+| `util/SessionRedisKeys` + `repository/redis/*RedisRepository` | Static key/TTL helpers and Redis repositories for session state, leaderboards, timers, stats, snapshots, join codes |
 | `AnswerService` | Answer recording and leaderboard updates |
 | `ParticipantService` | Join/rejoin logic and token management |
 | `OwnershipService` | Ensures organizers can only manage their own resources |

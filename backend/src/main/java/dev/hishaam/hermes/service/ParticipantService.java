@@ -13,12 +13,13 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
-import dev.hishaam.hermes.service.session.SessionCodeService;
+import dev.hishaam.hermes.repository.redis.ParticipantRejoinTokenRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
-import dev.hishaam.hermes.service.session.SessionLeaderboardStore;
-import dev.hishaam.hermes.service.session.SessionLiveStateService;
+import dev.hishaam.hermes.service.session.SessionRejoinContextService;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
-import dev.hishaam.hermes.service.session.SessionStateStore;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -29,36 +30,37 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ParticipantService {
 
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final String REJOIN_TOKEN_CHARS =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
   private final QuizSessionRepository sessionRepository;
   private final ParticipantRepository participantRepository;
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
-  private final SessionStateStore stateStore;
-  private final SessionLeaderboardStore leaderboardStore;
-  private final SessionLiveStateService liveStateService;
-  private final SessionCodeService sessionCodeService;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionLeaderboardRedisRepository leaderboardStore;
+  private final SessionRejoinContextService rejoinContextService;
   private final SessionEventPublisher eventPublisher;
-  private final ParticipantRejoinTokenStore rejoinTokenStore;
+  private final ParticipantRejoinTokenRedisRepository rejoinTokenStore;
 
   public ParticipantService(
       QuizSessionRepository sessionRepository,
       ParticipantRepository participantRepository,
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
-      SessionStateStore stateStore,
-      SessionLeaderboardStore leaderboardStore,
-      SessionLiveStateService liveStateService,
-      SessionCodeService sessionCodeService,
+      SessionStateRedisRepository stateStore,
+      SessionLeaderboardRedisRepository leaderboardStore,
+      SessionRejoinContextService rejoinContextService,
       SessionEventPublisher eventPublisher,
-      ParticipantRejoinTokenStore rejoinTokenStore) {
+      ParticipantRejoinTokenRedisRepository rejoinTokenStore) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
     this.leaderboardStore = leaderboardStore;
-    this.liveStateService = liveStateService;
-    this.sessionCodeService = sessionCodeService;
+    this.rejoinContextService = rejoinContextService;
     this.eventPublisher = eventPublisher;
     this.rejoinTokenStore = rejoinTokenStore;
   }
@@ -86,7 +88,7 @@ public class ParticipantService {
       throw AppException.conflict("Session is no longer accepting participants");
     }
 
-    String rejoinToken = sessionCodeService.generateRejoinToken();
+    String rejoinToken = generateRejoinToken();
     Participant participant =
         Participant.builder()
             .session(session)
@@ -117,7 +119,8 @@ public class ParticipantService {
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
     SessionStatus status = session.getStatus();
-    SessionLiveStateService.RejoinContext ctx = liveStateService.buildRejoinContext(sessionId);
+    SessionRejoinContextService.SessionRejoinContext ctx =
+        rejoinContextService.buildRejoinContext(sessionId);
 
     List<Long> answered = answerRepository.findAnsweredQuestionIds(participantId);
 
@@ -175,6 +178,14 @@ public class ParticipantService {
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
   public Long resolveParticipantId(String rejoinToken, Long sessionId) {
     return rejoinTokenStore.resolveParticipantId(rejoinToken, sessionId);
+  }
+
+  private static String generateRejoinToken() {
+    StringBuilder token = new StringBuilder(32);
+    for (int i = 0; i < 32; i++) {
+      token.append(REJOIN_TOKEN_CHARS.charAt(SECURE_RANDOM.nextInt(REJOIN_TOKEN_CHARS.length())));
+    }
+    return token.toString();
   }
 
   private RejoinResponse.CurrentQuestion buildCurrentQuestion(

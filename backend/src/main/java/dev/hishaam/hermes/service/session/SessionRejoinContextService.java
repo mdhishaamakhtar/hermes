@@ -1,24 +1,27 @@
 package dev.hishaam.hermes.service.session;
 
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionTimerRedisRepository;
 import org.springframework.stereotype.Service;
 
 /**
- * Thin facade that aggregates cross-store reads for participant rejoin. All other session state
- * operations have been extracted to {@link SessionStateStore}, {@link SessionTimerStateStore}, and
- * {@link SessionAnswerStatsStore}.
+ * Rejoin-only: aggregates Redis reads needed to reconstruct a participant's live view after
+ * reconnect. Other session state lives in {@link SessionStateRedisRepository}, {@link
+ * SessionTimerRedisRepository}, and {@link SessionAnswerStatsRedisRepository}.
  */
 @Service
-public class SessionLiveStateService {
+public class SessionRejoinContextService {
 
-  private final SessionStateStore stateStore;
-  private final SessionTimerStateStore timerStore;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionTimerRedisRepository timerStore;
 
-  public SessionLiveStateService(SessionStateStore stateStore, SessionTimerStateStore timerStore) {
+  public SessionRejoinContextService(
+      SessionStateRedisRepository stateStore, SessionTimerRedisRepository timerStore) {
     this.stateStore = stateStore;
     this.timerStore = timerStore;
   }
 
-  public record RejoinContext(
+  public record SessionRejoinContext(
       String questionLifecycle,
       Long currentQuestionId,
       Long currentPassageId,
@@ -29,7 +32,7 @@ public class SessionLiveStateService {
    * Reads all volatile session state needed to reconstruct a participant's view on rejoin. Avoids
    * repeated round-trips from the caller.
    */
-  public RejoinContext buildRejoinContext(Long sessionId) {
+  public SessionRejoinContext buildRejoinContext(Long sessionId) {
     String questionLifecycle = stateStore.getQuestionState(sessionId);
 
     String currentQIdStr = stateStore.getCurrentQuestionId(sessionId);
@@ -47,7 +50,7 @@ public class SessionLiveStateService {
     Long ttl = timerStore.getTimerTtlSeconds(sessionId);
     Integer timeLeftSeconds = (ttl != null && ttl > 0) ? ttl.intValue() : null;
 
-    return new RejoinContext(
+    return new SessionRejoinContext(
         questionLifecycle, currentQId, currentPassageId, participantCount, timeLeftSeconds);
   }
 }

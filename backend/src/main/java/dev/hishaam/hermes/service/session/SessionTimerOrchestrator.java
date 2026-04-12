@@ -5,6 +5,8 @@ import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionTimerRedisRepository;
 import dev.hishaam.hermes.service.*;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -19,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SessionTimerOrchestrator {
 
-  private final SessionStateStore stateStore;
-  private final SessionTimerStateStore timerStore;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionTimerRedisRepository timerStore;
   private final SessionSnapshotService snapshotService;
   private final SessionEventPublisher eventPublisher;
   private final SessionTimerScheduler timerScheduler;
@@ -28,8 +30,8 @@ public class SessionTimerOrchestrator {
   private final ParticipantAnswerRepository answerRepository;
 
   public SessionTimerOrchestrator(
-      SessionStateStore stateStore,
-      SessionTimerStateStore timerStore,
+      SessionStateRedisRepository stateStore,
+      SessionTimerRedisRepository timerStore,
       SessionSnapshotService snapshotService,
       SessionEventPublisher eventPublisher,
       SessionTimerScheduler timerScheduler,

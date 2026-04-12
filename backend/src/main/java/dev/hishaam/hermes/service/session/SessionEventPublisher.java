@@ -6,6 +6,9 @@ import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import dev.hishaam.hermes.dto.ws.WsPayloads;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.repository.ParticipantRepository;
+import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.util.LeaderboardBuilder;
 import dev.hishaam.hermes.util.WsTopics;
 import java.util.Comparator;
@@ -21,17 +24,17 @@ public class SessionEventPublisher {
 
   private final SimpMessagingTemplate messaging;
   private final SessionSnapshotService snapshotService;
-  private final SessionStateStore stateStore;
-  private final SessionAnswerStatsStore answerStatsStore;
-  private final SessionLeaderboardStore leaderboardStore;
+  private final SessionStateRedisRepository stateStore;
+  private final SessionAnswerStatsRedisRepository answerStatsStore;
+  private final SessionLeaderboardRedisRepository leaderboardStore;
   private final ParticipantRepository participantRepository;
 
   public SessionEventPublisher(
       SimpMessagingTemplate messaging,
       SessionSnapshotService snapshotService,
-      SessionStateStore stateStore,
-      SessionAnswerStatsStore answerStatsStore,
-      SessionLeaderboardStore leaderboardStore,
+      SessionStateRedisRepository stateStore,
+      SessionAnswerStatsRedisRepository answerStatsStore,
+      SessionLeaderboardRedisRepository leaderboardStore,
       ParticipantRepository participantRepository) {
     this.messaging = messaging;
     this.snapshotService = snapshotService;

@@ -6,26 +6,23 @@ import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import dev.hishaam.hermes.repository.redis.SessionSnapshotRedisRepository;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SessionSnapshotService {
 
-  private final StringRedisTemplate redis;
   private final ObjectMapper objectMapper;
   private final QuizSessionRepository sessionRepository;
-  private final SessionRedisHelper redisHelper;
+  private final SessionSnapshotRedisRepository snapshotRedis;
 
   public SessionSnapshotService(
-      StringRedisTemplate redis,
       ObjectMapper objectMapper,
       QuizSessionRepository sessionRepository,
-      SessionRedisHelper redisHelper) {
-    this.redis = redis;
+      SessionSnapshotRedisRepository snapshotRedis) {
     this.objectMapper = objectMapper;
     this.sessionRepository = sessionRepository;
-    this.redisHelper = redisHelper;
+    this.snapshotRedis = snapshotRedis;
   }
 
   public String serialize(QuizSnapshot snapshot) {
@@ -47,7 +44,7 @@ public class SessionSnapshotService {
   /** Persists the updated snapshot to both Redis and PostgreSQL. */
   public void updateSnapshot(String sid, Long sessionId, QuizSnapshot updated) {
     String json = serialize(updated);
-    redis.opsForValue().set(redisHelper.snapshotKey(sid), json, SessionRedisHelper.SESSION_TTL);
+    snapshotRedis.setSnapshotJson(sid, json);
     sessionRepository
         .findById(sessionId)
         .ifPresent(
@@ -58,14 +55,14 @@ public class SessionSnapshotService {
   }
 
   public QuizSnapshot loadSnapshot(String sid) {
-    String json = redis.opsForValue().get(redisHelper.snapshotKey(sid));
+    String json = snapshotRedis.getSnapshotJson(sid);
     if (json == null || json.isEmpty()) {
       QuizSession session =
           sessionRepository
               .findById(Long.parseLong(sid))
               .orElseThrow(() -> AppException.notFound("Session not found"));
       json = session.getSnapshot();
-      redis.opsForValue().set(redisHelper.snapshotKey(sid), json, SessionRedisHelper.SESSION_TTL);
+      snapshotRedis.setSnapshotJson(sid, json);
     }
     return deserialize(json);
   }
