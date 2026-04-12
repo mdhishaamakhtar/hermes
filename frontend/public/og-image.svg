@@ -40,6 +40,7 @@
         letter-spacing: 0.14em;
         text-transform: uppercase;
         fill: #60a5fa;
+        text-anchor: end;
       }
     </style>
   </defs>
@@ -47,7 +48,7 @@
   <rect width="1200" height="630" fill="#0a0a0f"/>
 
   <g transform="translate(74 54)">
-    <svg width="34" height="34" viewBox="0 0 32 32" fill="none">
+    <svg width="34" height="34" viewBox="4 8 24 22" fill="none">
       <rect x="8" y="18" width="16" height="4" fill="#2563EB"/>
       <rect x="10" y="14" width="12" height="4" fill="#2563EB"/>
       <rect x="12" y="10" width="8" height="4" fill="#2563EB"/>
@@ -59,15 +60,20 @@
     <text x="54" y="24" class="brand">Hermes</text>
   </g>
 
+  <!--
+    Optical margin corrections from Geist TTF hmtx left-side-bearings.
+    Bold H: lsb 74/1000em → 9.5px @128px
+    Regular R: lsb 92/1000em → 3px @34px, 1.5px @18px
+  -->
   <g transform="translate(74 248)">
-    <text x="-6" y="0" class="title">HERMES</text>
-    <text x="0" y="76" class="body">Real-time quiz sessions. Live analytics.</text>
-    <text x="0" y="118" class="body">Anonymous participants.</text>
+    <text x="-9.5" y="0" class="title">HERMES</text>
+    <text x="-3" y="76" class="body">Real-time quiz sessions. Live analytics.</text>
+    <text x="-3" y="118" class="body">Anonymous participants.</text>
     <rect x="0" y="154" width="96" height="2" fill="#2563EB"/>
   </g>
 
   <g transform="translate(74 548)">
-    <text x="0" y="0" class="meta">Real-time • WebSocket • Anonymous Participants</text>
-    <text x="759" y="0" class="domain">hermes.hishaam.dev</text>
+    <text x="-1.5" y="0" class="meta">Real-time • WebSocket • Anonymous Participants</text>
+    <text x="1052" y="0" class="domain">hermes.hishaam.dev</text>
   </g>
 </svg>

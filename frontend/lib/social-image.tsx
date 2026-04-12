@@ -25,6 +25,21 @@ export async function createSocialImage() {
     loadFont("Geist-Bold.ttf"),
   ]);
 
+  /*
+   * Optical margin corrections derived from Geist TTF hmtx left-side-bearings.
+   * Every glyph has invisible padding before its ink starts. At large sizes
+   * this becomes visible misalignment. Values below shift each text element
+   * left by its exact LSB so all ink edges align with geometric elements
+   * (the divider line, the icon viewBox crop).
+   *
+   * Geist Bold  H: lsb 74/1000em → 9.47px @128px
+   * Geist Regular R: lsb 92/1000em → 3.13px @34px, 1.66px @18px
+   * Geist Regular H: lsb 92/1000em → 2.02px @22px
+   */
+  const LSB_TITLE = -9.5; // Bold "H" at 128px
+  const LSB_BODY = -3; // Regular "R" at 34px
+  const LSB_META = -1.5; // Regular "R" at 18px
+
   return new ImageResponse(
     <div
       style={{
@@ -51,7 +66,7 @@ export async function createSocialImage() {
           <svg
             width="34"
             height="34"
-            viewBox="0 0 32 32"
+            viewBox="4 8 24 22"
             fill="none"
             aria-hidden="true"
           >
@@ -90,7 +105,7 @@ export async function createSocialImage() {
               lineHeight: 0.9,
               fontWeight: 700,
               letterSpacing: "-0.07em",
-              marginLeft: -6,
+              marginLeft: LSB_TITLE,
             }}
           >
             HERMES
@@ -101,6 +116,7 @@ export async function createSocialImage() {
               lineHeight: 1.22,
               color: "#cbd5e1",
               maxWidth: 700,
+              marginLeft: LSB_BODY,
             }}
           >
             {siteConfig.shortDescription}
@@ -128,6 +144,7 @@ export async function createSocialImage() {
               letterSpacing: "0.18em",
               textTransform: "uppercase",
               color: "#94a3b8",
+              marginLeft: LSB_META,
             }}
           >
             Real-time • WebSocket • Anonymous Participants
