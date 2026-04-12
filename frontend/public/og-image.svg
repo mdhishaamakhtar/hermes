@@ -60,7 +60,7 @@
   </g>
 
   <g transform="translate(74 248)">
-    <text x="0" y="0" class="title">HERMES</text>
+    <text x="-6" y="0" class="title">HERMES</text>
     <text x="0" y="76" class="body">Real-time quiz sessions. Live analytics.</text>
     <text x="0" y="118" class="body">Anonymous participants.</text>
     <rect x="0" y="154" width="96" height="2" fill="#2563EB"/>
