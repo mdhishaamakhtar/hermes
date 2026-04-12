@@ -10,17 +10,20 @@ export const socialImageSize = {
 
 export const socialImageAlt = "Hermes social preview";
 
-async function loadGeistRegular() {
-  return readFile(
-    join(
-      process.cwd(),
-      "node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf",
-    ),
-  );
+const GEIST_FONT_DIR = join(
+  process.cwd(),
+  "node_modules/geist/dist/fonts/geist-sans",
+);
+
+function loadFont(name: string) {
+  return readFile(join(GEIST_FONT_DIR, name));
 }
 
 export async function createSocialImage() {
-  const geistRegular = await loadGeistRegular();
+  const [geistRegular, geistBold] = await Promise.all([
+    loadFont("Geist-Regular.ttf"),
+    loadFont("Geist-Bold.ttf"),
+  ]);
 
   return new ImageResponse(
     <div
@@ -87,6 +90,7 @@ export async function createSocialImage() {
               lineHeight: 0.9,
               fontWeight: 700,
               letterSpacing: "-0.07em",
+              marginLeft: -6,
             }}
           >
             HERMES
@@ -149,6 +153,12 @@ export async function createSocialImage() {
           data: geistRegular,
           style: "normal",
           weight: 400,
+        },
+        {
+          name: "Geist",
+          data: geistBold,
+          style: "normal",
+          weight: 700,
         },
       ],
     },
