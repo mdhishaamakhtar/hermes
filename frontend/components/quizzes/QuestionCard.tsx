@@ -233,13 +233,15 @@ export default function QuestionCard({
                     key={option.id}
                     className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-3 border border-border/80 px-3 py-2"
                   >
-                    <span className="label text-foreground/75">
+                    <span className="label mt-0.5 text-foreground/75">
                       {String.fromCharCode(65 + optionIndex)}
                     </span>
                     <span className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
                       {option.text}
                     </span>
-                    <span className={`font-mono text-xs tabular-nums ${tone}`}>
+                    <span
+                      className={`mt-0.5 justify-self-end text-right font-mono text-xs tabular-nums ${tone}`}
+                    >
                       {option.pointValue > 0
                         ? `+${option.pointValue}`
                         : option.pointValue}

@@ -156,9 +156,9 @@ export function ParticipantQuestionCard({
           const content = (
             <>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex items-center gap-3">
+                <div className="min-w-0 flex items-start gap-3">
                   <span
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
+                    className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
                     style={{
                       borderColor,
                       color: chosenCorrect
@@ -174,12 +174,12 @@ export function ParticipantQuestionCard({
                   >
                     {meta.letter}
                   </span>
-                  <span className="min-w-0 text-sm text-foreground">
+                  <span className="min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
                     {option.text}
                   </span>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
+                <div className="mt-0.5 flex shrink-0 items-start gap-2 text-xs tabular-nums">
                   {interactive || resolved ? (
                     <span className="text-muted">{count}</span>
                   ) : null}

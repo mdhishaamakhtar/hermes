@@ -68,9 +68,9 @@ export function QuestionReviewCard({
 
             return (
               <div key={option.id}>
-                <div className="flex items-center justify-between mb-1.5 gap-4">
+                <div className="mb-1.5 flex items-start justify-between gap-4">
                   <span
-                    className={`text-sm ${
+                    className={`min-w-0 whitespace-pre-wrap break-words text-sm leading-6 ${
                       option.isCorrect
                         ? "text-success font-medium"
                         : "text-muted"
@@ -81,7 +81,7 @@ export function QuestionReviewCard({
                     )}
                     {option.text}
                   </span>
-                  <span className="text-xs tabular-nums text-muted shrink-0">
+                  <span className="mt-0.5 shrink-0 text-xs tabular-nums text-muted">
                     {option.count} ({pct}%)
                   </span>
                 </div>

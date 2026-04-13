@@ -145,10 +145,10 @@ export function QuestionCard({
 
             return (
               <div key={option.id}>
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
+                <div className="mb-2 flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
                     <span
-                      className="inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
+                      className="mt-0.5 inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
                       style={{
                         borderColor: `${meta.color}55`,
                         color: meta.color,
@@ -160,7 +160,7 @@ export function QuestionCard({
                       {option.text}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs tabular-nums">
+                  <div className="mt-0.5 flex shrink-0 items-start gap-2 text-xs tabular-nums">
                     <span
                       className={
                         option.isCorrect ? "text-success" : "text-muted"

@@ -106,7 +106,7 @@ export function QuestionResultCard({
                   <span className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
                     {option.text}
                   </span>
-                  <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
+                  <div className="mt-0.5 flex shrink-0 items-start gap-2 text-xs tabular-nums">
                     <span
                       className={`border px-2 py-1 ${
                         option.pointValue > 0
