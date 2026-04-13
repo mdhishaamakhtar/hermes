@@ -10,6 +10,7 @@ import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.exception.AppException;
+import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
@@ -32,6 +33,7 @@ public class SessionService {
 
   private final QuizSessionRepository sessionRepository;
   private final QuizRepository quizRepository;
+  private final ParticipantAnswerRepository participantAnswerRepository;
   private final ParticipantRepository participantRepository;
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
@@ -50,6 +52,7 @@ public class SessionService {
   public SessionService(
       QuizSessionRepository sessionRepository,
       QuizRepository quizRepository,
+      ParticipantAnswerRepository participantAnswerRepository,
       ParticipantRepository participantRepository,
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
@@ -66,6 +69,7 @@ public class SessionService {
       ScoringCorrectionService scoringCorrectionService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
+    this.participantAnswerRepository = participantAnswerRepository;
     this.participantRepository = participantRepository;
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
@@ -210,6 +214,8 @@ public class SessionService {
       // Ignore if already gone or invalid
     }
 
+    participantAnswerRepository.deleteBySessionIdIn(List.of(sessionId));
+    participantRepository.deleteBySessionIdIn(List.of(sessionId));
     sessionRepository.deleteById(sessionId);
   }
 
