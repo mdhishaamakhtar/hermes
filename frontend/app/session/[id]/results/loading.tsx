@@ -1,5 +1,5 @@
-import { SessionPageSkeleton } from "@/components/PageSkeleton";
+import { ResultsPageSkeleton } from "@/components/PageSkeleton";
 
 export default function Loading() {
-  return <SessionPageSkeleton />;
+  return <ResultsPageSkeleton />;
 }
