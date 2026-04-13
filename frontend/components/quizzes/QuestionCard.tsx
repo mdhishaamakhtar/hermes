@@ -362,7 +362,7 @@ export default function QuestionCard({
                         setOptionPoints(optionIndex, parsed);
                       }
                     }}
-                    className="input-field py-2 px-2 text-center font-mono tabular-nums"
+                    className="input-field h-full min-h-16 py-2 px-2 text-center font-mono tabular-nums"
                   />
                   <button
                     type="button"
