@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { CardBadge } from "@/components/session/CardBadge";
 import Logo from "@/components/Logo";
 import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";
@@ -20,7 +21,7 @@ export function PlayLobbyView({ session }: Props) {
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Logo size="sm" />
           <div className="flex items-center gap-3">
-            <span className="label text-warning">Lobby</span>
+            <CardBadge tone="warning">Lobby</CardBadge>
             <LiveParticipantCount
               count={participantCount}
               caption={formatParticipantCountPhrase(participantCount)}

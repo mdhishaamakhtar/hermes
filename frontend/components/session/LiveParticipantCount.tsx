@@ -34,7 +34,7 @@ export function LiveParticipantCount({
   const numberBlock = reduceMotion ? (
     <span className={numberClass}>{count}</span>
   ) : (
-    <span className="relative inline-flex min-h-[1em] min-w-[3ch] items-center justify-center overflow-hidden tabular-nums">
+    <span className="relative inline-flex min-h-[1em] min-w-[3ch] items-baseline justify-center overflow-hidden tabular-nums">
       <AnimatePresence initial={false} mode="wait">
         <motion.span
           key={count}
