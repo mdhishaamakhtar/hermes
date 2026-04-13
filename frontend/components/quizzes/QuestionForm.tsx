@@ -225,7 +225,7 @@ export default function QuestionForm({
                   value={option.text}
                   onChange={(event) => setOptionText(index, event.target.value)}
                   placeholder={`Option ${index + 1}`}
-                  className="input-field min-w-0 py-2 px-3 text-sm"
+                  className="input-field min-w-0 py-2 px-3"
                 />
                 <input
                   type="text"
@@ -242,7 +242,7 @@ export default function QuestionForm({
                       setOptionPoints(index, parsed);
                     }
                   }}
-                  className="input-field py-2 px-2 text-center font-mono tabular-nums text-sm"
+                  className="input-field py-2 px-2 text-center font-mono tabular-nums"
                 />
                 <button
                   type="button"

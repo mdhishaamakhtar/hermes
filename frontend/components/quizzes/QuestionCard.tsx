@@ -231,12 +231,12 @@ export default function QuestionCard({
                 return (
                   <div
                     key={option.id}
-                    className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 border border-border/80 px-3 py-2"
+                    className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-3 border border-border/80 px-3 py-2"
                   >
                     <span className="label text-foreground/75">
                       {String.fromCharCode(65 + optionIndex)}
                     </span>
-                    <span className="truncate text-sm text-foreground">
+                    <span className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
                       {option.text}
                     </span>
                     <span className={`font-mono text-xs tabular-nums ${tone}`}>
@@ -285,7 +285,13 @@ export default function QuestionCard({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_7rem]">
+          <div
+            className={
+              nested && question.timeLimitSeconds === 0
+                ? "grid gap-4"
+                : "grid gap-4 md:grid-cols-[minmax(0,1fr)_7rem]"
+            }
+          >
             <label className="block">
               <span className="field-label mb-2 block">Question Text</span>
               <textarea
@@ -295,23 +301,21 @@ export default function QuestionCard({
                 className="input-field min-h-[5rem] resize-y"
               />
             </label>
-            <label className="block">
-              <span className="field-label mb-2 block">Timer</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={editTime}
-                onChange={(event) => {
-                  const val = event.target.value.replace(/[^0-9]/g, "");
-                  setEditTime(val === "" ? 0 : parseInt(val, 10));
-                }}
-                className="input-field font-mono tabular-nums"
-                disabled={nested && question.timeLimitSeconds === 0}
-              />
-              {nested && question.timeLimitSeconds === 0 ? (
-                <p className="mt-1 text-[11px] text-muted">Passage timer</p>
-              ) : null}
-            </label>
+            {!(nested && question.timeLimitSeconds === 0) ? (
+              <label className="block">
+                <span className="field-label mb-2 block">Timer</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={editTime}
+                  onChange={(event) => {
+                    const val = event.target.value.replace(/[^0-9]/g, "");
+                    setEditTime(val === "" ? 0 : parseInt(val, 10));
+                  }}
+                  className="input-field font-mono tabular-nums"
+                />
+              </label>
+            ) : null}
           </div>
 
           <div className="mt-4">
@@ -340,7 +344,7 @@ export default function QuestionCard({
                     onChange={(event) =>
                       setOptionText(optionIndex, event.target.value)
                     }
-                    className="input-field min-w-0 py-2 px-3 text-sm"
+                    className="input-field min-w-0 py-2 px-3"
                     placeholder={`Option ${optionIndex + 1}`}
                   />
                   <input
@@ -357,7 +361,7 @@ export default function QuestionCard({
                         setOptionPoints(optionIndex, parsed);
                       }
                     }}
-                    className="input-field py-2 px-2 text-center font-mono tabular-nums text-sm"
+                    className="input-field py-2 px-2 text-center font-mono tabular-nums"
                   />
                   <button
                     type="button"

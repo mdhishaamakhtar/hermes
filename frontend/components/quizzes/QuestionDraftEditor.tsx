@@ -69,7 +69,13 @@ export default function QuestionDraftEditor({
         ) : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_7rem]">
+      <div
+        className={
+          timerLocked
+            ? "grid gap-4"
+            : "grid gap-4 md:grid-cols-[minmax(0,1fr)_7rem]"
+        }
+      >
         <label className="block">
           <span className="field-label mb-2 block">Question Text</span>
           <textarea
@@ -81,26 +87,24 @@ export default function QuestionDraftEditor({
             className="input-field min-h-[5rem] resize-y"
           />
         </label>
-        <label className="block">
-          <span className="field-label mb-2 block">Timer (s)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            disabled={timerLocked}
-            value={draft.timeLimitSeconds}
-            onChange={(event) => {
-              const val = event.target.value.replace(/[^0-9]/g, "");
-              onChange({
-                ...draft,
-                timeLimitSeconds: val === "" ? 0 : parseInt(val, 10),
-              });
-            }}
-            className="input-field font-mono tabular-nums disabled:opacity-40"
-          />
-          {timerLocked ? (
-            <p className="mt-1 text-[11px] text-muted">Passage timer</p>
-          ) : null}
-        </label>
+        {!timerLocked ? (
+          <label className="block">
+            <span className="field-label mb-2 block">Timer (s)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={draft.timeLimitSeconds}
+              onChange={(event) => {
+                const val = event.target.value.replace(/[^0-9]/g, "");
+                onChange({
+                  ...draft,
+                  timeLimitSeconds: val === "" ? 0 : parseInt(val, 10),
+                });
+              }}
+              className="input-field font-mono tabular-nums"
+            />
+          </label>
+        ) : null}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -168,7 +172,7 @@ export default function QuestionDraftEditor({
                 onChange={(event) =>
                   updateOption(optionIndex, { text: event.target.value })
                 }
-                className="input-field py-2 px-3 text-sm"
+                className="input-field py-2 px-3"
                 placeholder={`Option ${optionIndex + 1}`}
               />
               <input
@@ -186,7 +190,7 @@ export default function QuestionDraftEditor({
                     updateOption(optionIndex, { pointValue: parsed });
                   }
                 }}
-                className="input-field py-2 px-2 text-center font-mono tabular-nums text-sm"
+                className="input-field py-2 px-2 text-center font-mono tabular-nums"
               />
               <button
                 type="button"

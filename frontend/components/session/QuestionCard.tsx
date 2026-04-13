@@ -129,7 +129,9 @@ export function QuestionCard({
                   >
                     {meta.letter}
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{option.text}</span>
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words leading-6">
+                    {option.text}
+                  </span>
                 </div>
               </div>
             );
@@ -154,7 +156,7 @@ export function QuestionCard({
                     >
                       {meta.letter}
                     </span>
-                    <span className="min-w-0 truncate text-sm text-foreground">
+                    <span className="min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
                       {option.text}
                     </span>
                   </div>
