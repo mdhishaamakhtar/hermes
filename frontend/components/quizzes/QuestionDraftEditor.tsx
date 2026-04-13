@@ -162,17 +162,18 @@ export default function QuestionDraftEditor({
           {draft.options.map((option, optionIndex) => (
             <div
               key={optionIndex}
-              className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_1.75rem] items-center gap-2 border-b border-border/50 py-2"
+              className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_1.75rem] items-start gap-2 border-b border-border/50 py-2"
             >
               <span className="label text-foreground/80">
                 {String.fromCharCode(65 + optionIndex)}
               </span>
-              <input
+              <textarea
                 value={option.text}
                 onChange={(event) =>
                   updateOption(optionIndex, { text: event.target.value })
                 }
-                className="input-field py-2 px-3"
+                rows={2}
+                className="input-field resize-y py-2 px-3 leading-6"
                 placeholder={`Option ${optionIndex + 1}`}
               />
               <input
