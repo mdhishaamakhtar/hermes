@@ -31,30 +31,35 @@ export function PlayLobbyView({ session }: Props) {
         </div>
       </header>
 
-      <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl items-center justify-center px-4 sm:px-6 py-10">
+      <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col items-center justify-center px-4 sm:px-6 py-10">
         <motion.div
           {...enterAnimation}
-          className="w-full border border-border bg-surface px-8 py-10 text-center"
+          className="flex w-full flex-col items-center"
         >
-          <p className="label mb-4">{sessionTitle}</p>
-          <h1 className="text-3xl font-bold text-foreground">
+          <p className="label mb-6 text-accent">{sessionTitle}</p>
+
+          <h1 className="text-center text-4xl font-black tracking-tight text-foreground sm:text-5xl">
             Waiting for the host
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted">
-            The room is open and your connection is ready. When the host starts
-            the timer, the first question will slide into place here.
+
+          <p className="mt-5 max-w-md text-center text-sm leading-7 text-muted">
+            Your connection is ready. The first question will appear here when
+            the host starts the session.
           </p>
 
-          <div className="mt-8 flex flex-col items-center gap-3">
-            <span className="label text-accent">Live session</span>
+          <div className="mt-12 w-full max-w-xs border-t border-border pt-10">
             <LiveParticipantCount
               count={participantCount}
-              caption="joined"
+              caption="joined so far"
               size="lg"
               layout="stack"
-              className="w-full max-w-xs"
+              className="w-full border-accent/20"
             />
           </div>
+
+          <p className="mt-6 text-center text-xs tracking-wider uppercase text-muted-dark">
+            Live session
+          </p>
         </motion.div>
       </main>
     </div>

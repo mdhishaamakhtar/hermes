@@ -85,29 +85,27 @@ export function QuestionResultCard({
                 className="border px-4 py-4"
                 style={{ backgroundColor: background, borderColor }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex items-center gap-3">
-                    <span
-                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
-                      style={{
-                        borderColor,
-                        color: chosenCorrect
-                          ? "var(--color-success)"
-                          : missedCorrect
-                            ? `rgba(${colorRgb.success},0.55)`
-                            : chosenWrong
-                              ? "var(--color-danger)"
-                              : selected
-                                ? meta.color
-                                : "var(--color-muted)",
-                      }}
-                    >
-                      {meta.letter}
-                    </span>
-                    <span className="min-w-0 truncate text-sm text-foreground">
-                      {option.text}
-                    </span>
-                  </div>
+                <div className="flex items-start gap-3">
+                  <span
+                    className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
+                    style={{
+                      borderColor,
+                      color: chosenCorrect
+                        ? "var(--color-success)"
+                        : missedCorrect
+                          ? `rgba(${colorRgb.success},0.55)`
+                          : chosenWrong
+                            ? "var(--color-danger)"
+                            : selected
+                              ? meta.color
+                              : "var(--color-muted)",
+                    }}
+                  >
+                    {meta.letter}
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
+                    {option.text}
+                  </span>
                   <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
                     <span
                       className={`border px-2 py-1 ${

@@ -39,49 +39,53 @@ export function HostLobbyView({ session }: Props) {
         </div>
       </header>
 
-      <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-7xl items-center justify-center px-4 sm:px-6 py-10">
+      <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col items-center justify-center px-4 sm:px-6 py-10">
         <motion.div
           {...enterAnimation}
-          className="w-full max-w-2xl border border-border bg-surface p-8 text-center"
+          className="flex w-full flex-col items-center"
         >
-          <p className="label mb-4">Share this code</p>
-          <div
-            className="select-all border border-primary/30 bg-background px-8 py-6 font-black tracking-[0.35em] text-foreground"
-            style={{
-              fontSize: "clamp(2rem, 7vw, 4rem)",
-              letterSpacing: "0.35em",
-              paddingLeft: "calc(2rem + 0.35em)",
-            }}
-          >
-            {joinCode || "------"}
-          </div>
-          <div className="mt-6 flex flex-col items-center gap-6">
-            <button
-              onClick={handleCopyCode}
-              disabled={!joinCode}
-              className="border border-border px-4 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          <p className="label mb-8">Share this code with participants</p>
+
+          <div className="w-full max-w-lg bg-surface px-6 py-8 sm:px-10 sm:py-10">
+            <div
+              className="select-all text-center font-black tracking-[0.35em] text-foreground"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                letterSpacing: "0.35em",
+                paddingLeft: "0.35em",
+              }}
             >
-              {copied ? "Copied" : "Copy code"}
-            </button>
+              {joinCode || "------"}
+            </div>
+          </div>
+
+          <button
+            onClick={handleCopyCode}
+            disabled={!joinCode}
+            className="mt-5 border border-border bg-background px-6 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {copied ? "Copied" : "Copy code"}
+          </button>
+
+          <div className="mt-14 w-full max-w-xs border-t border-border pt-10">
             <LiveParticipantCount
               count={participantCount}
               caption="in lobby"
               size="lg"
               layout="stack"
-              className="w-full max-w-sm"
+              className="w-full border-accent/20"
             />
           </div>
-          <div className="mt-10 flex items-center justify-center gap-3">
-            <button
-              onClick={handleStartSession}
-              disabled={loadingAction === "start-session"}
-              className="btn-primary"
-            >
-              {loadingAction === "start-session"
-                ? "Starting..."
-                : "Start Session"}
-            </button>
-          </div>
+
+          <button
+            onClick={handleStartSession}
+            disabled={loadingAction === "start-session"}
+            className="btn-primary mt-12"
+          >
+            {loadingAction === "start-session"
+              ? "Starting..."
+              : "Start Session"}
+          </button>
         </motion.div>
       </main>
     </div>
