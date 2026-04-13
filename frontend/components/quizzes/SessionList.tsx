@@ -36,7 +36,7 @@ export default function SessionList({
           </button>
         )}
       </div>
-      <div className="space-y-px">
+      <div className="list-stack">
         {sessions.map((session, index) => (
           <motion.div
             key={session.id}

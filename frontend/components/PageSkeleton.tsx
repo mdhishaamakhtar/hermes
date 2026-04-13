@@ -14,7 +14,7 @@ export function ContentSkeleton() {
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="h-4 w-16 bg-surface/50 skeleton mb-3" />
       <div className="h-7 w-48 bg-surface skeleton mb-10" />
-      <div className="space-y-2">
+      <div className="list-stack">
         {[1, 2, 3].map((i) => (
           <RowSkeleton key={i} />
         ))}
@@ -35,7 +35,7 @@ export function EventListSkeleton() {
         <div className="h-9 w-28 bg-surface skeleton" />
       </div>
       <div className="h-px bg-border mb-8" />
-      <div className="space-y-2">
+      <div className="list-stack">
         {[1, 2, 3].map((i) => (
           <RowSkeleton key={i} subtitle />
         ))}
@@ -59,7 +59,7 @@ export function EventDetailSkeleton() {
         <div className="h-8 w-24 bg-surface skeleton" />
       </div>
       <div className="h-px bg-border mb-4" />
-      <div className="space-y-2">
+      <div className="list-stack">
         {[1, 2, 3].map((i) => (
           <QuizRowSkeleton key={i} />
         ))}
@@ -85,7 +85,7 @@ export function QuizEditorSkeleton() {
         <div className="h-3 w-24 bg-surface/50 skeleton" />
       </div>
       <div className="h-px bg-border mb-4" />
-      <div className="space-y-2">
+      <div className="list-stack">
         {[1, 2, 3].map((i) => (
           <QuestionSkeleton key={i} />
         ))}
@@ -105,7 +105,7 @@ export function ReviewSkeleton() {
         <div className="h-3 w-32 bg-surface/50 skeleton" />
       </div>
       <div className="h-px bg-border mb-8" />
-      <div className="space-y-2">
+      <div className="list-stack">
         {[1, 2, 3, 4, 5].map((i) => (
           <LeaderboardRowSkeleton key={i} />
         ))}

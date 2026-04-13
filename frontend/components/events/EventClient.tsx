@@ -143,7 +143,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
       {quizzes.length === 0 ? (
         <EmptyState message="No quizzes yet. Add one above." />
       ) : (
-        <div className="space-y-2">
+        <div className="list-stack">
           {quizzes.map((quiz, index) => (
             <ResourceRow
               key={quiz.id}

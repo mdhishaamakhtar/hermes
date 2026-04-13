@@ -119,7 +119,7 @@ export default function DashboardClient() {
           hint="Create your first event to get started"
         />
       ) : (
-        <motion.div className="space-y-2">
+        <motion.div className="list-stack">
           <AnimatePresence>
             {(events ?? []).map((event, index) => (
               <ResourceRow

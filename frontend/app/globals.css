@@ -469,6 +469,17 @@ body {
   }
 }
 
+/*
+ * list-stack
+ * Shared vertical rhythm for resource lists.
+ * Use for: events, quizzes, sessions, and matching loading states.
+ */
+@utility list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 /* ── 9. Component patterns ───────────────────────────────────────────────── */
 
 /*
