@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import OptionRow from "@/components/ui/OptionRow";
 import type { QuestionResult } from "@/lib/types";
 
 interface Props {
@@ -68,22 +69,27 @@ export function QuestionReviewCard({
 
             return (
               <div key={option.id}>
-                <div className="mb-1.5 flex items-start justify-between gap-4">
-                  <span
-                    className={`min-w-0 whitespace-pre-wrap break-words text-sm leading-6 ${
+                <div className="mb-1.5">
+                  <OptionRow
+                    content={
+                      <>
+                        {option.isCorrect ? (
+                          <span className="mr-2 text-xs">✓</span>
+                        ) : null}
+                        {option.text}
+                      </>
+                    }
+                    contentClassName={
                       option.isCorrect
-                        ? "text-success font-medium"
-                        : "text-muted"
-                    }`}
-                  >
-                    {option.isCorrect && (
-                      <span className="mr-2 text-xs">✓</span>
-                    )}
-                    {option.text}
-                  </span>
-                  <span className="mt-0.5 shrink-0 text-xs tabular-nums text-muted">
-                    {option.count} ({pct}%)
-                  </span>
+                        ? "text-sm font-medium text-success"
+                        : "text-sm text-muted"
+                    }
+                    aside={
+                      <span className="text-muted">
+                        {option.count} ({pct}%)
+                      </span>
+                    }
+                  />
                 </div>
                 <div className="h-1.5 bg-border overflow-hidden relative rounded-full">
                   <motion.div

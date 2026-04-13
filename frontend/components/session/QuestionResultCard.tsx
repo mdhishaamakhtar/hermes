@@ -2,6 +2,7 @@
 
 import { colorRgb } from "@/lib/design-tokens";
 import { optionLabel } from "@/lib/session-utils";
+import OptionRow from "@/components/ui/OptionRow";
 import type { MyResults } from "@/lib/types";
 
 export function QuestionResultCard({
@@ -85,52 +86,57 @@ export function QuestionResultCard({
                 className="border px-4 py-4"
                 style={{ backgroundColor: background, borderColor }}
               >
-                <div className="flex items-start gap-3">
-                  <span
-                    className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
-                    style={{
-                      borderColor,
-                      color: chosenCorrect
-                        ? "var(--color-success)"
-                        : missedCorrect
-                          ? `rgba(${colorRgb.success},0.55)`
-                          : chosenWrong
-                            ? "var(--color-danger)"
-                            : selected
-                              ? meta.color
-                              : "var(--color-muted)",
-                    }}
-                  >
-                    {meta.letter}
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
-                    {option.text}
-                  </span>
-                  <div className="mt-0.5 flex shrink-0 items-start gap-2 text-xs tabular-nums">
+                <OptionRow
+                  marker={
                     <span
-                      className={`border px-2 py-1 ${
-                        option.pointValue > 0
-                          ? "border-success/25 text-success"
-                          : option.pointValue < 0
-                            ? "border-danger/25 text-danger"
-                            : "border-border text-muted"
-                      }`}
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-bold tracking-widest"
+                      style={{
+                        borderColor,
+                        color: chosenCorrect
+                          ? "var(--color-success)"
+                          : missedCorrect
+                            ? `rgba(${colorRgb.success},0.55)`
+                            : chosenWrong
+                              ? "var(--color-danger)"
+                              : selected
+                                ? meta.color
+                                : "var(--color-muted)",
+                      }}
                     >
-                      {option.pointValue > 0
-                        ? `+${option.pointValue}`
-                        : option.pointValue}
+                      {meta.letter}
                     </span>
-                    {chosenCorrect ? (
-                      <span className="text-success">✓</span>
-                    ) : missedCorrect ? (
-                      <span style={{ color: `rgba(${colorRgb.success},0.55)` }}>
-                        ○
+                  }
+                  content={option.text}
+                  contentClassName="text-sm leading-relaxed text-foreground"
+                  aside={
+                    <>
+                      <span
+                        className={`border px-2 py-1 ${
+                          option.pointValue > 0
+                            ? "border-success/25 text-success"
+                            : option.pointValue < 0
+                              ? "border-danger/25 text-danger"
+                              : "border-border text-muted"
+                        }`}
+                      >
+                        {option.pointValue > 0
+                          ? `+${option.pointValue}`
+                          : option.pointValue}
                       </span>
-                    ) : chosenWrong ? (
-                      <span className="text-danger">✕</span>
-                    ) : null}
-                  </div>
-                </div>
+                      {chosenCorrect ? (
+                        <span className="text-success">✓</span>
+                      ) : missedCorrect ? (
+                        <span
+                          style={{ color: `rgba(${colorRgb.success},0.55)` }}
+                        >
+                          ○
+                        </span>
+                      ) : chosenWrong ? (
+                        <span className="text-danger">✕</span>
+                      ) : null}
+                    </>
+                  }
+                />
               </div>
             );
           })}

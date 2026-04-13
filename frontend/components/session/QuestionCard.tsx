@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { OPTION_META } from "@/lib/session-constants";
+import OptionRow from "@/components/ui/OptionRow";
 import { CardBadge } from "./CardBadge";
 
 export interface QuestionCardOption {
@@ -96,16 +97,20 @@ export function QuestionCard({
                 key={option.id}
                 className="border border-border px-3 py-2 text-sm text-foreground"
               >
-                <span
-                  className="mr-3 inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
-                  style={{
-                    borderColor: `${meta.color}55`,
-                    color: meta.color,
-                  }}
-                >
-                  {meta.letter}
-                </span>
-                <span className="align-middle">{option.text}</span>
+                <OptionRow
+                  marker={
+                    <span
+                      className="inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
+                      style={{
+                        borderColor: `${meta.color}55`,
+                        color: meta.color,
+                      }}
+                    >
+                      {meta.letter}
+                    </span>
+                  }
+                  content={option.text}
+                />
               </div>
             );
           })}
@@ -119,20 +124,20 @@ export function QuestionCard({
                 key={option.id}
                 className="border border-border bg-background px-3 py-2 text-sm text-foreground"
               >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
-                    style={{
-                      borderColor: `${meta.color}55`,
-                      color: meta.color,
-                    }}
-                  >
-                    {meta.letter}
-                  </span>
-                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words leading-6">
-                    {option.text}
-                  </span>
-                </div>
+                <OptionRow
+                  marker={
+                    <span
+                      className="inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
+                      style={{
+                        borderColor: `${meta.color}55`,
+                        color: meta.color,
+                      }}
+                    >
+                      {meta.letter}
+                    </span>
+                  }
+                  content={option.text}
+                />
               </div>
             );
           })}
@@ -145,48 +150,50 @@ export function QuestionCard({
 
             return (
               <div key={option.id}>
-                <div className="mb-2 flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span
-                      className="mt-0.5 inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
-                      style={{
-                        borderColor: `${meta.color}55`,
-                        color: meta.color,
-                      }}
-                    >
-                      {meta.letter}
-                    </span>
-                    <span className="min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
-                      {option.text}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex shrink-0 items-start gap-2 text-xs tabular-nums">
-                    <span
-                      className={
-                        option.isCorrect ? "text-success" : "text-muted"
-                      }
-                    >
-                      {option.count}
-                    </span>
-                    {mode === "review" ? (
+                <div className="mb-2">
+                  <OptionRow
+                    marker={
                       <span
-                        className={`border px-2 py-1 ${
-                          option.pointValue > 0
-                            ? "border-success/25 text-success"
-                            : option.pointValue < 0
-                              ? "border-danger/25 text-danger"
-                              : "border-border text-muted"
-                        }`}
+                        className="inline-flex h-6 w-6 items-center justify-center border text-[11px] font-bold tracking-widest"
+                        style={{
+                          borderColor: `${meta.color}55`,
+                          color: meta.color,
+                        }}
                       >
-                        {option.pointValue > 0
-                          ? `+${option.pointValue}`
-                          : option.pointValue}
+                        {meta.letter}
                       </span>
-                    ) : null}
-                    {option.isCorrect ? (
-                      <span className="text-success">✓</span>
-                    ) : null}
-                  </div>
+                    }
+                    content={option.text}
+                    aside={
+                      <>
+                        <span
+                          className={
+                            option.isCorrect ? "text-success" : "text-muted"
+                          }
+                        >
+                          {option.count}
+                        </span>
+                        {mode === "review" ? (
+                          <span
+                            className={`border px-2 py-1 ${
+                              option.pointValue > 0
+                                ? "border-success/25 text-success"
+                                : option.pointValue < 0
+                                  ? "border-danger/25 text-danger"
+                                  : "border-border text-muted"
+                            }`}
+                          >
+                            {option.pointValue > 0
+                              ? `+${option.pointValue}`
+                              : option.pointValue}
+                          </span>
+                        ) : null}
+                        {option.isCorrect ? (
+                          <span className="text-success">✓</span>
+                        ) : null}
+                      </>
+                    }
+                  />
                 </div>
                 <div className="h-3 bg-border/40 overflow-hidden">
                   <motion.div

@@ -14,6 +14,7 @@ import {
   type QuestionDraftOption,
 } from "@/components/quizzes/editor-model";
 import CustomSelect from "@/components/ui/CustomSelect";
+import OptionRow from "@/components/ui/OptionRow";
 import type { DisplayMode, Question, QuestionType } from "@/lib/types";
 
 interface Props {
@@ -231,21 +232,24 @@ export default function QuestionCard({
                 return (
                   <div
                     key={option.id}
-                    className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-3 border border-border/80 px-3 py-2"
+                    className="border border-border/80 px-3 py-2"
                   >
-                    <span className="label mt-0.5 text-foreground/75">
-                      {String.fromCharCode(65 + optionIndex)}
-                    </span>
-                    <span className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
-                      {option.text}
-                    </span>
-                    <span
-                      className={`mt-0.5 justify-self-end text-right font-mono text-xs tabular-nums ${tone}`}
-                    >
-                      {option.pointValue > 0
-                        ? `+${option.pointValue}`
-                        : option.pointValue}
-                    </span>
+                    <OptionRow
+                      marker={
+                        <span className="label text-foreground/75">
+                          {String.fromCharCode(65 + optionIndex)}
+                        </span>
+                      }
+                      content={option.text}
+                      aside={
+                        <span className={`font-mono ${tone}`}>
+                          {option.pointValue > 0
+                            ? `+${option.pointValue}`
+                            : option.pointValue}
+                        </span>
+                      }
+                      asideClassName="justify-self-end text-right"
+                    />
                   </div>
                 );
               })}

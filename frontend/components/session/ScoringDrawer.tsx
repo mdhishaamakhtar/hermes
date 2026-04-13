@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { enterAnimation } from "@/lib/design-tokens";
+import OptionRow from "@/components/ui/OptionRow";
 
 export interface CorrectionDraftOption {
   optionId: number;
@@ -56,13 +57,16 @@ export function ScoringDrawer({
                 <div className="space-y-4">
                   {draftOptions.map((option, index) => (
                     <label key={option.optionId} className="block">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="text-sm font-medium text-foreground">
-                          {option.text}
-                        </span>
-                        <span className="text-xs text-muted tabular-nums">
-                          Option {index + 1}
-                        </span>
+                      <div className="mb-2">
+                        <OptionRow
+                          content={option.text}
+                          contentClassName="text-sm font-medium text-foreground"
+                          aside={
+                            <span className="text-muted">
+                              Option {index + 1}
+                            </span>
+                          }
+                        />
                       </div>
                       <input
                         type="text"
