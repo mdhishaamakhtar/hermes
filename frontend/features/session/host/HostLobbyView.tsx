@@ -48,13 +48,12 @@ export function HostLobbyView({ session }: Props) {
 
           <div className="w-full max-w-lg bg-surface px-6 py-8 sm:px-10 sm:py-10">
             <div
-              className="select-all text-center font-black tracking-[0.35em] text-foreground"
-              style={{
-                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
-                textIndent: "0.35em",
-              }}
+              className="flex select-all items-center justify-center gap-[0.3em] font-black text-foreground"
+              style={{ fontSize: "clamp(2.5rem, 8vw, 4.5rem)" }}
             >
-              {joinCode || "------"}
+              {(joinCode || "------").split("").map((char, i) => (
+                <span key={i}>{char}</span>
+              ))}
             </div>
           </div>
 
