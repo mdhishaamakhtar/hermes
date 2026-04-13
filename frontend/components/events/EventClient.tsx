@@ -157,7 +157,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
             >
               <div className="flex items-center gap-4">
                 <span className="font-mono text-xs text-muted tabular-nums w-5">
-                  {quiz.orderIndex}
+                  {index + 1}
                 </span>
                 <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">
                   {quiz.title}
