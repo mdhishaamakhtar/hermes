@@ -51,8 +51,7 @@ export function HostLobbyView({ session }: Props) {
               className="select-all text-center font-black tracking-[0.35em] text-foreground"
               style={{
                 fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
-                letterSpacing: "0.35em",
-                paddingLeft: "0.35em",
+                textIndent: "0.35em",
               }}
             >
               {joinCode || "------"}
@@ -73,7 +72,7 @@ export function HostLobbyView({ session }: Props) {
               caption="in lobby"
               size="lg"
               layout="stack"
-              className="w-full border-accent/20"
+              className="w-full"
             />
           </div>
 

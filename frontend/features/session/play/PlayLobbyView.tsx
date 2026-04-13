@@ -53,7 +53,7 @@ export function PlayLobbyView({ session }: Props) {
               caption="joined so far"
               size="lg"
               layout="stack"
-              className="w-full border-accent/20"
+              className="w-full"
             />
           </div>
 

@@ -53,7 +53,7 @@ export function LiveParticipantCount({
   if (layout === "stack") {
     return (
       <div
-        className={`flex flex-col items-center gap-2 border border-accent/25 bg-background px-6 py-5 text-center ${className}`}
+        className={`flex flex-col items-center gap-2 text-center ${className}`}
         role="status"
         aria-live="polite"
         aria-atomic="true"
