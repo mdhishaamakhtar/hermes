@@ -40,6 +40,9 @@ export function HostEndedView({ id, session }: Props) {
   } = session;
 
   const leaderboardRows = finalLeaderboard ?? leaderboard;
+  const quizHref = sessionResults
+    ? `/events/${sessionResults.eventId}/quizzes/${sessionResults.quizId}`
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,6 +74,24 @@ export function HostEndedView({ id, session }: Props) {
               available. Open any question and update its point values to
               recalculate the leaderboard.
             </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {quizHref ? (
+                <Link
+                  href={quizHref}
+                  prefetch
+                  className="border border-border px-4 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                  Back to Quiz
+                </Link>
+              ) : null}
+              <Link
+                href={`/session/${id}/review`}
+                prefetch
+                className="btn-primary"
+              >
+                Full Review
+              </Link>
+            </div>
           </motion.div>
 
           <div className="space-y-4">
