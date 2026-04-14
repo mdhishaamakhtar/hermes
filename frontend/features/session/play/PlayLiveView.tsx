@@ -7,6 +7,7 @@ import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
 import { ParticipantQuestionCard } from "@/components/session/ParticipantQuestionCard";
 import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import { ConnectionStatusBadge } from "@/components/session/ConnectionStatusBadge";
 import { enterAnimation } from "@/lib/design-tokens";
 import {
   formatCountdownClock,
@@ -49,6 +50,7 @@ export function PlayLiveView({ session }: Props) {
     handleLockIn,
     handleLockAll,
     handleLeave,
+    connected,
   } = session;
 
   const currentQuestionsLabel = activeQuestions[0]
@@ -83,6 +85,7 @@ export function PlayLiveView({ session }: Props) {
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             <span className="label">{headerStatus}</span>
+            <ConnectionStatusBadge connected={connected} />
             <LiveParticipantCount
               count={participantCount}
               caption={formatParticipantCountPhrase(participantCount)}

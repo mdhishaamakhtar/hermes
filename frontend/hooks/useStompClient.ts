@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
-import { Client, StompSubscription } from "@stomp/stompjs";
+import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  Client,
+  ReconnectionTimeMode,
+  StompSubscription,
+} from "@stomp/stompjs";
 
 interface UseStompOptions {
   headers?: Record<string, string>;
@@ -11,6 +15,13 @@ interface UseStompOptions {
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws-hermes";
+
+// Start aggressive; exponential back-off widens the interval on repeat failures.
+const INITIAL_RECONNECT_DELAY_MS = 500;
+const MAX_RECONNECT_DELAY_MS = 5000;
+// STOMP-level keep-alive. Detects half-open sockets (cellular → Wi-Fi handoffs,
+// iOS backgrounding) that would otherwise sit silent until the next publish.
+const HEARTBEAT_MS = 10_000;
 
 export function useStompClient(options: UseStompOptions = {}) {
   const clientRef = useRef<Client | null>(null);
@@ -23,6 +34,7 @@ export function useStompClient(options: UseStompOptions = {}) {
     [],
   );
   const optionsRef = useRef(options);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     optionsRef.current = options;
@@ -34,9 +46,14 @@ export function useStompClient(options: UseStompOptions = {}) {
       beforeConnect: async () => {
         client.connectHeaders = optionsRef.current.headers || {};
       },
-      reconnectDelay: 3000,
+      reconnectDelay: INITIAL_RECONNECT_DELAY_MS,
+      maxReconnectDelay: MAX_RECONNECT_DELAY_MS,
+      reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
+      heartbeatIncoming: HEARTBEAT_MS,
+      heartbeatOutgoing: HEARTBEAT_MS,
       onConnect: () => {
         connectedRef.current = true;
+        setConnected(true);
         if (process.env.NODE_ENV === "development")
           console.info("[stomp] connected");
         subscriptionsRef.current.clear();
@@ -63,6 +80,7 @@ export function useStompClient(options: UseStompOptions = {}) {
       },
       onDisconnect: () => {
         connectedRef.current = false;
+        setConnected(false);
         if (process.env.NODE_ENV === "development")
           console.info("[stomp] disconnected");
         subscriptionsRef.current.clear();
@@ -70,6 +88,7 @@ export function useStompClient(options: UseStompOptions = {}) {
       },
       onWebSocketClose: () => {
         connectedRef.current = false;
+        setConnected(false);
         if (process.env.NODE_ENV === "development")
           console.info("[stomp] websocket-closed");
         subscriptionsRef.current.clear();
@@ -82,8 +101,45 @@ export function useStompClient(options: UseStompOptions = {}) {
     client.activate();
     clientRef.current = client;
 
+    // Force an immediate reconnect when we return to the foreground or the
+    // network comes back. stompjs otherwise sits in its reconnectDelay timeout.
+    // iOS Safari aggressively closes backgrounded WebSockets, so without this
+    // every app-switch eats a full back-off before the client even tries.
+    const forceReconnect = () => {
+      const c = clientRef.current;
+      if (!c) return;
+      if (c.connected) return;
+      if (process.env.NODE_ENV === "development")
+        console.info("[stomp] force-reconnect");
+      // Reset to initial delay so a long prior back-off doesn't carry over.
+      c.reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
+      // deactivate() cancels the pending reconnect timer; activate() re-queues
+      // a connection attempt immediately. Safe to call concurrently per stompjs.
+      void c.deactivate().then(() => c.activate());
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        forceReconnect();
+      }
+    };
+    const handlePageShow = () => {
+      // Covers iOS BFCache restores where visibilitychange may not fire.
+      forceReconnect();
+    };
+    const handleOnline = () => {
+      forceReconnect();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("online", handleOnline);
+
     const subs = subscriptionsRef.current;
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("online", handleOnline);
       subs.forEach((sub) => sub.unsubscribe());
       subs.clear();
       client.deactivate();
@@ -137,5 +193,12 @@ export function useStompClient(options: UseStompOptions = {}) {
     }
   }, []);
 
-  return { subscribe, publish, unsubscribe, clientRef, connectedRef };
+  return {
+    subscribe,
+    publish,
+    unsubscribe,
+    clientRef,
+    connectedRef,
+    connected,
+  };
 }

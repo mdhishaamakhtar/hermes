@@ -698,7 +698,7 @@ export function useHostSession(id: string) {
     dispatch({ type: "CONTEXT_LOADED" });
   }, [id, loadResults]);
 
-  const { subscribe, unsubscribe } = useStompClient({
+  const { subscribe, unsubscribe, connected } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
     onConnect: () => {
       void loadSessionContext();
@@ -1069,5 +1069,6 @@ export function useHostSession(id: string) {
     activeModeLabel,
     progressLabel,
     isLastQuestion,
+    connected,
   };
 }
