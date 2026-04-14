@@ -5,15 +5,18 @@ import dev.hishaam.hermes.dto.session.JoinSessionRequest;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.dto.session.RejoinRequest;
 import dev.hishaam.hermes.dto.session.RejoinResponse;
+import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.repository.redis.ParticipantRejoinTokenRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
@@ -22,7 +25,9 @@ import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +44,7 @@ public class ParticipantService {
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
+  private final SessionAnswerStatsRedisRepository answerStatsStore;
   private final SessionLeaderboardRedisRepository leaderboardStore;
   private final SessionRejoinContextService rejoinContextService;
   private final SessionEventPublisher eventPublisher;
@@ -50,6 +56,7 @@ public class ParticipantService {
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
+      SessionAnswerStatsRedisRepository answerStatsStore,
       SessionLeaderboardRedisRepository leaderboardStore,
       SessionRejoinContextService rejoinContextService,
       SessionEventPublisher eventPublisher,
@@ -59,6 +66,7 @@ public class ParticipantService {
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
+    this.answerStatsStore = answerStatsStore;
     this.leaderboardStore = leaderboardStore;
     this.rejoinContextService = rejoinContextService;
     this.eventPublisher = eventPublisher;
@@ -128,6 +136,7 @@ public class ParticipantService {
 
     RejoinResponse.CurrentQuestion currentQuestion = null;
     RejoinResponse.CurrentPassage currentPassage = null;
+    Map<Long, RejoinResponse.QuestionStats> questionStatsById = new LinkedHashMap<>();
     if (SessionStatus.ACTIVE == status && ctx.currentQuestionId() != null) {
       if (ctx.currentPassageId() != null) {
         QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(ctx.currentPassageId());
@@ -137,7 +146,12 @@ public class ParticipantService {
                   .map(snapshot::findQuestion)
                   .filter(Objects::nonNull)
                   .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-                  .map(qSnap -> buildQuestionInfo(participantId, qSnap, snapshot))
+                  .map(
+                      qSnap -> {
+                        questionStatsById.put(
+                            qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
+                        return buildQuestionInfo(participantId, qSnap, snapshot);
+                      })
                   .toList();
 
           currentPassage =
@@ -156,9 +170,15 @@ public class ParticipantService {
         QuizSnapshot.QuestionSnapshot qSnap = snapshot.findQuestion(ctx.currentQuestionId());
         if (qSnap != null) {
           currentQuestion = buildCurrentQuestion(participantId, qSnap, snapshot);
+          questionStatsById.put(qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
         }
       }
     }
+
+    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
+        SessionStatus.ACTIVE == status && "REVIEWING".equals(ctx.questionLifecycle())
+            ? leaderboardStore.buildLeaderboard(sessionId)
+            : List.of();
 
     return new RejoinResponse(
         participantId,
@@ -172,6 +192,8 @@ public class ParticipantService {
         answered,
         currentQuestion,
         currentPassage,
+        questionStatsById,
+        leaderboard,
         ctx.timeLeftSeconds());
   }
 
@@ -237,6 +259,34 @@ public class ParticipantService {
         options,
         selectedOptionIds(answer),
         answer != null && answer.isLockedIn());
+  }
+
+  private RejoinResponse.QuestionStats buildQuestionStats(
+      Long sessionId,
+      QuizSnapshot.QuestionSnapshot question,
+      SessionRejoinContextService.SessionRejoinContext ctx) {
+    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
+    question.options().forEach(option -> optionPoints.put(option.id(), option.pointValue()));
+    List<Long> correctOptionIds =
+        question.options().stream()
+            .filter(option -> option.pointValue() > 0)
+            .map(QuizSnapshot.OptionSnapshot::id)
+            .toList();
+    boolean reviewed = "REVIEWING".equals(ctx.questionLifecycle());
+    boolean revealed =
+        reviewed
+            && (question.effectiveDisplayMode() == DisplayMode.BLIND
+                || question.effectiveDisplayMode() == DisplayMode.CODE_DISPLAY);
+
+    return new RejoinResponse.QuestionStats(
+        answerStatsStore.getQuestionCounts(sessionId, question.id()),
+        answerStatsStore.getTotalAnswered(sessionId, question.id()),
+        answerStatsStore.getTotalLockedIn(sessionId, question.id()),
+        ctx.participantCount(),
+        correctOptionIds,
+        optionPoints,
+        revealed,
+        reviewed);
   }
 
   private ParticipantAnswer currentAnswer(Long participantId, Long questionId) {

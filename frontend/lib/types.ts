@@ -123,6 +123,17 @@ export interface RejoinCurrentPassage {
   subQuestions: RejoinCurrentPassageQuestion[];
 }
 
+export interface RejoinQuestionStats {
+  counts: Record<number, number>;
+  totalAnswered: number;
+  totalLockedIn: number;
+  totalParticipants: number;
+  correctOptionIds: number[];
+  optionPoints: Record<number, number>;
+  revealed: boolean;
+  reviewed: boolean;
+}
+
 export interface RejoinResponse {
   participantId: number;
   sessionId: number;
@@ -135,6 +146,8 @@ export interface RejoinResponse {
   alreadyAnswered: number[];
   currentQuestion: RejoinCurrentQuestion | null;
   currentPassage: RejoinCurrentPassage | null;
+  questionStatsById: Record<number, RejoinQuestionStats>;
+  leaderboard: LeaderboardEntry[];
   timeLeftSeconds: number | null;
 }
 

@@ -29,6 +29,7 @@ import type {
   QuestionType,
   RejoinCurrentPassageQuestion,
   RejoinCurrentQuestion,
+  RejoinQuestionStats,
   RejoinResponse,
   ParticipantLeaderboardEntry,
 } from "@/lib/types";
@@ -392,6 +393,27 @@ function buildQuestionFromRejoin(
   };
 }
 
+function applyRejoinStats(
+  question: ParticipantQuestion,
+  statsById: Record<number, RejoinQuestionStats> | undefined,
+): ParticipantQuestion {
+  const stats = statsById?.[question.id];
+  if (!stats) {
+    return question;
+  }
+
+  return {
+    ...question,
+    counts: normalizeCounts(stats.counts ?? {}),
+    totalAnswered: stats.totalAnswered ?? 0,
+    totalLockedIn: stats.totalLockedIn ?? (question.lockedIn ? 1 : 0),
+    correctOptionIds: normalizeIdList(stats.correctOptionIds ?? []),
+    optionPoints: normalizePoints(stats.optionPoints ?? {}),
+    reviewed: Boolean(stats.reviewed),
+    revealed: Boolean(stats.revealed),
+  };
+}
+
 function updateQuestion(
   prev: ParticipantQuestion[],
   questionId: number,
@@ -445,6 +467,7 @@ export function playSessionReducer(
       const data = action.response;
       let passage: ParticipantPassage | null = null;
       let questions = state.questions;
+      const questionStatsById = data.questionStatsById ?? {};
 
       if (data.currentPassage) {
         const currentPassage = data.currentPassage;
@@ -488,6 +511,10 @@ export function playSessionReducer(
         ];
       }
 
+      questions = questions.map((question) =>
+        applyRejoinStats(question, questionStatsById),
+      );
+
       const questionLifecycle =
         (data.questionLifecycle as QuestionLifecycle) || "DISPLAYED";
       return {
@@ -501,8 +528,8 @@ export function playSessionReducer(
           questionLifecycle === "DISPLAYED"
             ? null
             : (data.timeLeftSeconds ?? null),
-        leaderboard: [],
-        participantLeaderboard: [],
+        leaderboard: data.leaderboard ?? [],
+        participantLeaderboard: data.leaderboard ?? [],
         finalLeaderboard: [],
         passage,
         questions,

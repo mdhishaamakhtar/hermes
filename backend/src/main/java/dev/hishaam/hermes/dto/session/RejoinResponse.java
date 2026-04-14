@@ -1,6 +1,7 @@
 package dev.hishaam.hermes.dto.session;
 
 import java.util.List;
+import java.util.Map;
 
 public record RejoinResponse(
     Long participantId,
@@ -14,6 +15,8 @@ public record RejoinResponse(
     List<Long> alreadyAnswered,
     CurrentQuestion currentQuestion,
     CurrentPassage currentPassage,
+    Map<Long, QuestionStats> questionStatsById,
+    List<SessionResultsResponse.LeaderboardEntry> leaderboard,
     Integer timeLeftSeconds) {
 
   public record CurrentQuestion(
@@ -53,4 +56,14 @@ public record RejoinResponse(
   public record PassageInfo(Long id, String text, String timerMode) {}
 
   public record OptionInfo(Long id, String text, int orderIndex) {}
+
+  public record QuestionStats(
+      Map<Long, Long> counts,
+      long totalAnswered,
+      long totalLockedIn,
+      long totalParticipants,
+      List<Long> correctOptionIds,
+      Map<Long, Integer> optionPoints,
+      boolean revealed,
+      boolean reviewed) {}
 }
