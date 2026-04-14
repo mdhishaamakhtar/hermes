@@ -131,34 +131,46 @@ export function HostLiveView({ session }: Props) {
               ) : null}
             </div>
 
-            <div className="mt-4 flex items-end justify-between gap-4">
-              <div>
-                <p className="label mb-2">Timer</p>
-                <div
-                  className="font-black tabular-nums"
-                  style={{
-                    fontSize: "clamp(2rem, 7vw, 4rem)",
-                    lineHeight: 1,
-                    color: timerColour,
-                  }}
-                >
-                  {formatCountdownClock(timeLeft, questionLifecycle)}
-                </div>
-              </div>
-              <div className="min-w-0 w-full max-w-sm shrink">
-                <div className="h-1 overflow-hidden bg-border">
-                  <motion.div
-                    className="h-full max-w-full"
-                    initial={false}
-                    animate={{
-                      width: `${Math.max(0, Math.min(100, timerPct))}%`,
+            {questionLifecycle === "TIMED" ? (
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="label mb-2">Timer</p>
+                  <div
+                    className="font-black tabular-nums"
+                    style={{
+                      fontSize: "clamp(2rem, 7vw, 4rem)",
+                      lineHeight: 1,
+                      color: timerColour,
                     }}
-                    transition={{ duration: 1, ease: "linear" }}
-                    style={{ backgroundColor: timerColour }}
-                  />
+                  >
+                    {formatCountdownClock(timeLeft, questionLifecycle)}
+                  </div>
+                </div>
+                <div className="min-w-0 w-full max-w-sm shrink">
+                  <div className="h-1 overflow-hidden bg-border">
+                    <motion.div
+                      className="h-full max-w-full"
+                      initial={false}
+                      animate={{
+                        width: `${Math.max(0, Math.min(100, timerPct))}%`,
+                      }}
+                      transition={{ duration: 1, ease: "linear" }}
+                      style={{ backgroundColor: timerColour }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="mt-3">
+                <span className="label text-muted">
+                  {questionLifecycle === "DISPLAYED"
+                    ? "Awaiting timer"
+                    : questionLifecycle === "FROZEN"
+                      ? "Time\u2019s up"
+                      : "Reviewing"}
+                </span>
+              </div>
+            )}
           </motion.section>
 
           {/* Mobile-only session controls — shown above question so host doesn't have to scroll */}
