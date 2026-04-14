@@ -786,7 +786,7 @@ export function usePlaySession(sessionId: string) {
     void loadSessionContext();
   }, [loadSessionContext]);
 
-  const { subscribe, unsubscribe, publish } = useStompClient({
+  const { subscribe, unsubscribe, publish, connected } = useStompClient({
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
     onConnect: handleStompConnect,
   });
@@ -799,6 +799,29 @@ export function usePlaySession(sessionId: string) {
       void init();
     }
   }, [hydrated, rejoinToken, loadSessionContext]);
+
+  // Mobile browsers (especially iOS Safari) suspend/close WebSockets when the
+  // tab is backgrounded. On return we resync via REST immediately so the UI is
+  // live before the STOMP reconnect completes.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadSessionContext();
+      }
+    };
+
+    const handleFocus = () => {
+      void loadSessionContext();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [loadSessionContext]);
 
   useEffect(() => {
     const pendingAckResolvers = pendingAckResolversRef.current;
@@ -1391,5 +1414,6 @@ export function usePlaySession(sessionId: string) {
     handleLockIn,
     handleLockAll,
     handleLeave,
+    connected,
   };
 }

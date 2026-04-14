@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { CardBadge } from "@/components/session/CardBadge";
+import { ConnectionStatusBadge } from "@/components/session/ConnectionStatusBadge";
 import { QuestionCard } from "@/components/session/QuestionCard";
 import { ScoringDrawer } from "@/components/session/ScoringDrawer";
 import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
@@ -55,6 +56,7 @@ export function HostLiveView({ session }: Props) {
     activeModeLabel,
     progressLabel,
     isLastQuestion,
+    connected,
   } = session;
 
   const isTimedSummary =
@@ -90,6 +92,7 @@ export function HostLiveView({ session }: Props) {
             >
               {sessionStatus}
             </CardBadge>
+            <ConnectionStatusBadge connected={connected} />
             <CardBadge tone="accent" className="hidden sm:inline-flex">
               {questionLifecycle}
             </CardBadge>
