@@ -80,12 +80,11 @@ export function PlayLiveView({ session }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur relative">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             <span className="label">{headerStatus}</span>
-            <ConnectionStatusBadge connected={connected} />
             <LiveParticipantCount
               count={participantCount}
               caption={formatParticipantCountPhrase(participantCount)}
@@ -93,6 +92,9 @@ export function PlayLiveView({ session }: Props) {
               layout="inline"
             />
           </div>
+        </div>
+        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2">
+          <ConnectionStatusBadge connected={connected} />
         </div>
       </header>
 
