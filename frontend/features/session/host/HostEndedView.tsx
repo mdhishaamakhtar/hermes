@@ -76,11 +76,7 @@ export function HostEndedView({ id, session }: Props) {
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {quizHref ? (
-                <Link
-                  href={quizHref}
-                  prefetch
-                  className="border border-border px-4 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:border-primary/40 hover:text-foreground"
-                >
+                <Link href={quizHref} prefetch className="btn-ghost">
                   Back to Quiz
                 </Link>
               ) : null}
