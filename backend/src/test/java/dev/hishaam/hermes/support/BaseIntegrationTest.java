@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,8 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -42,25 +43,37 @@ public abstract class BaseIntegrationTest {
   private static final DockerImageName RABBIT_IMAGE =
       DockerImageName.parse("rabbitmq:4-management-alpine");
 
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:17-alpine"))
-          .withDatabaseName("hermes_it")
-          .withUsername("hermes")
-          .withPassword("hermes");
+  static final PostgreSQLContainer POSTGRES = postgresContainer();
 
-  static final GenericContainer<?> REDIS =
-      new GenericContainer<>(REDIS_IMAGE).withExposedPorts(6379);
+  static final GenericContainer<?> REDIS = redisContainer();
 
-  static final GenericContainer<?> RABBIT =
-      new GenericContainer<>(RABBIT_IMAGE)
-          .withEnv("RABBITMQ_DEFAULT_USER", "hermes")
-          .withEnv("RABBITMQ_DEFAULT_PASS", "hermes")
-          .withEnv("RABBITMQ_DEFAULT_VHOST", "/")
-          .withCommand(
-              "sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_stomp && rabbitmq-server")
-          .withExposedPorts(61613, 15672)
-          .waitingFor(Wait.forListeningPort())
-          .withStartupTimeout(Duration.ofSeconds(90));
+  static final GenericContainer<?> RABBIT = rabbitContainer();
+
+  @SuppressWarnings("resource")
+  private static PostgreSQLContainer postgresContainer() {
+    return new PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
+        .withDatabaseName("hermes_it")
+        .withUsername("hermes")
+        .withPassword("hermes");
+  }
+
+  @SuppressWarnings("resource")
+  private static GenericContainer<?> redisContainer() {
+    return new GenericContainer<>(REDIS_IMAGE).withExposedPorts(6379);
+  }
+
+  @SuppressWarnings("resource")
+  private static GenericContainer<?> rabbitContainer() {
+    return new GenericContainer<>(RABBIT_IMAGE)
+        .withEnv("RABBITMQ_DEFAULT_USER", "hermes")
+        .withEnv("RABBITMQ_DEFAULT_PASS", "hermes")
+        .withEnv("RABBITMQ_DEFAULT_VHOST", "/")
+        .withCommand(
+            "sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_stomp && rabbitmq-server")
+        .withExposedPorts(61613, 15672)
+        .waitingFor(Wait.forListeningPort())
+        .withStartupTimeout(Duration.ofSeconds(90));
+  }
 
   static {
     POSTGRES.start();
@@ -100,7 +113,9 @@ public abstract class BaseIntegrationTest {
 
   @BeforeEach
   void cleanState() {
-    redisTemplate.getConnectionFactory().getConnection().serverCommands().flushDb();
+    try (RedisConnection connection = redisTemplate.getConnectionFactory().getConnection()) {
+      connection.serverCommands().flushDb();
+    }
     jdbcTemplate.execute(
         "TRUNCATE TABLE participant_answers, participants, quiz_sessions, answer_options, "
             + "questions, passages, quizzes, events, users RESTART IDENTITY CASCADE");

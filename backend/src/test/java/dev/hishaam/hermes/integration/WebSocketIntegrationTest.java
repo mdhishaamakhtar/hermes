@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -125,7 +125,7 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
 
   private WebSocketStompClient stompClient() {
     WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());
-    client.setMessageConverter(new MappingJackson2MessageConverter());
+    client.setMessageConverter(new JacksonJsonMessageConverter());
     client.setTaskScheduler(
         new ConcurrentTaskScheduler(
             Executors.newSingleThreadScheduledExecutor(
@@ -170,12 +170,12 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     return new StompFrameHandler() {
       @Override
       public Type getPayloadType(StompHeaders headers) {
-        return JsonNode.class;
+        return Map.class;
       }
 
       @Override
       public void handleFrame(StompHeaders headers, Object payload) {
-        queue.add((JsonNode) payload);
+        queue.add(objectMapper.valueToTree(payload));
       }
     };
   }
