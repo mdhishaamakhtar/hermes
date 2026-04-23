@@ -19,40 +19,42 @@ public class ParticipantRejoinTokenRedisRepository {
     this.participantRepository = participantRepository;
   }
 
-  public void store(String rejoinToken, Long participantId) {
+  public void store(String rejoinToken, Long participantId, Long sessionId) {
     redis
         .opsForValue()
         .set(
             SessionRedisKeys.participantTokenKey(rejoinToken),
-            participantId.toString(),
+            sessionId + ":" + participantId,
             SessionRedisKeys.REJOIN_TTL);
   }
 
   public Long resolveParticipantId(String rejoinToken, Long sessionId) {
-    String participantIdStr =
-        redis.opsForValue().get(SessionRedisKeys.participantTokenKey(rejoinToken));
-    Long participantId;
+    String raw = redis.opsForValue().get(SessionRedisKeys.participantTokenKey(rejoinToken));
 
-    if (participantIdStr != null) {
-      participantId = Long.parseLong(participantIdStr);
-    } else {
-      Participant participant =
-          participantRepository
-              .findByRejoinToken(rejoinToken)
-              .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
-      participantId = participant.getId();
-      store(rejoinToken, participantId);
+    if (raw != null) {
+      String[] parts = raw.split(":", 2);
+      if (parts.length == 2) {
+        long storedSessionId = Long.parseLong(parts[0]);
+        long participantId = Long.parseLong(parts[1]);
+        if (storedSessionId != sessionId) {
+          throw AppException.notFound("Invalid rejoin token for this session");
+        }
+        return participantId;
+      }
     }
 
+    // Postgres fallback: token expired from Redis
     Participant participant =
         participantRepository
-            .findById(participantId)
-            .orElseThrow(() -> AppException.notFound("Participant not found"));
+            .findByRejoinToken(rejoinToken)
+            .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
 
     if (!participant.getSession().getId().equals(sessionId)) {
       throw AppException.notFound("Invalid rejoin token for this session");
     }
 
+    Long participantId = participant.getId();
+    store(rejoinToken, participantId, sessionId);
     return participantId;
   }
 }

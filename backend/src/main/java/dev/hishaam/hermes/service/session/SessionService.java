@@ -25,11 +25,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SessionService {
+
+  private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
   private final QuizSessionRepository sessionRepository;
   private final QuizRepository quizRepository;
@@ -211,7 +215,7 @@ public class SessionService {
       QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
       stateStore.cleanupSessionKeys(sessionId, snapshot, null);
     } catch (Exception e) {
-      // Ignore if already gone or invalid
+      log.warn("Redis cleanup failed for abandoned session {}", sessionId, e);
     }
 
     participantAnswerRepository.deleteBySessionIdIn(List.of(sessionId));
@@ -238,10 +242,7 @@ public class SessionService {
 
   public HostSessionSyncResponse getHostSyncState(Long sessionId, Long userId) {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
-    QuizSnapshot snapshot =
-        session.getSnapshot() != null && !session.getSnapshot().isBlank()
-            ? snapshotService.deserialize(session.getSnapshot())
-            : snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
 
     SessionRejoinContextService.SessionRejoinContext ctx =
         rejoinContextService.buildRejoinContext(sessionId);
@@ -353,7 +354,7 @@ public class SessionService {
   }
 
   private QuizSnapshot.PassageSnapshot toPassageSnapshot(Passage passage) {
-    List<Long> subQuestionIds = passage.getSubQuestions().stream().map(q -> q.getId()).toList();
+    List<Long> subQuestionIds = passage.getSubQuestions().stream().map(Question::getId).toList();
     return new QuizSnapshot.PassageSnapshot(
         passage.getId(),
         passage.getText(),
@@ -365,14 +366,6 @@ public class SessionService {
 
   private HostSessionSyncResponse.CurrentQuestion buildCurrentQuestion(
       QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    HostSessionSyncResponse.PassageInfo passageInfo =
-        question.passageId() == null
-            ? null
-            : snapshot.findPassage(question.passageId()) == null
-                ? null
-                : new HostSessionSyncResponse.PassageInfo(
-                    question.passageId(), snapshot.findPassage(question.passageId()).text());
-
     return new HostSessionSyncResponse.CurrentQuestion(
         question.id(),
         question.text(),
@@ -381,22 +374,12 @@ public class SessionService {
         snapshot.questions().size(),
         question.timeLimitSeconds(),
         question.effectiveDisplayMode().name(),
-        passageInfo,
-        question.options().stream()
-            .map(o -> new HostSessionSyncResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
-            .toList());
+        buildPassageInfo(question, snapshot),
+        buildOptionInfos(question));
   }
 
   private HostSessionSyncResponse.PassageQuestionInfo buildPassageQuestionInfo(
       QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    HostSessionSyncResponse.PassageInfo passageInfo =
-        question.passageId() == null
-            ? null
-            : snapshot.findPassage(question.passageId()) == null
-                ? null
-                : new HostSessionSyncResponse.PassageInfo(
-                    question.passageId(), snapshot.findPassage(question.passageId()).text());
-
     return new HostSessionSyncResponse.PassageQuestionInfo(
         question.id(),
         question.text(),
@@ -405,10 +388,24 @@ public class SessionService {
         snapshot.questions().size(),
         question.timeLimitSeconds(),
         question.effectiveDisplayMode().name(),
-        passageInfo,
-        question.options().stream()
-            .map(o -> new HostSessionSyncResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
-            .toList());
+        buildPassageInfo(question, snapshot),
+        buildOptionInfos(question));
+  }
+
+  private HostSessionSyncResponse.PassageInfo buildPassageInfo(
+      QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
+    if (question.passageId() == null) return null;
+    var passage = snapshot.findPassage(question.passageId());
+    return passage == null
+        ? null
+        : new HostSessionSyncResponse.PassageInfo(passage.id(), passage.text());
+  }
+
+  private List<HostSessionSyncResponse.OptionInfo> buildOptionInfos(
+      QuizSnapshot.QuestionSnapshot question) {
+    return question.options().stream()
+        .map(o -> new HostSessionSyncResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
+        .toList();
   }
 
   private HostSessionSyncResponse.QuestionStats buildQuestionStats(

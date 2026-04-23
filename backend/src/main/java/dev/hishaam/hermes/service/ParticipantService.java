@@ -105,7 +105,7 @@ public class ParticipantService {
             .build();
     participant = participantRepository.save(participant);
 
-    rejoinTokenStore.store(rejoinToken, participant.getId());
+    rejoinTokenStore.store(rejoinToken, participant.getId(), sessionId);
 
     long count = stateStore.incrementParticipantCount(sessionId);
     stateStore.cacheParticipantName(sessionId, participant.getId(), request.displayName());
@@ -218,15 +218,13 @@ public class ParticipantService {
             .toList();
     ParticipantAnswer answer = currentAnswer(participantId, question.id());
     List<Long> selectedOptionIds = selectedOptionIds(answer);
+    var foundPassage =
+        question.passageId() != null ? snapshot.findPassage(question.passageId()) : null;
     RejoinResponse.PassageInfo passageInfo =
-        question.passageId() == null
+        foundPassage == null
             ? null
-            : snapshot.findPassage(question.passageId()) == null
-                ? null
-                : new RejoinResponse.PassageInfo(
-                    question.passageId(),
-                    snapshot.findPassage(question.passageId()).text(),
-                    snapshot.findPassage(question.passageId()).timerMode().name());
+            : new RejoinResponse.PassageInfo(
+                foundPassage.id(), foundPassage.text(), foundPassage.timerMode().name());
 
     return new RejoinResponse.CurrentQuestion(
         question.id(),

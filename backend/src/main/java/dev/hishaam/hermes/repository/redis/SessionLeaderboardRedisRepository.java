@@ -40,6 +40,7 @@ public class SessionLeaderboardRedisRepository {
     redis
         .opsForZSet()
         .add(SessionRedisKeys.leaderboardKey(sid), participantId.toString(), newScore);
+    redis.expire(SessionRedisKeys.leaderboardKey(sid), SessionRedisKeys.SESSION_TTL);
   }
 
   public void incrementCumulativeTime(Long sessionId, Long participantId, long millis) {
