@@ -142,23 +142,39 @@ Swagger UI is available at:
 
 ### Run Tests
 
+Integration tests start PostgreSQL, Redis, and RabbitMQ with Testcontainers. Keep Docker running
+before invoking Maven. The backend targets Java 25, so pin `JAVA_HOME` when your shell defaults to
+another JDK:
+
 ```bash
-cd backend
-./mvnw test
+JAVA_HOME=$(/usr/libexec/java_home -v 25) ./mvnw test
+```
+
+The test layout is:
+
+- `src/test/java/dev/hishaam/hermes/integration`: full application flows with Testcontainers
+- `src/test/java/dev/hishaam/hermes/unit`: focused business-logic unit tests
+- `src/test/java/dev/hishaam/hermes/support`: shared integration-test infrastructure
+
+### Coverage
+
+`./mvnw test` generates JaCoCo coverage at `target/site/jacoco/index.html`.
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 25) ./mvnw clean test
+open target/site/jacoco/index.html
 ```
 
 ### Build
 
 ```bash
-cd backend
-./mvnw clean package
+JAVA_HOME=$(/usr/libexec/java_home -v 25) ./mvnw clean package
 ```
 
 ### Format
 
 ```bash
-cd backend
-./mvnw spotless:apply
+JAVA_HOME=$(/usr/libexec/java_home -v 25) ./mvnw spotless:apply
 ```
 
 ---

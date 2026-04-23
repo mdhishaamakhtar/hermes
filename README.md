@@ -74,6 +74,29 @@ The frontend expects:
 - `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080`
 - `NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws-hermes`
 
+## Backend Tests & Coverage
+
+Backend tests use Testcontainers for PostgreSQL, Redis, and RabbitMQ, so Docker must be running.
+The project targets Java 25; if your shell defaults to another JDK, pin `JAVA_HOME` for the command:
+
+```bash
+cd backend
+JAVA_HOME=$(/usr/libexec/java_home -v 25) ./mvnw test
+```
+
+The test run also generates the JaCoCo report:
+
+```bash
+open target/site/jacoco/index.html
+```
+
+For a clean rebuild with tests and coverage:
+
+```bash
+cd backend
+JAVA_HOME=$(/usr/libexec/java_home -v 25) ./mvnw clean test
+```
+
 ## Project Docs
 
 - Backend: [backend/README.md](./backend/README.md)

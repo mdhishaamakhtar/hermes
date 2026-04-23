@@ -1,0 +1,20 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  quartz:
+    auto-startup: true
+    jdbc:
+      initialize-schema: always
+  data:
+    redis:
+      password: ""
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+app:
+  cors:
+    allowed-origin: http://localhost:3000
