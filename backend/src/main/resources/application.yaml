@@ -40,7 +40,7 @@ spring:
             instanceName: HermesScheduler
             instanceId: AUTO
           threadPool:
-            threadCount: ${QUARTZ_THREAD_COUNT:10}
+            threadCount: ${QUARTZ_THREAD_COUNT:2}
           jobStore:
             isClustered: true
             misfireThreshold: 60000
