@@ -11,8 +11,6 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", \
-  "-XX:MaxRAMPercentage=60.0", \
-  "-XX:MaxMetaspaceSize=192m", \
-  "-XX:ReservedCodeCacheSize=96m", \
-  "-XX:+UseZGC", \
+  "-XX:MaxMetaspaceSize=128m", \
+  "-XX:ReservedCodeCacheSize=64m", \
   "-jar", "app.jar"]
