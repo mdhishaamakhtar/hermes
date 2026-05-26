@@ -16,11 +16,20 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.broker.BrokerAvailabilityEvent;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SessionEventPublisher {
+
+  private static final Logger log = LoggerFactory.getLogger(SessionEventPublisher.class);
+
+  private volatile boolean brokerAvailable = false;
 
   private final SimpMessagingTemplate messaging;
   private final SessionSnapshotService snapshotService;
@@ -46,8 +55,8 @@ public class SessionEventPublisher {
 
   public void publishParticipantJoined(Long sessionId, long participantCount) {
     var payload = new WsPayloads.ParticipantJoined(participantCount);
-    messaging.convertAndSend(WsTopics.sessionControl(sessionId), payload);
-    messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), payload);
+    send(WsTopics.sessionControl(sessionId), payload);
+    send(WsTopics.sessionQuestion(sessionId), payload);
   }
 
   public void publishQuestionDisplayed(
@@ -68,7 +77,7 @@ public class SessionEventPublisher {
       }
     }
 
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.QuestionDisplayed(
             question.id(),
@@ -107,7 +116,7 @@ public class SessionEventPublisher {
             ? DisplayMode.LIVE.name()
             : subQuestions.get(0).effectiveDisplayMode().name();
 
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.PassageDisplayed(
             passage.id(),
@@ -121,31 +130,30 @@ public class SessionEventPublisher {
 
   public void publishTimerStart(
       Long sessionId, Long questionId, Long passageId, int timeLimitSeconds) {
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.TimerStart(questionId, passageId, timeLimitSeconds));
   }
 
   public void publishQuestionFrozen(Long sessionId, Long questionId) {
-    messaging.convertAndSend(
-        WsTopics.sessionQuestion(sessionId), new WsPayloads.QuestionFrozen(questionId));
+    send(WsTopics.sessionQuestion(sessionId), new WsPayloads.QuestionFrozen(questionId));
   }
 
   public void publishPassageFrozen(Long sessionId, Long passageId, List<Long> subQuestionIds) {
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.PassageFrozen(passageId, subQuestionIds));
   }
 
   public void publishSessionEnd(Long sessionId) {
-    messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
+    send(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
   }
 
   public void publishSessionEndAnalytics(Long sessionId) {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
         leaderboardStore.buildLeaderboard(sessionId);
     long participantCount = stateStore.getParticipantCount(sessionId);
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionAnalytics(sessionId),
         new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
   }
@@ -161,7 +169,7 @@ public class SessionEventPublisher {
     Map<Long, Integer> optionPoints = new LinkedHashMap<>();
     question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
 
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.QuestionReviewed(questionId, correctOptionIds, optionPoints));
 
@@ -173,8 +181,8 @@ public class SessionEventPublisher {
 
       var answerReveal =
           new WsPayloads.AnswerReveal(questionId, counts, totalAnswered, totalParticipants);
-      messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerReveal);
-      messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerReveal);
+      send(WsTopics.sessionAnalytics(sessionId), answerReveal);
+      send(WsTopics.sessionQuestion(sessionId), answerReveal);
     }
   }
 
@@ -189,7 +197,7 @@ public class SessionEventPublisher {
     Map<Long, Integer> optionPoints = new LinkedHashMap<>();
     question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
 
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ScoringCorrected(questionId, correctOptionIds, optionPoints));
   }
@@ -204,10 +212,9 @@ public class SessionEventPublisher {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
         LeaderboardBuilder.rank(participantTotals, names);
 
-    messaging.convertAndSend(
-        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
+    send(WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
 
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ParticipantLeaderboard(
             leaderboard.stream()
@@ -224,10 +231,9 @@ public class SessionEventPublisher {
         leaderboardStore.buildLeaderboard(sessionId);
     long totalParticipants = stateStore.getParticipantCount(sessionId);
 
-    messaging.convertAndSend(
-        WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
+    send(WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
 
-    messaging.convertAndSend(
+    send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ParticipantLeaderboard(
             leaderboard.stream()
@@ -258,8 +264,8 @@ public class SessionEventPublisher {
             stats.totalAnswered(),
             stats.totalParticipants(),
             stats.totalLockedIn());
-    messaging.convertAndSend(WsTopics.sessionAnalytics(sessionId), answerUpdate);
-    messaging.convertAndSend(WsTopics.sessionQuestion(sessionId), answerUpdate);
+    send(WsTopics.sessionAnalytics(sessionId), answerUpdate);
+    send(WsTopics.sessionQuestion(sessionId), answerUpdate);
   }
 
   public void publishAnswerAccepted(
@@ -267,7 +273,7 @@ public class SessionEventPublisher {
     if (username == null || clientRequestId == null || clientRequestId.isBlank()) {
       return;
     }
-    messaging.convertAndSendToUser(
+    sendToUser(
         username,
         "/queue/answers",
         new WsPayloads.AnswerAccepted(clientRequestId, questionId, lockedIn));
@@ -283,9 +289,43 @@ public class SessionEventPublisher {
     if (username == null || clientRequestId == null || clientRequestId.isBlank()) {
       return;
     }
-    messaging.convertAndSendToUser(
+    sendToUser(
         username,
         "/queue/answers",
         new WsPayloads.AnswerRejected(clientRequestId, questionId, code, message, lockedIn));
+  }
+
+  @EventListener
+  public void onBrokerAvailability(BrokerAvailabilityEvent event) {
+    this.brokerAvailable = event.isBrokerAvailable();
+    if (!brokerAvailable) {
+      log.warn("STOMP broker relay went offline");
+    } else {
+      log.info("STOMP broker relay is online");
+    }
+  }
+
+  private void send(String destination, Object payload) {
+    if (!brokerAvailable) {
+      log.debug("Broker offline, dropping message to {}", destination);
+      return;
+    }
+    try {
+      messaging.convertAndSend(destination, payload);
+    } catch (MessageDeliveryException e) {
+      log.warn("Failed to deliver message to {}: {}", destination, e.getMessage());
+    }
+  }
+
+  private void sendToUser(String username, String destination, Object payload) {
+    if (!brokerAvailable) {
+      log.debug("Broker offline, dropping user message to {}", destination);
+      return;
+    }
+    try {
+      messaging.convertAndSendToUser(username, destination, payload);
+    } catch (MessageDeliveryException e) {
+      log.warn("Failed to deliver user message to {}: {}", destination, e.getMessage());
+    }
   }
 }

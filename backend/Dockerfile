@@ -13,4 +13,6 @@ EXPOSE 8080
 ENTRYPOINT ["java", \
   "-XX:MaxMetaspaceSize=128m", \
   "-XX:ReservedCodeCacheSize=64m", \
+  "-XX:MaxDirectMemorySize=64m", \
+  "-XX:+ExitOnOutOfMemoryError", \
   "-jar", "app.jar"]
