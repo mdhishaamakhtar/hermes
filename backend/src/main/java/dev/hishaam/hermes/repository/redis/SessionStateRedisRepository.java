@@ -3,7 +3,9 @@ package dev.hishaam.hermes.repository.redis;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.SessionStatus;
 import dev.hishaam.hermes.util.SessionRedisKeys;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -167,12 +169,20 @@ public class SessionStateRedisRepository {
     snapshot
         .questions()
         .forEach(
-            q ->
-                redis.delete(
-                    List.of(
-                        SessionRedisKeys.questionCountsKey(sid, q.id()),
-                        SessionRedisKeys.questionAnsweredKey(sid, q.id()),
-                        SessionRedisKeys.questionLockedInKey(sid, q.id()))));
+            q -> {
+              redis.delete(
+                  List.of(
+                      SessionRedisKeys.questionCountsKey(sid, q.id()),
+                      SessionRedisKeys.questionAnsweredKey(sid, q.id()),
+                      SessionRedisKeys.questionLockedInKey(sid, q.id())));
+
+              String pattern =
+                  SessionRedisKeys.participantSelectionKey(sid, q.id(), null).replace("null", "*");
+              Set<String> participantKeys = redis.keys(pattern);
+              if (participantKeys != null && !participantKeys.isEmpty()) {
+                redis.delete(new ArrayList<>(participantKeys));
+              }
+            });
 
     redis.delete(
         List.of(
