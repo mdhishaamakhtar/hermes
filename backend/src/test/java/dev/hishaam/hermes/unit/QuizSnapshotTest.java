@@ -9,6 +9,7 @@ import dev.hishaam.hermes.entity.enums.QuestionType;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 
 class QuizSnapshotTest {
@@ -28,10 +29,10 @@ class QuizSnapshotTest {
                 new QuizSnapshot.PassageSnapshot(
                     50L, "Passage", 5, PassageTimerMode.PER_SUB_QUESTION, null, List.of(2L, 3L))));
 
-    assertThat(snapshot.findNextQuestion(null).id()).isEqualTo(2L);
-    assertThat(snapshot.findNextQuestion(2L).id()).isEqualTo(3L);
-    assertThat(snapshot.findNextQuestion(3L).id()).isEqualTo(1L);
-    assertThat(snapshot.findNextQuestion(1L).id()).isEqualTo(4L);
+    assertThat(Objects.requireNonNull(snapshot.findNextQuestion(null)).id()).isEqualTo(2L);
+    assertThat(Objects.requireNonNull(snapshot.findNextQuestion(2L)).id()).isEqualTo(3L);
+    assertThat(Objects.requireNonNull(snapshot.findNextQuestion(3L)).id()).isEqualTo(1L);
+    assertThat(Objects.requireNonNull(snapshot.findNextQuestion(1L)).id()).isEqualTo(4L);
     assertThat(snapshot.findNextQuestion(4L)).isNull();
     assertThat(snapshot.questionPosition(2L)).isEqualTo(1);
     assertThat(snapshot.questionPosition(4L)).isEqualTo(4);
@@ -43,16 +44,16 @@ class QuizSnapshotTest {
     QuizSnapshot snapshot =
         new QuizSnapshot(
             1L, "Correction", List.of(question(1L, 1, null), question(2L, 2, null)), List.of());
-    long targetOption = snapshot.findQuestion(1L).options().get(0).id();
-    long untouchedOption = snapshot.findQuestion(2L).options().get(0).id();
+    long targetOption = snapshot.findQuestion(1L).options().getFirst().id();
+    long untouchedOption = snapshot.findQuestion(2L).options().getFirst().id();
 
     QuizSnapshot corrected =
         snapshot.withCorrectedScoring(1L, Map.of(targetOption, 0), correctedAt);
 
-    assertThat(corrected.findQuestion(1L).options().get(0).pointValue()).isZero();
+    assertThat(corrected.findQuestion(1L).options().getFirst().pointValue()).isZero();
     assertThat(corrected.findQuestion(1L).correctedAt()).isEqualTo(correctedAt);
-    assertThat(corrected.findQuestion(2L).options().get(0).id()).isEqualTo(untouchedOption);
-    assertThat(corrected.findQuestion(2L).options().get(0).pointValue()).isEqualTo(10);
+    assertThat(corrected.findQuestion(2L).options().getFirst().id()).isEqualTo(untouchedOption);
+    assertThat(corrected.findQuestion(2L).options().getFirst().pointValue()).isEqualTo(10);
     assertThat(corrected.findQuestion(2L).correctedAt()).isNull();
   }
 

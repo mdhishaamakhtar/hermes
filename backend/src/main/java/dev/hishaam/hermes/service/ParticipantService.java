@@ -160,10 +160,12 @@ public class ParticipantService {
                   passage.text(),
                   passage.timerMode().name(),
                   snapshot.questionPosition(
-                      subQuestions.isEmpty() ? ctx.currentQuestionId() : subQuestions.get(0).id()),
+                      subQuestions.isEmpty()
+                          ? ctx.currentQuestionId()
+                          : subQuestions.getFirst().id()),
                   snapshot.questions().size(),
                   passage.timeLimitSeconds(),
-                  subQuestions.isEmpty() ? null : subQuestions.get(0).effectiveDisplayMode(),
+                  subQuestions.isEmpty() ? null : subQuestions.getFirst().effectiveDisplayMode(),
                   subQuestions);
         }
       } else {

@@ -95,7 +95,7 @@ public class SessionEventPublisher {
       QuizSnapshot.PassageSnapshot passage,
       List<QuizSnapshot.QuestionSnapshot> subQuestions,
       QuizSnapshot snapshot) {
-    int questionIndex = snapshot.questionPosition(subQuestions.get(0).id());
+    int questionIndex = snapshot.questionPosition(subQuestions.getFirst().id());
     int totalQuestions = snapshot.questions().size();
 
     List<WsPayloads.SubQuestion> wsSubQuestions =
@@ -114,7 +114,7 @@ public class SessionEventPublisher {
     String effectiveDisplayMode =
         subQuestions.isEmpty()
             ? DisplayMode.LIVE.name()
-            : subQuestions.get(0).effectiveDisplayMode().name();
+            : subQuestions.getFirst().effectiveDisplayMode().name();
 
     send(
         WsTopics.sessionQuestion(sessionId),

@@ -247,7 +247,7 @@ public class SessionResultsService {
         answer ->
             scores.merge(
                 answer.getParticipantId(),
-                Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
+                (long) (answer.getScore() != null ? answer.getScore() : 0),
                 (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
 
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =

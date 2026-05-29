@@ -154,7 +154,7 @@ public class SessionEngine {
             .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
             .toList();
 
-    QuizSnapshot.QuestionSnapshot lastSub = subQuestions.get(subQuestions.size() - 1);
+    QuizSnapshot.QuestionSnapshot lastSub = subQuestions.getLast();
     stateStore.setCurrentQuestion(sessionId, lastSub.id());
     stateStore.setCurrentPassage(sessionId, passage.id());
     stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());

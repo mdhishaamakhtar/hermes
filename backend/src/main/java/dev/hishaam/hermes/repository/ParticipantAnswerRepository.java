@@ -49,7 +49,7 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
   @Query(
       "UPDATE ParticipantAnswer a SET a.frozenAt = :frozenAt"
           + " WHERE a.sessionId = :sessionId AND a.questionId = :questionId AND a.frozenAt IS NULL")
-  int freezeAnswersForQuestion(
+  void freezeAnswersForQuestion(
       @Param("sessionId") Long sessionId,
       @Param("questionId") Long questionId,
       @Param("frozenAt") OffsetDateTime frozenAt);

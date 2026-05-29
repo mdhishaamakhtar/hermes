@@ -281,12 +281,14 @@ public class SessionService {
                   passage.text(),
                   passage.timerMode().name(),
                   snapshot.questionPosition(
-                      subQuestions.isEmpty() ? ctx.currentQuestionId() : subQuestions.get(0).id()),
+                      subQuestions.isEmpty()
+                          ? ctx.currentQuestionId()
+                          : subQuestions.getFirst().id()),
                   snapshot.questions().size(),
                   passage.timeLimitSeconds(),
                   subQuestions.isEmpty()
                       ? DisplayMode.LIVE.name()
-                      : subQuestions.get(0).effectiveDisplayMode(),
+                      : subQuestions.getFirst().effectiveDisplayMode(),
                   subQuestions);
         }
       } else {

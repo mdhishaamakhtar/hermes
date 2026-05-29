@@ -50,7 +50,7 @@ public class AnswerScoringService {
         answer ->
             participantTotals.merge(
                 answer.getParticipantId(),
-                Long.valueOf(answer.getScore() != null ? answer.getScore() : 0),
+                (long) (answer.getScore() != null ? answer.getScore() : 0),
                 (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
     return participantTotals;
   }
@@ -60,6 +60,6 @@ public class AnswerScoringService {
     long answeredAtMs = answeredAt.toInstant().toEpochMilli();
     long elapsed = answeredAtMs - timerStartedAtEpochMs;
     long maxMs = (long) timeLimitSeconds * 1000;
-    return Math.min(Math.max(elapsed, 0L), maxMs);
+    return Math.clamp(elapsed, 0L, maxMs);
   }
 }

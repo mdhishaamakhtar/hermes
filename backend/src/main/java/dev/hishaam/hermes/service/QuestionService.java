@@ -295,7 +295,7 @@ public class QuestionService {
     boolean clashesWithQuestion =
         quiz.getQuestions().stream()
             .filter(q -> q.getPassage() == null)
-            .filter(q -> currentQuestionId == null || !q.getId().equals(currentQuestionId))
+            .filter(q -> !q.getId().equals(currentQuestionId))
             .anyMatch(q -> q.getOrderIndex() == orderIndex);
     if (clashesWithQuestion) {
       throw AppException.badRequest("orderIndex must be unique within the quiz");
@@ -311,7 +311,7 @@ public class QuestionService {
       Passage passage, int orderIndex, Long currentQuestionId) {
     boolean clashes =
         passage.getSubQuestions().stream()
-            .filter(q -> currentQuestionId == null || !q.getId().equals(currentQuestionId))
+            .filter(q -> !q.getId().equals(currentQuestionId))
             .anyMatch(q -> q.getOrderIndex() == orderIndex);
     if (clashes) {
       throw AppException.badRequest("orderIndex must be unique within the passage");

@@ -43,22 +43,16 @@ public class PassageService {
     checkNoActiveSession(quiz.getId());
     validatePassageRequest(quiz, request);
 
+    PassageTimerMode timerMode =
+        request.timerMode() != null ? request.timerMode() : PassageTimerMode.PER_SUB_QUESTION;
     Passage passage =
         Passage.builder()
             .quiz(quiz)
             .text(request.text())
             .orderIndex(request.orderIndex() != null ? request.orderIndex() : 0)
-            .timerMode(
-                request.timerMode() != null
-                    ? request.timerMode()
-                    : PassageTimerMode.PER_SUB_QUESTION)
+            .timerMode(timerMode)
             .timeLimitSeconds(
-                (request.timerMode() != null
-                            ? request.timerMode()
-                            : PassageTimerMode.PER_SUB_QUESTION)
-                        == PassageTimerMode.ENTIRE_PASSAGE
-                    ? request.timeLimitSeconds()
-                    : null)
+                (timerMode) == PassageTimerMode.ENTIRE_PASSAGE ? request.timeLimitSeconds() : null)
             .build();
 
     for (CreateQuestionRequest subQuestionRequest : request.subQuestions()) {
@@ -154,7 +148,7 @@ public class PassageService {
     }
     boolean clashesWithPassage =
         quiz.getPassages().stream()
-            .filter(p -> currentPassageId == null || !p.getId().equals(currentPassageId))
+            .filter(p -> !p.getId().equals(currentPassageId))
             .anyMatch(p -> p.getOrderIndex() == orderIndex);
     if (clashesWithPassage) {
       throw AppException.badRequest("orderIndex must be unique within the quiz");
