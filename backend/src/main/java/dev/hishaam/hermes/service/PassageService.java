@@ -148,7 +148,7 @@ public class PassageService {
     }
     boolean clashesWithPassage =
         quiz.getPassages().stream()
-            .filter(p -> !p.getId().equals(currentPassageId))
+            .filter(p -> currentPassageId == null || !p.getId().equals(currentPassageId))
             .anyMatch(p -> p.getOrderIndex() == orderIndex);
     if (clashesWithPassage) {
       throw AppException.badRequest("orderIndex must be unique within the quiz");
