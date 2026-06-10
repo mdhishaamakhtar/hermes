@@ -9,11 +9,16 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.context.ApplicationContext;
 
+/**
+ * Fires when a question/passage timer expires and hands off to {@code SessionEngine}. The question
+ * sequence snapshot taken at scheduling time guards against stale firings: if the host advanced or
+ * ended the session while this job was pending, the sequence in Redis has moved on and the job
+ * no-ops.
+ */
 @DisallowConcurrentExecution
 public class SessionTimeoutJob implements Job {
 
   public static final String SESSION_ID = "sessionId";
-  public static final String QUESTION_ID = "questionId";
   public static final String EXPECTED_QUESTION_SEQUENCE = "expectedQuestionSequence";
 
   @Override

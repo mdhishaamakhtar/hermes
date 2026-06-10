@@ -156,8 +156,7 @@ public class GradingService {
    * Re-grade a question after the host corrects answer keys. Recomputes scores from the updated
    * snapshot, does a full leaderboard recompute from DB, and broadcasts corrected results.
    */
-  @Transactional
-  public void regradeQuestion(Long sessionId, Long questionId) {
+  private void regradeQuestion(Long sessionId, Long questionId) {
     String sid = sessionId.toString();
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
     QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
