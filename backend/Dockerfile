@@ -11,8 +11,10 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", \
+  "-Xms128m", "-Xmx256m", \
   "-XX:MaxMetaspaceSize=128m", \
   "-XX:ReservedCodeCacheSize=64m", \
   "-XX:MaxDirectMemorySize=64m", \
+  "-XX:G1PeriodicGCInterval=300000", \
   "-XX:+ExitOnOutOfMemoryError", \
   "-jar", "app.jar"]
