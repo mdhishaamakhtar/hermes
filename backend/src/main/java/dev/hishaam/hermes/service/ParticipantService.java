@@ -16,11 +16,9 @@ import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.repository.redis.ParticipantRejoinTokenRedisRepository;
-import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
-import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
-import dev.hishaam.hermes.service.session.SessionRejoinContextService;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -44,9 +42,7 @@ public class ParticipantService {
   private final ParticipantAnswerRepository answerRepository;
   private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
-  private final SessionAnswerStatsRedisRepository answerStatsStore;
-  private final SessionLeaderboardRedisRepository leaderboardStore;
-  private final SessionRejoinContextService rejoinContextService;
+  private final SessionScoringRedisRepository scoringStore;
   private final SessionEventPublisher eventPublisher;
   private final ParticipantRejoinTokenRedisRepository rejoinTokenStore;
 
@@ -56,9 +52,7 @@ public class ParticipantService {
       ParticipantAnswerRepository answerRepository,
       SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
-      SessionAnswerStatsRedisRepository answerStatsStore,
-      SessionLeaderboardRedisRepository leaderboardStore,
-      SessionRejoinContextService rejoinContextService,
+      SessionScoringRedisRepository scoringStore,
       SessionEventPublisher eventPublisher,
       ParticipantRejoinTokenRedisRepository rejoinTokenStore) {
     this.sessionRepository = sessionRepository;
@@ -66,9 +60,7 @@ public class ParticipantService {
     this.answerRepository = answerRepository;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
-    this.answerStatsStore = answerStatsStore;
-    this.leaderboardStore = leaderboardStore;
-    this.rejoinContextService = rejoinContextService;
+    this.scoringStore = scoringStore;
     this.eventPublisher = eventPublisher;
     this.rejoinTokenStore = rejoinTokenStore;
   }
@@ -110,7 +102,7 @@ public class ParticipantService {
     long count = stateStore.incrementParticipantCount(sessionId);
     stateStore.cacheParticipantName(sessionId, participant.getId(), request.displayName());
     // Initialize with score 0 so zero-correct participants appear in leaderboard
-    leaderboardStore.initEntry(sessionId, participant.getId());
+    scoringStore.initEntry(sessionId, participant.getId());
 
     eventPublisher.publishParticipantJoined(sessionId, count);
 
@@ -127,8 +119,7 @@ public class ParticipantService {
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
     SessionStatus status = session.getStatus();
-    SessionRejoinContextService.SessionRejoinContext ctx =
-        rejoinContextService.buildRejoinContext(sessionId);
+    SessionStateRedisRepository.RejoinContext ctx = stateStore.readRejoinContext(sessionId);
 
     List<Long> answered = answerRepository.findAnsweredQuestionIds(participantId);
 
@@ -179,7 +170,7 @@ public class ParticipantService {
 
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
         SessionStatus.ACTIVE == status && "REVIEWING".equals(ctx.questionLifecycle())
-            ? leaderboardStore.buildLeaderboard(sessionId)
+            ? scoringStore.buildLeaderboard(sessionId)
             : List.of();
 
     return new RejoinResponse(
@@ -201,7 +192,27 @@ public class ParticipantService {
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
   public Long resolveParticipantId(String rejoinToken, Long sessionId) {
-    return rejoinTokenStore.resolveParticipantId(rejoinToken, sessionId);
+    ParticipantRejoinTokenRedisRepository.TokenEntry entry = rejoinTokenStore.find(rejoinToken);
+    if (entry != null) {
+      if (entry.sessionId() != sessionId) {
+        throw AppException.notFound("Invalid rejoin token for this session");
+      }
+      return entry.participantId();
+    }
+
+    // Postgres fallback: token expired from Redis
+    Participant participant =
+        participantRepository
+            .findByRejoinToken(rejoinToken)
+            .orElseThrow(() -> AppException.notFound("Invalid rejoin token"));
+
+    if (!participant.getSession().getId().equals(sessionId)) {
+      throw AppException.notFound("Invalid rejoin token for this session");
+    }
+
+    Long participantId = participant.getId();
+    rejoinTokenStore.store(rejoinToken, participantId, sessionId);
+    return participantId;
   }
 
   private static String generateRejoinToken() {
@@ -264,7 +275,7 @@ public class ParticipantService {
   private RejoinResponse.QuestionStats buildQuestionStats(
       Long sessionId,
       QuizSnapshot.QuestionSnapshot question,
-      SessionRejoinContextService.SessionRejoinContext ctx) {
+      SessionStateRedisRepository.RejoinContext ctx) {
     Map<Long, Integer> optionPoints = new LinkedHashMap<>();
     question.options().forEach(option -> optionPoints.put(option.id(), option.pointValue()));
     List<Long> correctOptionIds =
@@ -279,9 +290,9 @@ public class ParticipantService {
                 || question.effectiveDisplayMode() == DisplayMode.CODE_DISPLAY);
 
     return new RejoinResponse.QuestionStats(
-        answerStatsStore.getQuestionCounts(sessionId, question.id()),
-        answerStatsStore.getTotalAnswered(sessionId, question.id()),
-        answerStatsStore.getTotalLockedIn(sessionId, question.id()),
+        scoringStore.getQuestionCounts(sessionId, question.id()),
+        scoringStore.getTotalAnswered(sessionId, question.id()),
+        scoringStore.getTotalLockedIn(sessionId, question.id()),
         ctx.participantCount(),
         correctOptionIds,
         optionPoints,

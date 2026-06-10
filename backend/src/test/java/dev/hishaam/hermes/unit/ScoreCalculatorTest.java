@@ -6,7 +6,7 @@ import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
-import dev.hishaam.hermes.service.AnswerScoringService;
+import dev.hishaam.hermes.service.ScoreCalculator;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -14,9 +14,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class AnswerScoringServiceTest {
+class ScoreCalculatorTest {
 
-  private final AnswerScoringService scoringService = new AnswerScoringService();
+  private final ScoreCalculator scoreCalculator = new ScoreCalculator();
 
   @Test
   void computesPositiveScoresAndClampsNegativeTotalsToZero() {
@@ -26,9 +26,9 @@ class AnswerScoringServiceTest {
             new QuizSnapshot.OptionSnapshot(11L, "Penalty", -12, 1),
             new QuizSnapshot.OptionSnapshot(12L, "Neutral", 0, 2));
 
-    assertThat(scoringService.computeScore(answer(1L, 10L), question)).isEqualTo(8);
-    assertThat(scoringService.computeScore(answer(1L, 10L, 11L), question)).isZero();
-    assertThat(scoringService.computeScore(answer(1L, 99L), question)).isZero();
+    assertThat(scoreCalculator.computeScore(answer(1L, 10L), question)).isEqualTo(8);
+    assertThat(scoreCalculator.computeScore(answer(1L, 10L, 11L), question)).isZero();
+    assertThat(scoreCalculator.computeScore(answer(1L, 99L), question)).isZero();
   }
 
   @Test
@@ -39,11 +39,11 @@ class AnswerScoringServiceTest {
             new QuizSnapshot.OptionSnapshot(11L, "Correct B", 5, 1),
             new QuizSnapshot.OptionSnapshot(12L, "Wrong", 0, 2));
 
-    assertThat(scoringService.isCorrectSelection(answer(1L, 10L, 11L), question)).isTrue();
-    assertThat(scoringService.isCorrectSelection(answer(1L, 10L), question)).isFalse();
-    assertThat(scoringService.isCorrectSelection(answer(1L, 10L, 11L, 12L), question)).isFalse();
-    assertThat(scoringService.isCorrectSelection(answer(1L), question)).isFalse();
-    assertThat(scoringService.isCorrectSelection(null, question)).isFalse();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L, 11L), question)).isTrue();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L), question)).isFalse();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L, 11L, 12L), question)).isFalse();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L), question)).isFalse();
+    assertThat(scoreCalculator.isCorrectSelection(null, question)).isFalse();
   }
 
   @Test
@@ -55,25 +55,25 @@ class AnswerScoringServiceTest {
     ParticipantAnswer third = answer(2L, 12L);
     third.setScore(4);
 
-    assertThat(scoringService.sumScoresByParticipant(List.of(first, second, third)))
+    assertThat(scoreCalculator.sumScoresByParticipant(List.of(first, second, third)))
         .containsEntry(1L, 7L)
         .containsEntry(2L, 4L);
 
     long startedAt = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli();
     assertThat(
-            scoringService.computeAnswerTimeMs(
+            scoreCalculator.computeAnswerTimeMs(
                 OffsetDateTime.ofInstant(Instant.parse("2026-01-01T00:00:03Z"), ZoneOffset.UTC),
                 startedAt,
                 10))
         .isEqualTo(3000L);
     assertThat(
-            scoringService.computeAnswerTimeMs(
+            scoreCalculator.computeAnswerTimeMs(
                 OffsetDateTime.ofInstant(Instant.parse("2026-01-01T00:00:20Z"), ZoneOffset.UTC),
                 startedAt,
                 10))
         .isEqualTo(10000L);
     assertThat(
-            scoringService.computeAnswerTimeMs(
+            scoreCalculator.computeAnswerTimeMs(
                 OffsetDateTime.ofInstant(Instant.parse("2025-12-31T23:59:59Z"), ZoneOffset.UTC),
                 startedAt,
                 10))

@@ -11,8 +11,13 @@ import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
+/**
+ * Stateless scoring math: per-answer scores, correctness checks, participant totals, and
+ * answer-time clamping. Orchestration (persisting grades, leaderboard updates, broadcasts) lives in
+ * {@link GradingService}.
+ */
 @Service
-public class AnswerScoringService {
+public class ScoreCalculator {
 
   public int computeScore(ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
     Map<Long, Integer> pointsByOptionId = new LinkedHashMap<>();

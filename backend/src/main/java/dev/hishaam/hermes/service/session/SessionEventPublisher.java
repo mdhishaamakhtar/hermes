@@ -6,8 +6,7 @@ import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import dev.hishaam.hermes.dto.ws.WsPayloads;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.repository.ParticipantRepository;
-import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
-import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.util.LeaderboardBuilder;
 import dev.hishaam.hermes.util.WsTopics;
@@ -34,22 +33,19 @@ public class SessionEventPublisher {
   private final SimpMessagingTemplate messaging;
   private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
-  private final SessionAnswerStatsRedisRepository answerStatsStore;
-  private final SessionLeaderboardRedisRepository leaderboardStore;
+  private final SessionScoringRedisRepository scoringStore;
   private final ParticipantRepository participantRepository;
 
   public SessionEventPublisher(
       SimpMessagingTemplate messaging,
       SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
-      SessionAnswerStatsRedisRepository answerStatsStore,
-      SessionLeaderboardRedisRepository leaderboardStore,
+      SessionScoringRedisRepository scoringStore,
       ParticipantRepository participantRepository) {
     this.messaging = messaging;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
-    this.answerStatsStore = answerStatsStore;
-    this.leaderboardStore = leaderboardStore;
+    this.scoringStore = scoringStore;
     this.participantRepository = participantRepository;
   }
 
@@ -151,7 +147,7 @@ public class SessionEventPublisher {
 
   public void publishSessionEndAnalytics(Long sessionId) {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        leaderboardStore.buildLeaderboard(sessionId);
+        scoringStore.buildLeaderboard(sessionId);
     long participantCount = stateStore.getParticipantCount(sessionId);
     send(
         WsTopics.sessionAnalytics(sessionId),
@@ -175,8 +171,8 @@ public class SessionEventPublisher {
 
     DisplayMode mode = question.effectiveDisplayMode();
     if (mode == DisplayMode.BLIND || mode == DisplayMode.CODE_DISPLAY) {
-      Map<Long, Long> counts = answerStatsStore.getQuestionCounts(sessionId, questionId);
-      long totalAnswered = answerStatsStore.getTotalAnswered(sessionId, questionId);
+      Map<Long, Long> counts = scoringStore.getQuestionCounts(sessionId, questionId);
+      long totalAnswered = scoringStore.getTotalAnswered(sessionId, questionId);
       long totalParticipants = stateStore.getParticipantCount(sessionId);
 
       var answerReveal =
@@ -228,7 +224,7 @@ public class SessionEventPublisher {
 
   public void publishLeaderboardUpdates(Long sessionId) {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        leaderboardStore.buildLeaderboard(sessionId);
+        scoringStore.buildLeaderboard(sessionId);
     long totalParticipants = stateStore.getParticipantCount(sessionId);
 
     send(WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));

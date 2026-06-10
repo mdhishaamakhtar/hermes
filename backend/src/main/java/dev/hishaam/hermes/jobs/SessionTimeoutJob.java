@@ -1,7 +1,7 @@
 package dev.hishaam.hermes.jobs;
 
-import dev.hishaam.hermes.repository.redis.SessionTimerRedisRepository;
-import dev.hishaam.hermes.service.session.SessionTimerOrchestrator;
+import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.service.session.SessionEngine;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobDataMap;
@@ -26,17 +26,16 @@ public class SessionTimeoutJob implements Job {
       Long sessionId = jobDataMap.getLong(SESSION_ID);
       long expectedQuestionSequence = jobDataMap.getLong(EXPECTED_QUESTION_SEQUENCE);
 
-      SessionTimerRedisRepository timerStore =
-          applicationContext.getBean(SessionTimerRedisRepository.class);
-      SessionTimerOrchestrator timerOrchestrator =
-          applicationContext.getBean(SessionTimerOrchestrator.class);
+      SessionStateRedisRepository stateStore =
+          applicationContext.getBean(SessionStateRedisRepository.class);
+      SessionEngine engine = applicationContext.getBean(SessionEngine.class);
 
-      long currentSequence = timerStore.getQuestionSequence(sessionId);
+      long currentSequence = stateStore.getQuestionSequence(sessionId);
       if (currentSequence != expectedQuestionSequence) {
         return;
       }
 
-      timerOrchestrator.onTimerExpired(sessionId);
+      engine.onTimerExpired(sessionId);
     } catch (Exception e) {
       throw new JobExecutionException("Failed to execute session timeout job", e);
     }
