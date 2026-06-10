@@ -10,7 +10,7 @@ import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
@@ -28,7 +28,7 @@ public class AnswerService {
   private final ParticipantService participantService;
   private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
-  private final SessionAnswerStatsRedisRepository answerStatsStore;
+  private final SessionScoringRedisRepository scoringStore;
   private final SessionEventPublisher eventPublisher;
 
   public AnswerService(
@@ -36,13 +36,13 @@ public class AnswerService {
       ParticipantService participantService,
       SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
-      SessionAnswerStatsRedisRepository answerStatsStore,
+      SessionScoringRedisRepository scoringStore,
       SessionEventPublisher eventPublisher) {
     this.answerRepository = answerRepository;
     this.participantService = participantService;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
-    this.answerStatsStore = answerStatsStore;
+    this.scoringStore = scoringStore;
     this.eventPublisher = eventPublisher;
   }
 
@@ -73,7 +73,7 @@ public class AnswerService {
     answer.setAnsweredAt(selectedOptionIds.isEmpty() ? null : OffsetDateTime.now());
     answerRepository.save(answer);
 
-    answerStatsStore.replaceParticipantSelections(
+    scoringStore.replaceParticipantSelections(
         sessionId, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
     broadcastAnswerState(sessionId, request.questionId());
   }
@@ -99,7 +99,7 @@ public class AnswerService {
     answer.setFrozenAt(frozenAt);
     answerRepository.save(answer);
 
-    answerStatsStore.markLockedIn(sessionId, request.questionId(), participantId);
+    scoringStore.markLockedIn(sessionId, request.questionId(), participantId);
     broadcastAnswerState(sessionId, request.questionId());
   }
 
@@ -177,8 +177,7 @@ public class AnswerService {
   private Set<Long> previousSelectionIds(
       Long sessionId, Long participantId, ParticipantAnswer answer) {
     Set<Long> previousSelectionIds =
-        answerStatsStore.getParticipantSelectionIds(
-            sessionId, answer.getQuestionId(), participantId);
+        scoringStore.getParticipantSelectionIds(sessionId, answer.getQuestionId(), participantId);
     if (!previousSelectionIds.isEmpty()) {
       return previousSelectionIds;
     }
@@ -187,10 +186,10 @@ public class AnswerService {
   }
 
   private void broadcastAnswerState(Long sessionId, Long questionId) {
-    Map<Long, Long> counts = answerStatsStore.getQuestionCounts(sessionId, questionId);
-    long totalAnswered = answerStatsStore.getTotalAnswered(sessionId, questionId);
+    Map<Long, Long> counts = scoringStore.getQuestionCounts(sessionId, questionId);
+    long totalAnswered = scoringStore.getTotalAnswered(sessionId, questionId);
     long totalParticipants = stateStore.getParticipantCount(sessionId);
-    long totalLockedIn = answerStatsStore.getTotalLockedIn(sessionId, questionId);
+    long totalLockedIn = scoringStore.getTotalLockedIn(sessionId, questionId);
 
     eventPublisher.publishAnswerUpdate(
         sessionId,

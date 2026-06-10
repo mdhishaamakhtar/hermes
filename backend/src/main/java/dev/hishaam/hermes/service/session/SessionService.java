@@ -1,8 +1,6 @@
 package dev.hishaam.hermes.service.session;
 
 import dev.hishaam.hermes.dto.session.*;
-import dev.hishaam.hermes.entity.Passage;
-import dev.hishaam.hermes.entity.Question;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.SessionStatus;
@@ -14,11 +12,10 @@ import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
-import dev.hishaam.hermes.repository.redis.SessionAnswerStatsRedisRepository;
-import dev.hishaam.hermes.repository.redis.SessionLeaderboardRedisRepository;
+import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
-import dev.hishaam.hermes.repository.redis.SessionTimerRedisRepository;
 import dev.hishaam.hermes.service.*;
+import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -30,10 +27,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Organizer-facing session API: authorizes every call, validates lifecycle preconditions, and
+ * delegates state transitions to {@link SessionEngine}.
+ */
 @Service
 public class SessionService {
 
   private static final Logger log = LoggerFactory.getLogger(SessionService.class);
+
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final String JOIN_CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
   private final QuizSessionRepository sessionRepository;
   private final QuizRepository quizRepository;
@@ -42,16 +46,11 @@ public class SessionService {
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
-  private final SessionTimerRedisRepository timerStore;
-  private final SessionAnswerStatsRedisRepository answerStatsStore;
-  private final SessionLeaderboardRedisRepository leaderboardStore;
-  private final SessionRejoinContextService rejoinContextService;
-  private final SessionJoinCodeService joinCodeService;
+  private final SessionScoringRedisRepository scoringStore;
   private final SessionEngine engine;
-  private final SessionTimerOrchestrator timerOrchestrator;
   private final SessionEventPublisher eventPublisher;
   private final SessionTimerScheduler timerScheduler;
-  private final ScoringCorrectionService scoringCorrectionService;
+  private final GradingService gradingService;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -61,16 +60,11 @@ public class SessionService {
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
-      SessionTimerRedisRepository timerStore,
-      SessionAnswerStatsRedisRepository answerStatsStore,
-      SessionLeaderboardRedisRepository leaderboardStore,
-      SessionRejoinContextService rejoinContextService,
-      SessionJoinCodeService joinCodeService,
+      SessionScoringRedisRepository scoringStore,
       SessionEngine engine,
-      SessionTimerOrchestrator timerOrchestrator,
       SessionEventPublisher eventPublisher,
       SessionTimerScheduler timerScheduler,
-      ScoringCorrectionService scoringCorrectionService) {
+      GradingService gradingService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.participantAnswerRepository = participantAnswerRepository;
@@ -78,16 +72,11 @@ public class SessionService {
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
-    this.timerStore = timerStore;
-    this.answerStatsStore = answerStatsStore;
-    this.leaderboardStore = leaderboardStore;
-    this.rejoinContextService = rejoinContextService;
-    this.joinCodeService = joinCodeService;
+    this.scoringStore = scoringStore;
     this.engine = engine;
-    this.timerOrchestrator = timerOrchestrator;
     this.eventPublisher = eventPublisher;
     this.timerScheduler = timerScheduler;
-    this.scoringCorrectionService = scoringCorrectionService;
+    this.gradingService = gradingService;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -104,11 +93,11 @@ public class SessionService {
       throw AppException.badRequest("Quiz must have at least one question");
     }
 
-    QuizSnapshot snapshot = buildSnapshot(quiz);
+    QuizSnapshot snapshot = snapshotService.buildSnapshot(quiz);
     String snapshotJson = snapshotService.serialize(snapshot);
 
     // Generate join code with atomic Redis reservation (fixes TOCTOU race)
-    String joinCode = joinCodeService.generateJoinCode();
+    String joinCode = generateJoinCode();
 
     QuizSession session =
         QuizSession.builder()
@@ -159,17 +148,17 @@ public class SessionService {
     }
 
     stateStore.activateSession(sessionId, first.id());
-    answerStatsStore.initQuestionCounts(sessionId, first);
+    scoringStore.initQuestionCounts(sessionId, first);
     stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
     eventPublisher.publishQuestionDisplayed(sessionId, first, snapshot);
     // Timer is NOT started — host will call /start-timer
   }
 
-  // ─── Start Timer (host command to begin countdown) ────────────────────────────
+  // ─── Timer commands (host) ─────────────────────────────────────────────────────
 
   public void startTimer(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    timerOrchestrator.startTimerInternal(sessionId);
+    engine.startTimerInternal(sessionId);
   }
 
   public void endTimerEarly(Long sessionId, Long userId) {
@@ -180,8 +169,8 @@ public class SessionService {
     }
 
     timerScheduler.cancelQuestionTimer(sessionId);
-    timerStore.clearTimer(sessionId);
-    timerOrchestrator.onTimerExpired(sessionId);
+    stateStore.clearTimer(sessionId);
+    engine.onTimerExpired(sessionId);
   }
 
   // ─── Advance / End (delegate to engine — cross-bean call, @Transactional works)
@@ -192,15 +181,15 @@ public class SessionService {
     if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
       throw AppException.conflict("Cannot advance: current question is not in REVIEWING state");
     }
-    timerStore.incrementQuestionSequence(sessionId);
+    stateStore.incrementQuestionSequence(sessionId);
     engine.advanceSessionInternal(sessionId);
   }
 
   public void endSessionByOrganiser(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     timerScheduler.cancelQuestionTimer(sessionId);
-    timerStore.clearTimer(sessionId);
-    timerStore.incrementQuestionSequence(sessionId);
+    stateStore.clearTimer(sessionId);
+    stateStore.incrementQuestionSequence(sessionId);
     engine.doEndSession(sessionId);
   }
 
@@ -208,12 +197,13 @@ public class SessionService {
   public void abandonSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     timerScheduler.cancelQuestionTimer(sessionId);
-    timerStore.clearTimer(sessionId);
+    stateStore.clearTimer(sessionId);
 
     // Attempt best-effort cleanup of Redis keys
     try {
       QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
-      stateStore.cleanupSessionKeys(sessionId, snapshot, null);
+      stateStore.cleanupSessionKeys(sessionId, null);
+      scoringStore.cleanupScoringKeys(sessionId, snapshot);
     } catch (Exception e) {
       log.warn("Redis cleanup failed for abandoned session {}", sessionId, e);
     }
@@ -244,8 +234,7 @@ public class SessionService {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
 
-    SessionRejoinContextService.SessionRejoinContext ctx =
-        rejoinContextService.buildRejoinContext(sessionId);
+    SessionStateRedisRepository.RejoinContext ctx = stateStore.readRejoinContext(sessionId);
     int participantCount = ctx.participantCount();
     if (participantCount == 0) {
       participantCount = (int) participantRepository.countBySessionId(sessionId);
@@ -312,7 +301,7 @@ public class SessionService {
         currentPassage,
         questionStatsById,
         session.getStatus() == SessionStatus.ACTIVE
-            ? leaderboardStore.buildLeaderboard(sessionId)
+            ? scoringStore.buildLeaderboard(sessionId)
             : List.of(),
         ctx.timeLeftSeconds());
   }
@@ -321,49 +310,23 @@ public class SessionService {
 
   public void correctScoring(
       Long sessionId, Long questionId, ScoringCorrectionRequest request, Long userId) {
-    scoringCorrectionService.correctScoring(sessionId, questionId, request, userId);
+    gradingService.correctScoring(sessionId, questionId, request, userId);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  private QuizSnapshot buildSnapshot(Quiz quiz) {
-    List<QuizSnapshot.QuestionSnapshot> questions =
-        quiz.getQuestions().stream()
-            .map(
-                q -> {
-                  List<QuizSnapshot.OptionSnapshot> options =
-                      q.getOptions().stream()
-                          .map(
-                              o ->
-                                  new QuizSnapshot.OptionSnapshot(
-                                      o.getId(), o.getText(), o.getPointValue(), o.getOrderIndex()))
-                          .toList();
-                  return new QuizSnapshot.QuestionSnapshot(
-                      q.getId(),
-                      q.getText(),
-                      q.getQuestionType(),
-                      q.getOrderIndex(),
-                      q.getTimeLimitSeconds(),
-                      q.getPassage() != null ? q.getPassage().getId() : null,
-                      resolveEffectiveDisplayMode(quiz, q),
-                      options,
-                      null);
-                })
-            .toList();
-    List<QuizSnapshot.PassageSnapshot> passages =
-        quiz.getPassages().stream().map(this::toPassageSnapshot).toList();
-    return new QuizSnapshot(quiz.getId(), quiz.getTitle(), questions, passages);
-  }
-
-  private QuizSnapshot.PassageSnapshot toPassageSnapshot(Passage passage) {
-    List<Long> subQuestionIds = passage.getSubQuestions().stream().map(Question::getId).toList();
-    return new QuizSnapshot.PassageSnapshot(
-        passage.getId(),
-        passage.getText(),
-        passage.getOrderIndex(),
-        passage.getTimerMode(),
-        passage.getTimeLimitSeconds(),
-        subQuestionIds);
+  private String generateJoinCode() {
+    for (int attempt = 0; attempt < 10; attempt++) {
+      StringBuilder code = new StringBuilder(6);
+      for (int i = 0; i < 6; i++) {
+        code.append(JOIN_CODE_CHARS.charAt(SECURE_RANDOM.nextInt(JOIN_CODE_CHARS.length())));
+      }
+      String candidate = code.toString();
+      if (stateStore.tryReserveJoinCode(candidate)) {
+        return candidate;
+      }
+    }
+    throw AppException.internalError("Failed to generate unique join code");
   }
 
   private HostSessionSyncResponse.CurrentQuestion buildCurrentQuestion(
@@ -429,20 +392,14 @@ public class SessionService {
                 || question.effectiveDisplayMode() == DisplayMode.CODE_DISPLAY);
 
     return new HostSessionSyncResponse.QuestionStats(
-        answerStatsStore.getQuestionCounts(sessionId, question.id()),
-        answerStatsStore.getTotalAnswered(sessionId, question.id()),
-        answerStatsStore.getTotalLockedIn(sessionId, question.id()),
+        scoringStore.getQuestionCounts(sessionId, question.id()),
+        scoringStore.getTotalAnswered(sessionId, question.id()),
+        scoringStore.getTotalLockedIn(sessionId, question.id()),
         participantCount,
         correctOptionIds,
         optionPoints,
         revealed,
         reviewed);
-  }
-
-  private DisplayMode resolveEffectiveDisplayMode(Quiz quiz, Question question) {
-    return question.getDisplayModeOverride() != null
-        ? question.getDisplayModeOverride()
-        : quiz.getDisplayMode();
   }
 
   private SessionResponse toResponse(QuizSession session) {

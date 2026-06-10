@@ -24,7 +24,7 @@ public class SessionResultsService {
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
   private final ParticipantService participantService;
-  private final AnswerScoringService scoringService;
+  private final ScoreCalculator scoreCalculator;
 
   public SessionResultsService(
       QuizSessionRepository sessionRepository,
@@ -33,14 +33,14 @@ public class SessionResultsService {
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
       ParticipantService participantService,
-      AnswerScoringService scoringService) {
+      ScoreCalculator scoreCalculator) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
     this.participantService = participantService;
-    this.scoringService = scoringService;
+    this.scoreCalculator = scoreCalculator;
   }
 
   @Transactional(readOnly = true)
@@ -79,7 +79,7 @@ public class SessionResultsService {
             answers.stream()
                 .filter(
                     answer ->
-                        scoringService.isCorrectSelection(
+                        scoreCalculator.isCorrectSelection(
                             answer, snapshot.findQuestion(answer.getQuestionId())))
                 .count();
     int totalScore =
@@ -139,7 +139,7 @@ public class SessionResultsService {
                               ? snapshot.findPassage(q.passageId()).text()
                               : null
                           : null;
-                  boolean isCorrect = scoringService.isCorrectSelection(ans, q);
+                  boolean isCorrect = scoreCalculator.isCorrectSelection(ans, q);
                   int pointsEarned = ans != null && ans.getScore() != null ? ans.getScore() : 0;
                   return new MyResultsResponse.QuestionResult(
                       q.id(),
