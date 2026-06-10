@@ -40,6 +40,12 @@ public record QuizSnapshot(
     return passages.stream().filter(p -> p.id().equals(passageId)).findFirst().orElse(null);
   }
 
+  /**
+   * Position of a question in the global presentation order. Standalone questions and passages
+   * share a single quiz-level orderIndex space (uniqueness across both is enforced at edit time);
+   * passage sub-questions slot in as fractional offsets after their passage's index, which assumes
+   * a passage never has 1000+ sub-questions.
+   */
   public double globalSortKey(QuestionSnapshot q) {
     if (q.passageId() != null) {
       PassageSnapshot p = findPassage(q.passageId());
@@ -59,20 +65,6 @@ public record QuizSnapshot(
     double currentKey = globalSortKey(current);
     return questions.stream()
         .filter(q -> globalSortKey(q) > currentKey)
-        .min(Comparator.comparingDouble(this::globalSortKey))
-        .orElse(null);
-  }
-
-  /**
-   * Finds the first question whose orderIndex is greater than the highest orderIndex of any
-   * sub-question in the given passage. Used to advance past an ENTIRE_PASSAGE unit.
-   */
-  public QuestionSnapshot findNextAfterPassage(Long passageId) {
-    PassageSnapshot passage = findPassage(passageId);
-    if (passage == null) return null;
-    double targetKey = passage.orderIndex() + 0.999;
-    return questions.stream()
-        .filter(q -> globalSortKey(q) > targetKey)
         .min(Comparator.comparingDouble(this::globalSortKey))
         .orElse(null);
   }

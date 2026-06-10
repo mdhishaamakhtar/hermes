@@ -25,7 +25,7 @@ public class SessionTimerScheduler {
   }
 
   public void scheduleQuestionTimer(
-      Long sessionId, Long questionId, int timeLimitSeconds, long expectedQuestionSequence) {
+      Long sessionId, int timeLimitSeconds, long expectedQuestionSequence) {
     JobKey jobKey = jobKey(sessionId);
     TriggerKey triggerKey = triggerKey(sessionId);
 
@@ -33,7 +33,6 @@ public class SessionTimerScheduler {
         JobBuilder.newJob(SessionTimeoutJob.class)
             .withIdentity(jobKey)
             .usingJobData(SessionTimeoutJob.SESSION_ID, sessionId)
-            .usingJobData(SessionTimeoutJob.QUESTION_ID, questionId)
             .usingJobData(SessionTimeoutJob.EXPECTED_QUESTION_SEQUENCE, expectedQuestionSequence)
             .storeDurably()
             .build();

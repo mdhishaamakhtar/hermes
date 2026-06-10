@@ -124,9 +124,7 @@ public class SessionEngine {
       eventPublisher.publishTimerStart(sessionId, null, passageId, passage.timeLimitSeconds());
 
       long seqAtStart = stateStore.getQuestionSequence(sessionId);
-      Long anchorQuestionId = Long.parseLong(currentQIdStr);
-      timerScheduler.scheduleQuestionTimer(
-          sessionId, anchorQuestionId, passage.timeLimitSeconds(), seqAtStart);
+      timerScheduler.scheduleQuestionTimer(sessionId, passage.timeLimitSeconds(), seqAtStart);
 
     } else {
       if (currentQIdStr == null || currentQIdStr.isEmpty()) {
@@ -145,8 +143,7 @@ public class SessionEngine {
       eventPublisher.publishTimerStart(sessionId, questionId, null, question.timeLimitSeconds());
 
       long seqAtStart = stateStore.getQuestionSequence(sessionId);
-      timerScheduler.scheduleQuestionTimer(
-          sessionId, questionId, question.timeLimitSeconds(), seqAtStart);
+      timerScheduler.scheduleQuestionTimer(sessionId, question.timeLimitSeconds(), seqAtStart);
     }
   }
 
@@ -201,9 +198,7 @@ public class SessionEngine {
     String currentPassageIdStr = stateStore.getCurrentPassageId(sessionId);
     String currentQIdStr = stateStore.getCurrentQuestionId(sessionId);
     String qState = stateStore.getQuestionState(sessionId);
-    boolean shouldGrade =
-        QuestionLifecycleState.TIMED.name().equals(qState)
-            || QuestionLifecycleState.FROZEN.name().equals(qState);
+    boolean shouldGrade = QuestionLifecycleState.TIMED.name().equals(qState);
 
     if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
       Long passageId = Long.parseLong(currentPassageIdStr);
