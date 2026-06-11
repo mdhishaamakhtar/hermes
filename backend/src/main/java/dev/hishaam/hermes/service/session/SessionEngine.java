@@ -58,6 +58,11 @@ public class SessionEngine {
 
   // ─── Question advancement ──────────────────────────────────────────────────────
 
+  /**
+   * Advances the session to the next question (or ends the session if no more questions remain).
+   * Handles ENTIRE_PASSAGE passages by displaying all sub-questions together. No-ops if the session
+   * is no longer ACTIVE (guards against late-firing Quartz jobs and race conditions).
+   */
   @Transactional
   public void advanceSessionInternal(Long sessionId) {
     String sid = sessionId.toString();
@@ -94,6 +99,11 @@ public class SessionEngine {
 
   // ─── Timer start / expiry ──────────────────────────────────────────────────────
 
+  /**
+   * Starts the countdown timer for the current question or ENTIRE_PASSAGE block. Transitions the
+   * question lifecycle from DISPLAYED to TIMED, records the timer start epoch for answer-time
+   * ranking, and schedules a Quartz job to fire {@link #onTimerExpired} when time runs out.
+   */
   @Transactional
   public void startTimerInternal(Long sessionId) {
     String sid = sessionId.toString();
@@ -147,6 +157,11 @@ public class SessionEngine {
     }
   }
 
+  /**
+   * Handles timer expiry: freezes all unfrozen answers, grades the question or passage, and
+   * transitions the lifecycle to REVIEWING. No-ops if the session is not ACTIVE or the question is
+   * not in the TIMED state (guards against stale Quartz job firings).
+   */
   @Transactional
   public void onTimerExpired(Long sessionId) {
     String sid = sessionId.toString();
@@ -185,12 +200,21 @@ public class SessionEngine {
 
   // ─── Session end ───────────────────────────────────────────────────────────────
 
+  /**
+   * Ends the session, loading the snapshot internally. Convenience overload for callers that don't
+   * already hold the snapshot.
+   */
   @Transactional
   public void doEndSession(Long sessionId) {
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
     doEndSession(sessionId, snapshot);
   }
 
+  /**
+   * Ends the session: cancels any pending timer, freezes and grades the in-progress question if
+   * needed, persists ENDED status with the end timestamp, broadcasts SESSION_END to participants,
+   * and cleans up all Redis keys for the session.
+   */
   @Transactional
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
     timerScheduler.cancelQuestionTimer(sessionId);

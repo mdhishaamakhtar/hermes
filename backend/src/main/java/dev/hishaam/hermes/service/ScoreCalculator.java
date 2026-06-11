@@ -19,6 +19,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class ScoreCalculator {
 
+  /**
+   * Computes the total score for a single answer by summing the point values of all selected
+   * options. Negative raw scores (e.g., penalty options) are clamped to zero.
+   */
   public int computeScore(ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
     Map<Long, Integer> pointsByOptionId = new LinkedHashMap<>();
     question.options().forEach(o -> pointsByOptionId.put(o.id(), o.pointValue()));
@@ -33,6 +37,10 @@ public class ScoreCalculator {
     return Math.max(rawScore, 0);
   }
 
+  /**
+   * Returns {@code true} if the answer's selected options exactly match the set of options with a
+   * positive point value. An empty selection is never considered correct.
+   */
   public boolean isCorrectSelection(
       ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
     if (answer == null || question == null) {
@@ -49,6 +57,7 @@ public class ScoreCalculator {
     return !selectedOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds);
   }
 
+  /** Aggregates graded answers into a map of participantId → total score across all questions. */
   public Map<Long, Long> sumScoresByParticipant(List<ParticipantAnswer> answers) {
     Map<Long, Long> participantTotals = new LinkedHashMap<>();
     answers.forEach(
@@ -60,6 +69,11 @@ public class ScoreCalculator {
     return participantTotals;
   }
 
+  /**
+   * Computes how many milliseconds elapsed between {@code timerStartedAt} and {@code answeredAt},
+   * clamped to {@code [0, timeLimitSeconds * 1000]}. Used to break ties in leaderboard ranking:
+   * among participants with the same score, faster answers rank higher.
+   */
   public long computeAnswerTimeMs(
       OffsetDateTime answeredAt, long timerStartedAtEpochMs, int timeLimitSeconds) {
     long answeredAtMs = answeredAt.toInstant().toEpochMilli();

@@ -15,6 +15,11 @@ import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Computes and serves post-session results for both organizers and individual participants. All
+ * results are derived from the frozen PostgreSQL rows (answers, participants, the serialised quiz
+ * snapshot) — Redis is not consulted after a session ends.
+ */
 @Service
 public class SessionResultsService {
 

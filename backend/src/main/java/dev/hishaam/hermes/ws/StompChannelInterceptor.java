@@ -17,6 +17,16 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
+/**
+ * STOMP channel interceptor that handles authentication and subscription authorization.
+ *
+ * <p>On {@code CONNECT}: extracts a Bearer JWT from the {@code Authorization} header and sets the
+ * STOMP principal. Anonymous clients fall back to a {@code ws:<sessionId>} principal so every
+ * connection has a non-null principal.
+ *
+ * <p>On {@code SUBSCRIBE}: restricts {@code /topic/session.{id}.analytics} and {@code
+ * /topic/session.{id}.control} to the session's owning organizer. All other destinations are open.
+ */
 @Component
 public class StompChannelInterceptor implements ChannelInterceptor {
 

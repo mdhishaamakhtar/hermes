@@ -156,11 +156,16 @@ public class SessionService {
 
   // ─── Timer commands (host) ─────────────────────────────────────────────────────
 
+  /** Authorises ownership and delegates to {@link SessionEngine#startTimerInternal}. */
   public void startTimer(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     engine.startTimerInternal(sessionId);
   }
 
+  /**
+   * Cancels the Quartz job and immediately invokes {@link SessionEngine#onTimerExpired} as if the
+   * timer had elapsed naturally. Only valid when the question is in the TIMED state.
+   */
   public void endTimerEarly(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
     String questionState = stateStore.getQuestionState(sessionId);
@@ -193,6 +198,11 @@ public class SessionService {
     engine.doEndSession(sessionId);
   }
 
+  /**
+   * Hard-deletes a session and all its participants and answers, typically used to discard a LOBBY
+   * session the organizer never started. Performs best-effort Redis cleanup — failure is logged but
+   * does not abort the transaction.
+   */
   @Transactional
   public void abandonSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
@@ -230,6 +240,11 @@ public class SessionService {
         session.getStatus().name(), participantCount, session.getJoinCode());
   }
 
+  /**
+   * Returns a complete snapshot of the live session for the host reconnect flow: current
+   * question/passage, per-question answer stats, the active leaderboard, and time left on the
+   * timer. Combines Redis state (fast path) with PostgreSQL counts when Redis is cold.
+   */
   public HostSessionSyncResponse getHostSyncState(Long sessionId, Long userId) {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());

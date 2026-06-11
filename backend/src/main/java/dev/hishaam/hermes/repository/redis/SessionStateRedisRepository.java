@@ -82,6 +82,7 @@ public class SessionStateRedisRepository {
         });
   }
 
+  /** Transitions the session status to ACTIVE and sets the first current question. */
   public void activateSession(Long sessionId, Long firstQuestionId) {
     String sid = sessionId.toString();
     redis
@@ -203,6 +204,12 @@ public class SessionStateRedisRepository {
 
   // ─── Timer & question sequence ─────────────────────────────────────────────────
 
+  /**
+   * Records the timer as a volatile key with its own TTL matching {@code timeLimitSeconds}. The key
+   * expiring naturally signals timer end; explicit deletion via {@link #clearTimer} cancels it
+   * early. The remaining TTL is used by {@link #readRejoinContext} to compute time-left for
+   * reconnecting participants.
+   */
   public void setTimer(Long sessionId, int timeLimitSeconds) {
     redis
         .opsForValue()

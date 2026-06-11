@@ -30,6 +30,12 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages anonymous participant join and rejoin flows. Join creates a new {@link
+ * dev.hishaam.hermes.entity.Participant} row, issues a 32-character rejoin token, and initialises
+ * the participant's leaderboard entry in Redis. Rejoin reconstructs the full live-session view from
+ * Redis state and the quiz snapshot so a reconnecting client can resume without missing events.
+ */
 @Service
 public class ParticipantService {
 

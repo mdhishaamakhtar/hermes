@@ -5,6 +5,12 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.*;
 import org.springframework.stereotype.Service;
 
+/**
+ * Authorization guard for organizer-owned resources. Each {@code require*Owner} method fetches the
+ * entity, verifies that the authenticated user ID matches the owner, and throws {@link
+ * dev.hishaam.hermes.exception.AppException#forbidden} on mismatch. Returns the entity so callers
+ * avoid a second load.
+ */
 @Service
 public class OwnershipService {
 
