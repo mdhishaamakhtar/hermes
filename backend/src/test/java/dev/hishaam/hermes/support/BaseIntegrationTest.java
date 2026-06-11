@@ -91,6 +91,9 @@ public abstract class BaseIntegrationTest {
     registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     registry.add("spring.quartz.jdbc.initialize-schema", () -> "always");
     registry.add("spring.quartz.auto-startup", () -> "true");
+    // The clustered JDBC job store polls for new triggers every idleWaitTime (default 30s);
+    // shorten it so freshly scheduled question timers fire promptly in tests.
+    registry.add("spring.quartz.properties.org.quartz.scheduler.idleWaitTime", () -> "1000");
     registry.add("app.cors.allowed-origin", () -> "http://localhost:3000");
     registry.add("app.stomp.broker-relay.host", RABBIT::getHost);
     registry.add("app.stomp.broker-relay.port", () -> RABBIT.getMappedPort(61613));
