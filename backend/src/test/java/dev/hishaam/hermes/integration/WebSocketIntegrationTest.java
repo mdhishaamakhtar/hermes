@@ -14,6 +14,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.converter.JacksonJsonMessageConverter;
+import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -123,6 +124,36 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     organiserSession.disconnect();
   }
 
+  @Test
+  void organiserTopicsRejectSubscriptionsFromNonOwnersAndAnonymousClients() throws Exception {
+    Auth owner = organiser();
+    Auth intruder = organiser();
+    long eventId = createEvent(owner, "Private Socket Event");
+    long quizId = createQuiz(owner, eventId, "Private Socket Quiz");
+    createSingleSelectQuestion(owner, quizId, "Question", 1, 30);
+
+    JsonNode session = postJson("/api/sessions", owner, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+
+    WebSocketStompClient intruderClient = stompClient();
+    CountDownLatch intruderRejected = new CountDownLatch(1);
+    StompSession intruderSession = connect(intruderClient, intruder.token(), intruderRejected);
+    intruderSession.subscribe(
+        "/topic/session." + sessionId + ".analytics", handler(new LinkedBlockingQueue<>()));
+    assertThat(intruderRejected.await(10, TimeUnit.SECONDS))
+        .as("authenticated non-owner subscription to the analytics topic must be rejected")
+        .isTrue();
+
+    WebSocketStompClient anonymousClient = stompClient();
+    CountDownLatch anonymousRejected = new CountDownLatch(1);
+    StompSession anonymousSession = connect(anonymousClient, null, anonymousRejected);
+    anonymousSession.subscribe(
+        "/topic/session." + sessionId + ".control", handler(new LinkedBlockingQueue<>()));
+    assertThat(anonymousRejected.await(10, TimeUnit.SECONDS))
+        .as("anonymous subscription to the control topic must be rejected")
+        .isTrue();
+  }
+
   private WebSocketStompClient stompClient() {
     WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());
     client.setMessageConverter(new JacksonJsonMessageConverter());
@@ -149,6 +180,45 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
             .get(10, TimeUnit.SECONDS);
     session.setAutoReceipt(true);
     return session;
+  }
+
+  /**
+   * Connects expecting the session to be rejected later: any ERROR frame, handling exception, or
+   * transport close counts down the latch.
+   */
+  private StompSession connect(WebSocketStompClient client, String token, CountDownLatch rejected)
+      throws Exception {
+    StompHeaders headers = new StompHeaders();
+    if (token != null) {
+      headers.add("Authorization", "Bearer " + token);
+    }
+    return client
+        .connectAsync(
+            wsUrl(),
+            new WebSocketHttpHeaders(),
+            headers,
+            new StompSessionHandlerAdapter() {
+              @Override
+              public void handleFrame(StompHeaders frameHeaders, Object payload) {
+                rejected.countDown();
+              }
+
+              @Override
+              public void handleException(
+                  StompSession session,
+                  StompCommand command,
+                  StompHeaders frameHeaders,
+                  byte[] payload,
+                  Throwable exception) {
+                rejected.countDown();
+              }
+
+              @Override
+              public void handleTransportError(StompSession session, Throwable exception) {
+                rejected.countDown();
+              }
+            })
+        .get(10, TimeUnit.SECONDS);
   }
 
   private void subscribe(StompSession session, String destination, BlockingQueue<JsonNode> queue)

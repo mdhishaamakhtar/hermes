@@ -39,6 +39,10 @@ spring:
           scheduler:
             instanceName: HermesScheduler
             instanceId: AUTO
+            # New triggers are only discovered by polling the DB (the in-JVM signal fires
+            # before the scheduling transaction commits, so the poll is the real mechanism).
+            # The 30s default delays question timer expiry by up to a full poll cycle.
+            idleWaitTime: ${QUARTZ_IDLE_WAIT_TIME:5000}
           threadPool:
             threadCount: ${QUARTZ_THREAD_COUNT:2}
           jobStore:
