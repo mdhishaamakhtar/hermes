@@ -3,6 +3,12 @@ package dev.hishaam.hermes.exception;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Application-level exception that carries an HTTP status and a machine-readable error code. Caught
+ * and serialised into a uniform {@link dev.hishaam.hermes.dto.ApiResponse} by {@link
+ * GlobalExceptionHandler}. Use the static factory methods rather than calling the constructor
+ * directly.
+ */
 @Getter
 public class AppException extends RuntimeException {
 

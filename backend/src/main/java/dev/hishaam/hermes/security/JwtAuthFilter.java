@@ -12,6 +12,12 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * HTTP request filter that extracts a Bearer JWT from the {@code Authorization} header, validates
+ * it, and populates the Spring Security context with the organizer's {@link AuthenticatedUser}. A
+ * missing or invalid token leaves the context unauthenticated so Spring Security can enforce
+ * endpoint-level access control downstream.
+ */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 

@@ -21,6 +21,12 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles participant answer submission and lock-in during a live session. Validates that the
+ * session is in the TIMED lifecycle state, enforces question ownership (passage vs standalone),
+ * persists answers to PostgreSQL, updates per-question option counts in Redis, and broadcasts live
+ * answer statistics to the organizer dashboard.
+ */
 @Service
 public class AnswerService {
 
@@ -46,6 +52,11 @@ public class AnswerService {
     this.eventPublisher = eventPublisher;
   }
 
+  /**
+   * Records or replaces a participant's answer for the active question. An empty {@code
+   * selectedOptionIds} clears any existing selection. Idempotent — re-submitting the same options
+   * is a no-op in terms of Redis counts.
+   */
   @Transactional
   public void submitAnswer(Long sessionId, AnswerRequest request) {
     Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);
@@ -78,6 +89,10 @@ public class AnswerService {
     broadcastAnswerState(sessionId, request.questionId());
   }
 
+  /**
+   * Permanently locks a participant's current selection for the active question. A locked-in answer
+   * cannot be changed. Requires an existing selection — participants must submit before locking in.
+   */
   @Transactional
   public void lockInAnswer(Long sessionId, LockInRequest request) {
     Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);

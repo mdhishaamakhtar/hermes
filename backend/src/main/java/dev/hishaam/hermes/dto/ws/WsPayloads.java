@@ -4,6 +4,13 @@ import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Namespace for all outbound STOMP WebSocket message payloads. Each nested record carries an {@link
+ * EventType} discriminator as its first field so clients can deserialise on {@code event} without a
+ * polymorphic wrapper. Compact constructors omit the {@code event} arg and fill it in
+ * automatically. Records in the question-lifecycle section go to {@code session.{id}.question};
+ * analytics records go to {@code session.{id}.analytics}.
+ */
 public final class WsPayloads {
 
   private WsPayloads() {}

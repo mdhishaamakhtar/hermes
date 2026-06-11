@@ -53,6 +53,12 @@ public class SessionScoringRedisRepository {
     return raw.stream().map(Long::parseLong).collect(LinkedHashSet::new, Set::add, Set::addAll);
   }
 
+  /**
+   * Atomically updates the per-option counts and the participant's selection set in Redis.
+   * Decrements counts for options that were deselected, increments for newly selected ones, and
+   * replaces the participant's selection set. Also updates the answered-participant set based on
+   * whether the new selection is non-empty.
+   */
   public void replaceParticipantSelections(
       Long sessionId,
       Long questionId,
@@ -152,6 +158,11 @@ public class SessionScoringRedisRepository {
     redis.expire(SessionRedisKeys.cumulativeTimeKey(sid), SessionRedisKeys.SESSION_TTL);
   }
 
+  /**
+   * Builds the full leaderboard from the Redis sorted set, sorted by score descending then by
+   * cumulative answer time ascending (faster answers rank higher among equal scores). Names are
+   * resolved from the participant-names hash; absent keys fall back to "Unknown".
+   */
   public List<SessionResultsResponse.LeaderboardEntry> buildLeaderboard(Long sessionId) {
     String sid = sessionId.toString();
     Set<ZSetOperations.TypedTuple<String>> data =

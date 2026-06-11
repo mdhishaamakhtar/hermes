@@ -93,6 +93,11 @@ public class SessionSnapshotService {
             });
   }
 
+  /**
+   * Loads the snapshot for the given session, checking Redis first and falling back to the {@code
+   * snapshot} column in PostgreSQL. Re-populates Redis on a cache miss so subsequent loads are
+   * served from memory.
+   */
   public QuizSnapshot loadSnapshot(String sid) {
     String json = stateStore.getSnapshotJson(sid);
     if (json == null || json.isEmpty()) {

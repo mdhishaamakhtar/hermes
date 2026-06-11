@@ -23,6 +23,12 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.broker.BrokerAvailabilityEvent;
 import org.springframework.stereotype.Service;
 
+/**
+ * Publishes all STOMP WebSocket events for a session: question lifecycle events (displayed, frozen,
+ * reviewed), passage events, timer start, leaderboard updates, session end, and per-participant
+ * answer feedback. Drops messages silently when the broker relay is offline to avoid blocking
+ * callers. Broker availability is tracked via Spring's {@link BrokerAvailabilityEvent}.
+ */
 @Service
 public class SessionEventPublisher {
 

@@ -8,6 +8,11 @@ import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+/**
+ * JWT generation and validation for organizer sessions. Tokens are signed with HMAC-SHA and contain
+ * the organizer's email address as the subject. The secret and expiry are configured via {@code
+ * jwt.secret} and {@code jwt.expiration-ms} application properties.
+ */
 @Component
 public class JwtUtil {
 
@@ -20,6 +25,7 @@ public class JwtUtil {
     this.expirationMs = expirationMs;
   }
 
+  /** Generates a signed JWT with the given email as the subject. */
   public String generateToken(String email) {
     return Jwts.builder()
         .subject(email)
@@ -29,10 +35,12 @@ public class JwtUtil {
         .compact();
   }
 
+  /** Extracts the email (subject) from a token. Throws if the token is invalid or expired. */
   public String extractEmail(String token) {
     return parseClaims(token).getPayload().getSubject();
   }
 
+  /** Returns {@code true} if the token has a valid signature and has not expired. */
   public boolean isValid(String token) {
     try {
       parseClaims(token);

@@ -15,6 +15,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST controller for session lifecycle, participant join/rejoin, answer submission, and results.
+ * Organizer-facing endpoints require JWT authentication via
+ * {@code @PreAuthorize("isAuthenticated()")} and resolve the caller's ID from the injected {@link
+ * dev.hishaam.hermes.security.AuthenticatedUser} principal. Participant endpoints are
+ * unauthenticated and identify participants by rejoin token.
+ */
 @RestController
 @RequestMapping("/api/sessions")
 public class SessionController {

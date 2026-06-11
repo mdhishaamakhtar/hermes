@@ -10,6 +10,11 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * Translates exceptions into uniform {@link dev.hishaam.hermes.dto.ApiResponse} error responses.
+ * Handles {@link AppException} (domain errors with explicit HTTP status), bean-validation failures,
+ * and all other unhandled exceptions (500 with a generic message to avoid leaking internals).
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

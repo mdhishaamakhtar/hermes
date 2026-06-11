@@ -13,6 +13,12 @@ import org.springframework.messaging.simp.stomp.StompReactorNettyCodec;
 import org.springframework.messaging.tcp.reactor.ReactorNettyTcpClient;
 import org.springframework.web.socket.config.annotation.*;
 
+/**
+ * Configures STOMP over WebSocket with a full broker relay to RabbitMQ. The Reactor Netty TCP
+ * client is tuned with TCP keepalive to survive Railway's idle-connection proxy timeout (~60 s) and
+ * a dynamic {@code remoteAddress} supplier so DNS is re-resolved on each reconnect attempt (works
+ * around stale IPs after broker container restarts — SPR-13702).
+ */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
