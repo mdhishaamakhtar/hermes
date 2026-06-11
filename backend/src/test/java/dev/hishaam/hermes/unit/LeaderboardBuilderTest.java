@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test;
  * Unit tests for leaderboard ranking helpers.
  *
  * <p>This class verifies the pure ranking logic only: ordering, rank assignment, tie handling, and
- * name fallback behavior. It does not exercise any database, Redis, or session orchestration
- * code.
+ * name fallback behavior. It does not exercise any database, Redis, or session orchestration code.
  */
 class LeaderboardBuilderTest {
 

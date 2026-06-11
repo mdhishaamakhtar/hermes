@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
 
   /**
-   * Verifies that scoring correction is rejected before the session reaches a reviewable state
-   * and that missing questions return a not-found response.
+   * Verifies that scoring correction is rejected before the session reaches a reviewable state and
+   * that missing questions return a not-found response.
    */
   @Test
   void scoringCorrectionIsRejectedOutsideReviewAndEndedStates() throws Exception {
@@ -142,8 +142,8 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
-   * Verifies that leaderboard ranking prefers participants with the same score who answered
-   * faster overall.
+   * Verifies that leaderboard ranking prefers participants with the same score who answered faster
+   * overall.
    */
   @Test
   void leaderboardBreaksScoreTiesByFasterCumulativeAnswerTime() throws Exception {

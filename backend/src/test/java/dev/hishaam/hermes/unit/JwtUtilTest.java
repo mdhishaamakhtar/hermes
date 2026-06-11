@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.hishaam.hermes.security.JwtUtil;
-import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
  * Unit tests for JWT token generation and validation.
  *
  * <p>This class covers the pure token behavior exposed by {@link JwtUtil}: signing, extracting the
- * subject, and rejecting malformed or expired tokens. It stays at the utility boundary and does
- * not depend on Spring MVC, persistence, or HTTP controllers.
+ * subject, and rejecting malformed or expired tokens. It stays at the utility boundary and does not
+ * depend on Spring MVC, persistence, or HTTP controllers.
  */
 class JwtUtilTest {
 
@@ -38,14 +38,11 @@ class JwtUtilTest {
     assertThat(jwtUtil.extractEmail(token)).isEqualTo("organizer@example.com");
   }
 
-  /**
-   * Verifies that malformed input is rejected by both validation and subject extraction.
-   */
+  /** Verifies that malformed input is rejected by both validation and subject extraction. */
   @Test
   void rejectsMalformedTokens() {
     assertThat(jwtUtil.isValid("not-a-jwt")).isFalse();
-    assertThatThrownBy(() -> jwtUtil.extractEmail("not-a-jwt"))
-        .isInstanceOf(JwtException.class);
+    assertThatThrownBy(() -> jwtUtil.extractEmail("not-a-jwt")).isInstanceOf(JwtException.class);
   }
 
   /**
@@ -63,7 +60,6 @@ class JwtUtilTest {
             .compact();
 
     assertThat(jwtUtil.isValid(expiredToken)).isFalse();
-    assertThatThrownBy(() -> jwtUtil.extractEmail(expiredToken))
-        .isInstanceOf(JwtException.class);
+    assertThatThrownBy(() -> jwtUtil.extractEmail(expiredToken)).isInstanceOf(JwtException.class);
   }
 }

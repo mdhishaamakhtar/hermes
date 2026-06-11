@@ -11,15 +11,14 @@ import org.junit.jupiter.api.Test;
 /**
  * Integration tests for lifecycle guardrails on sessions.
  *
- * <p>This suite focuses on invalid or out-of-order transitions: creation rules, double-starts,
- * late joins, timer state checks, and automatic session ending when the final question is
- * completed.
+ * <p>This suite focuses on invalid or out-of-order transitions: creation rules, double-starts, late
+ * joins, timer state checks, and automatic session ending when the final question is completed.
  */
 class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
 
   /**
-   * Verifies that session creation and lifecycle transitions are rejected when the quiz is empty
-   * or when the host attempts to move the session out of order.
+   * Verifies that session creation and lifecycle transitions are rejected when the quiz is empty or
+   * when the host attempts to move the session out of order.
    */
   @Test
   void sessionRejectsCreationWithoutQuestionsAndOutOfOrderTransitions() throws Exception {
@@ -69,8 +68,8 @@ class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
-   * Verifies that advancing past the final reviewed question closes the session and produces
-   * final results instead of leaving the session stranded.
+   * Verifies that advancing past the final reviewed question closes the session and produces final
+   * results instead of leaving the session stranded.
    */
   @Test
   void advancingPastTheFinalReviewedQuestionEndsTheSession() throws Exception {

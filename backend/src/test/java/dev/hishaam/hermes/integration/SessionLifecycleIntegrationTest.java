@@ -11,14 +11,14 @@ import org.junit.jupiter.api.Test;
 /**
  * Integration tests for the main live session flow.
  *
- * <p>This suite covers the most complete happy-path session lifecycle: joining, answering,
- * locking in, rejoining, review, scoring correction, advancing, and final results.
+ * <p>This suite covers the most complete happy-path session lifecycle: joining, answering, locking
+ * in, rejoining, review, scoring correction, advancing, and final results.
  */
 class SessionLifecycleIntegrationTest extends BaseIntegrationTest {
 
   /**
-   * Verifies the primary live session flow from lobby through final results, including rejoin
-   * state and host-driven scoring correction between questions.
+   * Verifies the primary live session flow from lobby through final results, including rejoin state
+   * and host-driven scoring correction between questions.
    */
   @Test
   void sessionFlowCoversJoinAnswerLockRejoinReviewCorrectionAndResults() throws Exception {
