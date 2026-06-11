@@ -8,8 +8,19 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Integration tests for full session flows that include passages.
+ *
+ * <p>This suite covers the live-host lifecycle, participant joins and rejoins, passage-based
+ * answer collection, review transition, and final result generation when the quiz contains an
+ * ENTIRE_PASSAGE block.
+ */
 class PassageSessionIntegrationTest extends BaseIntegrationTest {
 
+  /**
+   * Verifies the full passage-driven session flow from join through results, including rejoin
+   * state, answer persistence, review stats, and final leaderboard output.
+   */
   @Test
   void entirePassageSessionAcceptsSubQuestionAnswersRejoinsReviewsAndProducesResults()
       throws Exception {

@@ -10,10 +10,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+/**
+ * Integration tests for participant rejoin-token recovery paths.
+ *
+ * <p>This suite covers the Redis-backed fast path and the Postgres fallback path used when a
+ * participant returns after the cached token mapping has expired or been removed.
+ */
 class RejoinTokenIntegrationTest extends BaseIntegrationTest {
 
   @Autowired private StringRedisTemplate redis;
 
+  /**
+   * Verifies that rejoin can recover from a missing Redis token entry by falling back to the
+   * persisted participant row and then restoring the cache entry.
+   */
   @Test
   void rejoinFallsBackToPostgresWhenRedisTokenEntryIsGoneAndRecachesIt() throws Exception {
     Auth organiser = organiser();
@@ -52,6 +62,10 @@ class RejoinTokenIntegrationTest extends BaseIntegrationTest {
     assertThat(redis.hasKey(tokenKey)).isTrue();
   }
 
+  /**
+   * Verifies that rejoin tokens remain scoped to the original session regardless of whether the
+   * lookup happens through Redis or through the database fallback.
+   */
   @Test
   void rejoinTokensAreScopedToTheirSessionOnBothRedisAndPostgresPaths() throws Exception {
     Auth organiser = organiser();

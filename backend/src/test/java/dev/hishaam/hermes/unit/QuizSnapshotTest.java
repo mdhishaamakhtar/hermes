@@ -12,8 +12,19 @@ import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Unit tests for quiz snapshot ordering and correction helpers.
+ *
+ * <p>This class covers the record-level behavior in {@link QuizSnapshot}: ordering, lookups,
+ * computed positions, and scoring corrections. It does not test any service-layer logic or any
+ * external persistence.
+ */
 class QuizSnapshotTest {
 
+  /**
+   * Verifies that passage sub-questions and standalone questions are merged into one global
+   * presentation order and that next-question lookup follows that order correctly.
+   */
   @Test
   void ordersStandaloneAndPassageQuestionsByGlobalQuizPosition() {
     QuizSnapshot snapshot =
@@ -38,6 +49,10 @@ class QuizSnapshotTest {
     assertThat(snapshot.questionPosition(4L)).isEqualTo(4);
   }
 
+  /**
+   * Verifies that correcting one question replaces only that question's option values and stamps
+   * the correction timestamp without mutating the rest of the snapshot.
+   */
   @Test
   void correctedScoringReplacesOnlyTargetQuestionOptionsAndStampsCorrectionTime() {
     OffsetDateTime correctedAt = OffsetDateTime.parse("2026-01-01T00:00:00Z");

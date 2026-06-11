@@ -7,8 +7,16 @@ import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Integration tests for authentication and CRUD endpoints.
+ *
+ * <p>This suite exercises the API boundary end to end: registration and login, plus event, quiz,
+ * question, and passage lifecycle operations with ownership and validation rules enforced by the
+ * HTTP layer.
+ */
 class AuthAndCrudIntegrationTest extends BaseIntegrationTest {
 
+  /** Verifies registration, login, and the current-user endpoint for an organiser account. */
   @Test
   void authEndpointsRegisterLoginAndReturnCurrentUser() throws Exception {
     Auth auth = organiser();
@@ -34,6 +42,10 @@ class AuthAndCrudIntegrationTest extends BaseIntegrationTest {
     assertThat(badLogin.path("error").path("message").asText()).isEqualTo("Invalid credentials");
   }
 
+  /**
+   * Verifies that a quiz owner can create, update, fetch, and delete events, quizzes, questions,
+   * and passages through the public REST API, while a different organiser is blocked from access.
+   */
   @Test
   void organiserOwnsEventsQuizzesQuestionsAndPassagesThroughCrudLifecycle() throws Exception {
     Auth owner = organiser();
@@ -171,6 +183,10 @@ class AuthAndCrudIntegrationTest extends BaseIntegrationTest {
     assertThat(getJson("/api/events", owner, 200).path("data")).isEmpty();
   }
 
+  /**
+   * Verifies that the API enforces quiz editing rules, question order uniqueness, single-select
+   * correctness constraints, and passage timer validation at the boundary.
+   */
   @Test
   void validatesQuestionAndPassageBusinessRulesAtApiBoundary() throws Exception {
     Auth owner = organiser();
@@ -244,6 +260,10 @@ class AuthAndCrudIntegrationTest extends BaseIntegrationTest {
         .isEqualTo("ENTIRE_PASSAGE passages must define a positive timeLimitSeconds");
   }
 
+  /**
+   * Verifies quiz-session listing works for the owner and that ending an in-progress session
+   * releases the quiz for editing again.
+   */
   @Test
   void quizSessionListingAndAbandonCleanupUnlocksQuizEditing() throws Exception {
     Auth owner = organiser();

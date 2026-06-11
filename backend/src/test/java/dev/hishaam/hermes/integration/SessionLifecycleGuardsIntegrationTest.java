@@ -8,8 +8,19 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Integration tests for lifecycle guardrails on sessions.
+ *
+ * <p>This suite focuses on invalid or out-of-order transitions: creation rules, double-starts,
+ * late joins, timer state checks, and automatic session ending when the final question is
+ * completed.
+ */
 class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
 
+  /**
+   * Verifies that session creation and lifecycle transitions are rejected when the quiz is empty
+   * or when the host attempts to move the session out of order.
+   */
   @Test
   void sessionRejectsCreationWithoutQuestionsAndOutOfOrderTransitions() throws Exception {
     Auth organiser = organiser();
@@ -57,6 +68,10 @@ class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
         .isEqualTo("Timer can only be started when question is in DISPLAYED state");
   }
 
+  /**
+   * Verifies that advancing past the final reviewed question closes the session and produces
+   * final results instead of leaving the session stranded.
+   */
   @Test
   void advancingPastTheFinalReviewedQuestionEndsTheSession() throws Exception {
     Auth organiser = organiser();
@@ -105,6 +120,10 @@ class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
     assertThat(results.path("leaderboard").get(0).path("score").asLong()).isEqualTo(10);
   }
 
+  /**
+   * Verifies that ending a session while a question is still timed freezes the live answer state,
+   * grades the question, and exposes the stored result to the participant.
+   */
   @Test
   void endingSessionWhileQuestionIsTimedFreezesAndGradesUnlockedAnswers() throws Exception {
     Auth organiser = organiser();
@@ -161,6 +180,10 @@ class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
     assertThat(myResults.path("questions").get(0).path("pointsEarned").asInt()).isEqualTo(10);
   }
 
+  /**
+   * Verifies that only the session owner can drive control endpoints and that failed attempts do
+   * not disturb the active session state.
+   */
   @Test
   void sessionControlEndpointsRejectOrganisersWhoDoNotOwnTheSession() throws Exception {
     Auth owner = organiser();

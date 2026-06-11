@@ -9,8 +9,18 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Integration tests for timer expiry behavior.
+ *
+ * <p>This suite verifies the Quartz-driven timeout path and the stale-job guard that prevents an
+ * old timer firing from affecting the next question.
+ */
 class TimerExpiryIntegrationTest extends BaseIntegrationTest {
 
+  /**
+   * Verifies that when the timer expires naturally, the session freezes answers, grades the
+   * question, and transitions into review without a host-driven end-timer call.
+   */
   @Test
   void expiredQuestionTimerFreezesAnswersGradesAndMovesToReviewing() throws Exception {
     Auth organiser = organiser();
@@ -70,6 +80,10 @@ class TimerExpiryIntegrationTest extends BaseIntegrationTest {
         .isEqualTo("Question is not currently accepting answers");
   }
 
+  /**
+   * Verifies that a stale timeout from a previous question cannot interfere with the next timed
+   * question after the host has already advanced the session.
+   */
   @Test
   void timerEndedEarlyDoesNotFireIntoTheNextTimedQuestion() throws Exception {
     Auth organiser = organiser();

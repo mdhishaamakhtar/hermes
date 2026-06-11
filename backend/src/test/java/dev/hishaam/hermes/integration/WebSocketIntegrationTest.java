@@ -24,8 +24,18 @@ import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
+/**
+ * Integration tests for the STOMP/WebSocket event stream.
+ *
+ * <p>This suite validates the live publish/subscribe layer for session control events, question
+ * updates, answer acknowledgements, and authorization boundaries on topic subscriptions.
+ */
 class WebSocketIntegrationTest extends BaseIntegrationTest {
 
+  /**
+   * Verifies that the STOMP flow emits the expected session events and per-user answer
+   * acknowledgements as the organiser starts, runs, and scores a live question.
+   */
   @Test
   void stompFlowPublishesSessionEventsAndPerUserAnswerAcknowledgements() throws Exception {
     Auth organiser = organiser();
@@ -124,6 +134,10 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     organiserSession.disconnect();
   }
 
+  /**
+   * Verifies that protected organiser topics reject subscriptions from non-owners and anonymous
+   * clients.
+   */
   @Test
   void organiserTopicsRejectSubscriptionsFromNonOwnersAndAnonymousClients() throws Exception {
     Auth owner = organiser();

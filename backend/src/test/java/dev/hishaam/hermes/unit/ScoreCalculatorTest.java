@@ -14,10 +14,21 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Unit tests for scoring math.
+ *
+ * <p>This class stays at the function level: score math, correctness checks, participant score
+ * aggregation, and answer-time clamping. It intentionally avoids persistence, Redis, and session
+ * orchestration.
+ */
 class ScoreCalculatorTest {
 
   private final ScoreCalculator scoreCalculator = new ScoreCalculator();
 
+  /**
+   * Verifies that selected option points are summed correctly and that negative totals are clamped
+   * to zero.
+   */
   @Test
   void computesPositiveScoresAndClampsNegativeTotalsToZero() {
     QuizSnapshot.QuestionSnapshot question =
@@ -31,6 +42,10 @@ class ScoreCalculatorTest {
     assertThat(scoreCalculator.computeScore(answer(1L, 99L), question)).isZero();
   }
 
+  /**
+   * Verifies that correctness requires an exact, non-empty match with all positive-value options
+   * and rejects partial, extra, or null selections.
+   */
   @Test
   void correctSelectionRequiresExactNonEmptySetOfPositiveOptions() {
     QuizSnapshot.QuestionSnapshot question =
@@ -46,6 +61,10 @@ class ScoreCalculatorTest {
     assertThat(scoreCalculator.isCorrectSelection(null, question)).isFalse();
   }
 
+  /**
+   * Verifies per-participant score aggregation and answer-time clamping against the configured
+   * timer window.
+   */
   @Test
   void sumsScoresByParticipantAndBoundsAnswerTiming() {
     ParticipantAnswer first = answer(1L, 10L);

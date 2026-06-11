@@ -8,8 +8,18 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Integration tests for answer submission guardrails.
+ *
+ * <p>This suite covers the participant-facing answer path: lock-in prerequisites, empty answer
+ * clearing, single-select validation, and the prevention of duplicate freezes.
+ */
 class AnswerGuardsIntegrationTest extends BaseIntegrationTest {
 
+  /**
+   * Verifies that locking in requires a submitted non-empty answer and cannot be repeated once an
+   * answer has already been frozen.
+   */
   @Test
   void lockInRequiresASubmittedNonEmptySelectionAndCannotBeRepeated() throws Exception {
     Auth organiser = organiser();
@@ -104,6 +114,10 @@ class AnswerGuardsIntegrationTest extends BaseIntegrationTest {
         .isEqualTo("Answer is already frozen");
   }
 
+  /**
+   * Verifies that single-select questions reject multi-choice submissions and do not count the
+   * rejected answer toward live stats.
+   */
   @Test
   void singleSelectAnswersRejectMultipleSelectedOptions() throws Exception {
     Auth organiser = organiser();

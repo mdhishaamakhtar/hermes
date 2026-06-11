@@ -8,8 +8,18 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Integration tests for scoring correction and leaderboard ordering.
+ *
+ * <p>This suite exercises the API path that allows hosts to revise scoring after answers have
+ * already been persisted, and verifies that score ties are resolved by cumulative answer time.
+ */
 class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
 
+  /**
+   * Verifies that scoring correction is rejected before the session reaches a reviewable state
+   * and that missing questions return a not-found response.
+   */
   @Test
   void scoringCorrectionIsRejectedOutsideReviewAndEndedStates() throws Exception {
     Auth organiser = organiser();
@@ -51,6 +61,10 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
         .isEqualTo("Question not found in session snapshot");
   }
 
+  /**
+   * Verifies that correcting scoring after the session ends regrades stored answers and updates
+   * both the session results and per-participant results endpoints.
+   */
   @Test
   void scoringCorrectionAfterSessionEndRegradesPersistedResults() throws Exception {
     Auth organiser = organiser();
@@ -127,6 +141,10 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
     assertThat(myResults.path("questions").get(0).path("pointsEarned").asInt()).isEqualTo(10);
   }
 
+  /**
+   * Verifies that leaderboard ranking prefers participants with the same score who answered
+   * faster overall.
+   */
   @Test
   void leaderboardBreaksScoreTiesByFasterCumulativeAnswerTime() throws Exception {
     Auth organiser = organiser();
