@@ -1,5 +1,6 @@
 package dev.hishaam.hermes.entity;
 
+import dev.hishaam.hermes.entity.enums.SessionStatus;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import lombok.*;

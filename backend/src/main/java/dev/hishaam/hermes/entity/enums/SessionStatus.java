@@ -1,4 +1,6 @@
-package dev.hishaam.hermes.entity;
+package dev.hishaam.hermes.entity.enums;
+
+import dev.hishaam.hermes.entity.QuizSession;
 
 /**
  * Lifecycle state of a {@link QuizSession}.

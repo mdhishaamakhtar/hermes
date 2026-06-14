@@ -1,6 +1,6 @@
 package dev.hishaam.hermes.repository.redis;
 
-import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.time.Duration;
 import java.util.List;

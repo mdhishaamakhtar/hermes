@@ -1,7 +1,7 @@
 package dev.hishaam.hermes.repository;
 
 import dev.hishaam.hermes.entity.QuizSession;
-import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.SessionStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

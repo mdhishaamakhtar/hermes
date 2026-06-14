@@ -2,7 +2,7 @@ package dev.hishaam.hermes.controller;
 
 import dev.hishaam.hermes.dto.*;
 import dev.hishaam.hermes.dto.session.*;
-import dev.hishaam.hermes.entity.SessionStatus;
+import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.security.AuthenticatedUser;
 import dev.hishaam.hermes.service.AnswerService;
 import dev.hishaam.hermes.service.ParticipantService;
