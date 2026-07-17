@@ -18,6 +18,10 @@ export default function DashboardClient() {
     isLoading,
     error,
   } = useSWR<EventSummary[]>("/api/events");
+  // Fade rows in only when this mount actually showed the skeleton.
+  // Cached data must paint instantly — re-fading known content on every
+  // navigation reads as a flicker.
+  const [animateEntrance] = useState(() => events === undefined);
   const [showForm, setShowForm] = useState(false);
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
@@ -128,7 +132,7 @@ export default function DashboardClient() {
                 ariaLabel={`Open event: ${event.title}`}
                 onDelete={() => setConfirmId(event.id)}
                 deleteAriaLabel={`Delete event: ${event.title}`}
-                initial={{ opacity: 0 }}
+                initial={animateEntrance ? { opacity: 0 } : false}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}

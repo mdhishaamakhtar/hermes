@@ -21,6 +21,10 @@ export default function EventClient({ eventId }: { eventId: string }) {
     isLoading,
     error,
   } = useSWR<EventSummary>(`/api/events/${eventId}`);
+  // Fade rows in only when this mount actually showed the skeleton.
+  // Cached data must paint instantly — re-fading known content on every
+  // navigation reads as a flicker.
+  const [animateEntrance] = useState(() => event === undefined);
   const [showForm, setShowForm] = useState(false);
   const [quizTitle, setQuizTitle] = useState("");
   const [confirmQuizId, setConfirmQuizId] = useState<number | null>(null);
@@ -151,7 +155,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
               ariaLabel={`Open quiz: ${quiz.title}`}
               onDelete={() => setConfirmQuizId(quiz.id)}
               deleteAriaLabel={`Delete quiz: ${quiz.title}`}
-              initial={{ opacity: 0 }}
+              initial={animateEntrance ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.15 }}
             >
