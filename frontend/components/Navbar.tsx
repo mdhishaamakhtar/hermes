@@ -10,6 +10,9 @@ export default function Navbar() {
 
   const handleLogout = () => {
     clearStoredAuthToken();
+    // Full page load: drops the SWR cache so the next account on this
+    // browser can't see the previous user's cached data.
+    window.location.assign("/");
   };
 
   return (
@@ -27,14 +30,13 @@ export default function Navbar() {
               <span className="text-sm text-muted tracking-wide select-none">
                 {user.displayName}
               </span>
-              <Link
-                href="/"
-                prefetch
+              <button
+                type="button"
                 onClick={handleLogout}
                 className="label hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 Sign Out
-              </Link>
+              </button>
             </>
           )}
         </div>

@@ -1,5 +1,5 @@
 import ky, { HTTPError, type Options } from "ky";
-import { getStoredAuthToken } from "@/lib/auth-storage";
+import { clearStoredAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -7,7 +7,7 @@ const BASE_URL =
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
-  error: { code: string; message: string } | null;
+  error: { code: string; message: string; status?: number } | null;
 }
 
 export function getAuthToken(): string | null {
@@ -37,9 +37,22 @@ const kyInstance = ky.create({
   },
 });
 
+// An expired/invalid organizer token: clear it and send the user back to
+// login. Skipped for anonymous flows (no stored token) and skipAuth requests
+// like login itself, where a 401 means bad credentials, not a dead session.
+function handleUnauthorized() {
+  if (typeof window === "undefined") return;
+  if (!getStoredAuthToken()) return;
+  clearStoredAuthToken();
+  window.location.assign("/auth/login");
+}
+
 async function requestWrapper<T>(
   requestFn: () => Promise<Response>,
-  is204 = false,
+  {
+    is204 = false,
+    skipAuth = false,
+  }: { is204?: boolean; skipAuth?: boolean } = {},
 ): Promise<ApiResponse<T>> {
   try {
     const response = await requestFn();
@@ -50,11 +63,20 @@ async function requestWrapper<T>(
     return data;
   } catch (error) {
     if (error instanceof HTTPError) {
+      const status = error.response.status;
+      if (status === 401 && !skipAuth) {
+        handleUnauthorized();
+      }
       try {
         const data = (await error.response.json()) as ApiResponse<T>;
+        if (data.error) data.error.status = status;
         return data;
       } catch {
-        // fall through
+        return {
+          success: false,
+          data: null as unknown as T,
+          error: { code: "HTTP_ERROR", message: error.message, status },
+        };
       }
     }
     return {
@@ -89,7 +111,7 @@ export const api = {
           json: body,
           skipAuth: opts?.skipAuth,
         } as RequestOptions),
-      !body,
+      { is204: !body, skipAuth: opts?.skipAuth },
     ),
 
   put: <T>(path: string, body?: unknown) =>
@@ -107,5 +129,7 @@ export const api = {
     ),
 
   delete: <T>(path: string) =>
-    requestWrapper<T>(() => kyInstance.delete(normalizePath(path)), true),
+    requestWrapper<T>(() => kyInstance.delete(normalizePath(path)), {
+      is204: true,
+    }),
 };

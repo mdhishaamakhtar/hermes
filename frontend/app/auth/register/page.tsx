@@ -47,7 +47,9 @@ export default function RegisterPage() {
         }>("/api/auth/login", { email, password }, { skipAuth: true });
         if (loginRes.success) {
           setStoredAuthToken(loginRes.data.token);
-          router.push("/dashboard");
+          // Full page load: resets the SWR cache and the Next.js router
+          // cache so nothing fetched pre-login leaks into the new session.
+          window.location.assign("/dashboard");
         } else {
           router.push("/auth/login");
         }

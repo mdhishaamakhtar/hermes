@@ -2,7 +2,6 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { setStoredAuthToken } from "@/lib/auth-storage";
 import MinimalNav from "@/components/MinimalNav";
@@ -12,8 +11,6 @@ interface LoginState {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
-
   const [state, formAction, isPending] = useActionState<LoginState, FormData>(
     async (_prev, formData) => {
       const email = formData.get("email") as string;
@@ -30,7 +27,9 @@ export default function LoginPage() {
         }>("/api/auth/login", { email, password }, { skipAuth: true });
         if (res.success) {
           setStoredAuthToken(res.data.token);
-          router.push("/dashboard");
+          // Full page load: resets the SWR cache and the Next.js router
+          // cache so nothing fetched pre-login leaks into the new session.
+          window.location.assign("/dashboard");
           return { error: "" };
         }
         return { error: res.error?.message || "Invalid credentials" };

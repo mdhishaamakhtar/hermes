@@ -47,7 +47,7 @@ LOBBY → ACTIVE → ENDED
 - **ENDED:** Leaderboard shown; results available for review.
 
 ### Authentication
-- **Organizers** authenticate with JWT (stored in `localStorage` as `hermes_token`). Token is injected by an Axios request interceptor (`frontend/lib/api.ts`) and validated on STOMP handshake via `StompChannelInterceptor`.
+- **Organizers** authenticate with JWT, stored in `localStorage` as `hermes_token` and mirrored in a same-name cookie (read only by `frontend/proxy.ts` for route protection). Both are written/cleared together via `frontend/lib/auth-storage.ts`. The token is injected by a ky `beforeRequest` hook (`frontend/lib/api.ts`); a 401 on an authenticated request clears the token and hard-redirects to `/auth/login`. Login/logout use full page loads (not client navigation) to reset SWR and router caches. Validated on STOMP handshake via `StompChannelInterceptor`.
 - **Participants** are anonymous. They receive a rejoin token on `POST /api/sessions/join`, stored in `localStorage` as `hermes_rejoin_{sessionId}`.
 
 ### WebSocket Communication (STOMP)
@@ -76,8 +76,10 @@ Frontend WebSocket is managed by `frontend/hooks/useStompClient.ts` with automat
 ### Key Frontend Files
 | File | Purpose |
 |---|---|
-| `lib/api.ts` | Axios wrapper; injects JWT, handles 401 logout |
-| `lib/auth-context.tsx` | React Context for organizer auth state |
+| `lib/api.ts` | ky wrapper; injects JWT, handles 401 logout |
+| `lib/auth-storage.ts` | Reads/writes the auth token (localStorage + cookie) |
+| `lib/fetcher.ts` | SWR fetcher; throws `FetchError` carrying the HTTP status |
+| `components/SWRProvider.tsx` | Global SWR config: fetcher, capped retries (none on 401/403/404) |
 | `hooks/useStompClient.ts` | STOMP client lifecycle and subscription management |
 | `lib/session-constants.ts` | Shared session-related constants |
 | `lib/design-tokens.ts` | Design system colors and UI constants |
