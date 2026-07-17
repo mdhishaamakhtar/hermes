@@ -151,9 +151,9 @@ export default function EventClient({ eventId }: { eventId: string }) {
               ariaLabel={`Open quiz: ${quiz.title}`}
               onDelete={() => setConfirmQuizId(quiz.id)}
               deleteAriaLabel={`Delete quiz: ${quiz.title}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15, delay: index * 0.04 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15 }}
             >
               <div className="flex items-center gap-4">
                 <span className="font-mono text-xs text-muted tabular-nums w-5">

@@ -27,12 +27,12 @@ export function ContentSkeleton() {
 export function EventListSkeleton() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="mb-10 flex items-center justify-between">
+      <div className="mb-6 sm:mb-10 flex items-start justify-between">
         <div>
-          <div className="mb-2 h-3 w-16 bg-surface/50 skeleton" />
-          <div className="h-8 w-24 bg-surface skeleton" />
+          <div className="mb-1 h-4 w-16 bg-surface/50 skeleton" />
+          <div className="h-8 md:h-9 w-24 bg-surface skeleton" />
         </div>
-        <div className="h-9 w-28 bg-surface skeleton" />
+        <div className="mt-1 h-10 w-28 bg-surface skeleton" />
       </div>
       <div className="mb-8 h-px bg-border" />
       <div className="list-stack">
@@ -48,15 +48,15 @@ export function EventListSkeleton() {
 export function EventDetailSkeleton() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="mb-8 h-3 w-20 bg-surface/50 skeleton" />
-      <div className="mb-10">
-        <div className="mb-2 h-3 w-10 bg-surface/50 skeleton" />
-        <div className="mb-2 h-8 w-56 bg-surface skeleton" />
-        <div className="h-3 w-40 bg-surface/50 skeleton" />
+      <div className="mb-2 h-4 w-20 bg-surface/50 skeleton" />
+      <div className="mb-6 sm:mb-10">
+        <div className="mb-1 h-4 w-10 bg-surface/50 skeleton" />
+        <div className="mb-2 h-8 md:h-9 w-56 bg-surface skeleton" />
+        <div className="h-5 w-40 bg-surface/50 skeleton" />
       </div>
       <div className="mb-6 flex items-center justify-between">
-        <div className="h-3 w-14 bg-surface/50 skeleton" />
-        <div className="h-8 w-24 bg-surface skeleton" />
+        <div className="h-4 w-14 bg-surface/50 skeleton" />
+        <div className="h-9 w-24 bg-surface skeleton" />
       </div>
       <div className="mb-4 h-px bg-border" />
       <div className="list-stack">
@@ -269,12 +269,12 @@ function RowSkeleton({ subtitle = false }: { subtitle?: boolean }) {
   return (
     <div className="flex items-center justify-between border border-border bg-surface px-6 py-4">
       <div>
-        <div className="h-4 w-36 bg-border skeleton" />
+        <div className="h-6 w-36 bg-border skeleton" />
         {subtitle ? (
-          <div className="mt-2 h-3 w-24 bg-border/50 skeleton" />
+          <div className="mt-1 h-4 w-24 bg-border/50 skeleton" />
         ) : null}
       </div>
-      <div className="h-4 w-4 bg-border/50 skeleton" />
+      <div className="h-6 w-4 bg-border/50 skeleton" />
     </div>
   );
 }
@@ -283,10 +283,10 @@ function QuizRowSkeleton() {
   return (
     <div className="flex items-center justify-between border border-border bg-surface px-6 py-4">
       <div className="flex items-center gap-4">
-        <div className="h-3 w-5 bg-border/50 skeleton" />
-        <div className="h-4 w-32 bg-border skeleton" />
+        <div className="h-4 w-5 bg-border/50 skeleton" />
+        <div className="h-6 w-32 bg-border skeleton" />
       </div>
-      <div className="h-4 w-4 bg-border/50 skeleton" />
+      <div className="h-6 w-4 bg-border/50 skeleton" />
     </div>
   );
 }

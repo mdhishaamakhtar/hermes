@@ -121,7 +121,7 @@ export default function DashboardClient() {
       ) : (
         <motion.div className="list-stack">
           <AnimatePresence>
-            {(events ?? []).map((event, index) => (
+            {(events ?? []).map((event) => (
               <ResourceRow
                 key={event.id}
                 href={`/events/${event.id}`}
@@ -131,7 +131,7 @@ export default function DashboardClient() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.15, delay: index * 0.04 }}
+                transition={{ duration: 0.15 }}
                 layout
               >
                 <h2 className="text-foreground font-medium group-hover:text-accent transition-colors">

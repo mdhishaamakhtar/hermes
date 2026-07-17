@@ -1,7 +1,4 @@
-"use client";
-
 import { type ReactNode } from "react";
-import { motion } from "framer-motion";
 
 interface PageHeaderProps {
   label: string;
@@ -19,12 +16,7 @@ export default function PageHeader({
   action,
 }: PageHeaderProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="mb-6 sm:mb-10"
-    >
+    <div className="mb-6 sm:mb-10">
       <div className={action ? "flex items-start justify-between gap-4" : ""}>
         <div className="min-w-0">
           <p className="label mb-1">{label}</p>
@@ -38,6 +30,6 @@ export default function PageHeader({
         {action && <div className="shrink-0 pt-1">{action}</div>}
       </div>
       {meta && <div className="mt-3">{meta}</div>}
-    </motion.div>
+    </div>
   );
 }
