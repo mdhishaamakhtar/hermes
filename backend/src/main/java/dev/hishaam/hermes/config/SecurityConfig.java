@@ -84,6 +84,9 @@ public class SecurityConfig {
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
     config.setAllowCredentials(true);
+    // Let browsers cache preflight responses; without this every cross-origin
+    // request from the deployed frontend pays an extra OPTIONS round-trip.
+    config.setMaxAge(3600L);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", config);
     return source;
