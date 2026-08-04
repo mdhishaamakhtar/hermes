@@ -11,10 +11,18 @@ spring:
       password: ""
 
 logging:
-  structured:
-    format:
-      console: ecs
+  level:
+    root: WARN
+    org.springframework.test: INFO
+    org.springframework.boot.test: WARN
+    dev.hishaam.hermes: INFO
 
 app:
   cors:
     allowed-origin: http://localhost:3000
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

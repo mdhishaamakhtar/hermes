@@ -130,6 +130,12 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
         .isEqualTo("Lin");
     assertThat(leaderboard.path("leaderboard").get(0).path("score").asLong()).isEqualTo(10);
 
+    // NOTE: calling disconnect() here races with StompBrokerRelayMessageHandler's
+    // per-client circuit teardown — the relay pre-emptively closes the virtual STOMP session
+    // to RabbitMQ before our DISCONNECT frame can be forwarded, producing "Failed to forward
+    // DISCONNECT" ERROR logs from Spring during teardown. Test assertions are unaffected;
+    // RabbitMQ reaps the abandoned session via the STOMP plugin's connection TTL. Silencing
+    // the logger would mask real broker-connection regressions, so the noise is accepted.
     participantSession.disconnect();
     organiserSession.disconnect();
   }
@@ -152,6 +158,9 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     WebSocketStompClient intruderClient = stompClient();
     CountDownLatch intruderRejected = new CountDownLatch(1);
     StompSession intruderSession = connect(intruderClient, intruder.token(), intruderRejected);
+    // The broker relay closes the underlying WebSocket when a subscription is denied, so a
+    // follow-up disconnect() would throw "session has been closed". Drain the rejected frame
+    // and let the transport close on its own rather than forcing a DISCONNECT.
     intruderSession.subscribe(
         "/topic/session." + sessionId + ".analytics", handler(new LinkedBlockingQueue<>()));
     assertThat(intruderRejected.await(10, TimeUnit.SECONDS))
