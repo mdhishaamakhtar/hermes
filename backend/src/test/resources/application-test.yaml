@@ -11,6 +11,9 @@ spring:
       password: ""
 
 logging:
+  structured:
+    format:
+      console: ecs
   level:
     root: WARN
     org.springframework.test: INFO
