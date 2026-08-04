@@ -16,6 +16,7 @@ logging:
       console: ecs
   level:
     root: WARN
+    org.springframework.test.context: WARN
     org.springframework.test: INFO
     org.springframework.boot.test: WARN
     dev.hishaam.hermes: INFO
