@@ -40,15 +40,22 @@ export default function ResourceRow({
         aria-label={ariaLabel}
         className="absolute inset-0"
       />
-      <div className="relative z-10 pointer-events-none">{children}</div>
-      <div className="relative z-10 flex items-center gap-4 pointer-events-none">
+      <div className="relative z-[var(--z-raised)] pointer-events-none">
+        {children}
+      </div>
+      <div className="relative z-[var(--z-raised)] flex items-center gap-4 pointer-events-none">
         <button
           onClick={(e) => {
             e.preventDefault();
             onDelete();
           }}
           aria-label={deleteAriaLabel}
-          className="pointer-events-auto label text-muted/40 hover:text-danger transition-colors focus-visible:outline-none focus-visible:opacity-100 focus-visible:text-danger focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          // text-muted/75 is the lowest opacity that still clears 4.5:1 on
+          // surface (4.60:1). It reads as quietly as the old /40 did against
+          // the row title, but /40 measured 2.15:1 — illegible for the only
+          // visible affordance of a destructive action. The -my-3 py-3 keeps
+          // the tap target at 40px without changing the row's height.
+          className="pointer-events-auto label -my-3 py-3 text-muted/75 hover:text-danger transition-colors focus-visible:outline-none focus-visible:opacity-100 focus-visible:text-danger focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Delete
         </button>

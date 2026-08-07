@@ -89,7 +89,9 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
             <span className="tabular-nums">
               {sortedQuestions.length} questions
             </span>
-            <span className="text-muted/40">·</span>
+            <span aria-hidden className="text-muted/40">
+              ·
+            </span>
             <span className="tabular-nums">
               {formatParticipantCount(results.participantCount)}
             </span>
@@ -206,7 +208,9 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                     <div className="bg-background/50 border-b border-border p-6 pb-8">
                       <div className="mb-4 flex items-center gap-2">
                         <span className="label text-warning">Passage</span>
-                        <span className="text-muted/40 text-xs">·</span>
+                        <span aria-hidden className="text-muted/40 text-xs">
+                          ·
+                        </span>
                         <span className="text-xs text-muted">
                           {group.questions.length} questions
                         </span>

@@ -50,7 +50,9 @@ export function QuestionCard({
           <p className="label tabular-nums">Q{question.orderIndex}</p>
           {question.timeLimitSeconds > 0 && (
             <>
-              <span className="text-xs text-muted/50">·</span>
+              <span aria-hidden className="text-xs text-muted/50">
+                ·
+              </span>
               <span className="text-xs text-muted tabular-nums">
                 {question.timeLimitSeconds}s
               </span>

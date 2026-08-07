@@ -19,13 +19,17 @@ export function QuestionResultCard({
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <p className="label tabular-nums">Q{question.orderIndex}</p>
-            <span className="text-xs text-muted/40">·</span>
+            <span aria-hidden className="text-xs text-muted/40">
+              ·
+            </span>
             <span className="label text-accent">
               {question.questionType.replace("_", " ")}
             </span>
             {question.passageId != null ? (
               <>
-                <span className="text-xs text-muted/40">·</span>
+                <span aria-hidden className="text-xs text-muted/40">
+                  ·
+                </span>
                 <span className="label text-warning">Passage</span>
               </>
             ) : null}

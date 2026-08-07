@@ -83,7 +83,7 @@ export function HostLiveView({ session }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur relative">
+      <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/95 backdrop-blur relative">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
@@ -113,7 +113,7 @@ export function HostLiveView({ session }: Props) {
             </button>
           </div>
         </div>
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-full z-[var(--z-raised)] mt-2 -translate-x-1/2">
           <ConnectionStatusBadge connected={connected} />
         </div>
       </header>
@@ -126,11 +126,15 @@ export function HostLiveView({ session }: Props) {
           >
             <div className="flex flex-wrap items-center gap-3">
               <span className="label tabular-nums">{progressLabel}</span>
-              <span className="text-xs text-muted/50">·</span>
+              <span aria-hidden className="text-xs text-muted/50">
+                ·
+              </span>
               <span className="label text-accent">{activeModeLabel}</span>
               {passageBannerText ? (
                 <>
-                  <span className="text-xs text-muted/50">·</span>
+                  <span aria-hidden className="text-xs text-muted/50">
+                    ·
+                  </span>
                   <span className="label text-warning">Passage</span>
                 </>
               ) : null}

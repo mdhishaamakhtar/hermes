@@ -116,8 +116,11 @@ export default function EventClient({ eventId }: { eventId: string }) {
           >
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="field-label block mb-2">Title</label>
+                <label htmlFor="quiz-title" className="field-label block mb-2">
+                  Title
+                </label>
                 <input
+                  id="quiz-title"
                   name="quizTitle"
                   value={quizTitle}
                   onChange={(e) => setQuizTitle(e.target.value)}
@@ -127,8 +130,11 @@ export default function EventClient({ eventId }: { eventId: string }) {
                 />
               </div>
               <div className="w-24">
-                <label className="field-label block mb-2">Order</label>
+                <label htmlFor="quiz-order" className="field-label block mb-2">
+                  Order
+                </label>
                 <input
+                  id="quiz-order"
                   type="text"
                   inputMode="numeric"
                   name="orderIndex"

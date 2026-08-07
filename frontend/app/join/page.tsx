@@ -81,7 +81,7 @@ export default function JoinPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-[var(--z-raised)]">
         <div className="page-enter w-full max-w-sm">
           {/* Rejoin banner */}
           {activeSession && (
@@ -109,6 +109,9 @@ export default function JoinPage() {
             <div>
               <input
                 ref={codeRef}
+                id="join-code"
+                aria-label="Session code"
+                aria-describedby="join-code-hint"
                 type="text"
                 value={code}
                 onChange={(e) =>
@@ -127,15 +130,18 @@ export default function JoinPage() {
                 spellCheck={false}
                 autoFocus
               />
-              <p className="label text-center opacity-50 mt-2">
+              <p id="join-code-hint" className="label text-center mt-2">
                 6-character code
               </p>
             </div>
 
             {/* Display name */}
             <div>
-              <label className="field-label block mb-2">Your Name</label>
+              <label htmlFor="join-name" className="field-label block mb-2">
+                Your Name
+              </label>
               <input
+                id="join-name"
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value.slice(0, 30))}

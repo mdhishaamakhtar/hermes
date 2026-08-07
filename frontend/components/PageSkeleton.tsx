@@ -24,7 +24,7 @@ const PAGE = "mx-auto max-w-4xl px-6 py-12";
 function NavShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-50 border-b border-border bg-background/80">
+      <div className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/80">
         <div className="mx-auto h-14 max-w-4xl px-6" />
       </div>
       {children}
@@ -151,7 +151,7 @@ export function ReviewSkeleton() {
 export function ReviewPageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-50 border-b border-border bg-background/80">
+      <div className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/80">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
           <Shimmer h="h-4" w="w-28" />
           <div className="flex items-center gap-6">

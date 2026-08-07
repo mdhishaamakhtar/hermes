@@ -46,7 +46,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
-      <div className="flex-1 flex items-center justify-center px-6 relative z-10">
+      <div className="flex-1 flex items-center justify-center px-6 relative z-[var(--z-raised)]">
         <div className="page-enter w-full max-w-sm">
           <div className="mb-8">
             <p className="label mb-2">Organiser Access</p>
@@ -57,8 +57,11 @@ export default function LoginPage() {
 
           <form action={formAction} className="space-y-4">
             <div>
-              <label className="field-label block mb-2">Email</label>
+              <label htmlFor="login-email" className="field-label block mb-2">
+                Email
+              </label>
               <input
+                id="login-email"
                 type="email"
                 name="email"
                 required
@@ -67,8 +70,14 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="field-label block mb-2">Password</label>
+              <label
+                htmlFor="login-password"
+                className="field-label block mb-2"
+              >
+                Password
+              </label>
               <input
+                id="login-password"
                 type="password"
                 name="password"
                 required

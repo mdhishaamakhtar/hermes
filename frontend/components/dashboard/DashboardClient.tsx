@@ -92,8 +92,11 @@ export default function DashboardClient() {
             className="mb-8 border border-border bg-surface p-6 space-y-4"
           >
             <div>
-              <label className="field-label block mb-2">Title</label>
+              <label htmlFor="event-title" className="field-label block mb-2">
+                Title
+              </label>
               <input
+                id="event-title"
                 name="title"
                 required
                 className="input-field"
@@ -101,8 +104,14 @@ export default function DashboardClient() {
               />
             </div>
             <div>
-              <label className="field-label block mb-2">Description</label>
+              <label
+                htmlFor="event-description"
+                className="field-label block mb-2"
+              >
+                Description
+              </label>
               <textarea
+                id="event-description"
                 name="description"
                 rows={2}
                 className="input-field resize-none"

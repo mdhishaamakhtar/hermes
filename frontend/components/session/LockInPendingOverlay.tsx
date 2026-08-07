@@ -26,7 +26,7 @@ export function LockInPendingOverlay({ tone }: { tone: LockInPendingTone }) {
   const backgroundImage = GRADIENT[tone];
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 z-[var(--z-base)] overflow-hidden">
       <motion.div
         aria-hidden
         className="absolute inset-y-0 left-0 flex w-[200%]"

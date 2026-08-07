@@ -68,7 +68,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
-      <div className="flex-1 flex items-center justify-center px-6 relative z-10">
+      <div className="flex-1 flex items-center justify-center px-6 relative z-[var(--z-raised)]">
         <div className="page-enter w-full max-w-sm">
           <div className="mb-8">
             <p className="label mb-2">New Organiser</p>
@@ -79,8 +79,11 @@ export default function RegisterPage() {
 
           <form action={formAction} className="space-y-4">
             <div>
-              <label className="field-label block mb-2">Display Name</label>
+              <label htmlFor="register-name" className="field-label block mb-2">
+                Display Name
+              </label>
               <input
+                id="register-name"
                 type="text"
                 name="displayName"
                 required
@@ -90,8 +93,14 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="field-label block mb-2">Email</label>
+              <label
+                htmlFor="register-email"
+                className="field-label block mb-2"
+              >
+                Email
+              </label>
               <input
+                id="register-email"
                 type="email"
                 name="email"
                 required
@@ -100,8 +109,14 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="field-label block mb-2">Password</label>
+              <label
+                htmlFor="register-password"
+                className="field-label block mb-2"
+              >
+                Password
+              </label>
               <input
+                id="register-password"
                 type="password"
                 name="password"
                 required

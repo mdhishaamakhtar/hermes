@@ -82,19 +82,25 @@ export function ParticipantQuestionCard({
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <p className="label tabular-nums">Q{question.questionIndex}</p>
-            <span className="text-xs text-muted/40">·</span>
+            <span aria-hidden className="text-xs text-muted/40">
+              ·
+            </span>
             <span className="text-xs text-muted tabular-nums">
               {question.timeLimitSeconds || 0}s
             </span>
             {question.questionType === "MULTI_SELECT" ? (
               <>
-                <span className="text-xs text-muted/40">·</span>
+                <span aria-hidden className="text-xs text-muted/40">
+                  ·
+                </span>
                 <span className="label text-accent">Multi-select</span>
               </>
             ) : null}
             {question.passageId != null ? (
               <>
-                <span className="text-xs text-muted/40">·</span>
+                <span aria-hidden className="text-xs text-muted/40">
+                  ·
+                </span>
                 <span className="label text-warning">Passage</span>
               </>
             ) : null}

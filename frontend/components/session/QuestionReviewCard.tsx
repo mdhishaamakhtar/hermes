@@ -28,13 +28,17 @@ export function QuestionReviewCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-2">
             <p className="label tabular-nums">Q{question.orderIndex}</p>
-            <span className="text-muted/40 text-xs">·</span>
+            <span aria-hidden className="text-muted/40 text-xs">
+              ·
+            </span>
             <span className="text-xs text-muted tabular-nums">
               {question.timeLimitSeconds}s time limit
             </span>
             {question.passageId != null ? (
               <>
-                <span className="text-muted/40 text-xs">·</span>
+                <span aria-hidden className="text-muted/40 text-xs">
+                  ·
+                </span>
                 <span className="label text-warning">Passage</span>
               </>
             ) : null}

@@ -33,7 +33,7 @@ export function ScoringDrawer({
   return (
     <AnimatePresence>
       {open ? (
-        <motion.div {...rise} className="fixed inset-0 z-40">
+        <motion.div {...rise} className="fixed inset-0 z-[var(--z-overlay)]">
           <button
             type="button"
             aria-label="Close scoring editor"

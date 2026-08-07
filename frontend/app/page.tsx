@@ -53,7 +53,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav
         aria-label="Site navigation"
-        className="page-enter relative z-10 px-8 py-6 flex items-center justify-between border-b border-border/60"
+        className="page-enter relative z-[var(--z-raised)] px-8 py-6 flex items-center justify-between border-b border-border/60"
       >
         <Logo size="sm" showWordmark />
         <Link
@@ -66,7 +66,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero — asymmetric, left-aligned */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 max-w-5xl">
+      <div className="relative z-[var(--z-raised)] flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 max-w-5xl">
         <div className="page-enter page-enter-delay-1 mb-8">
           <Logo size="lg" showWordmark={false} />
         </div>
@@ -106,7 +106,7 @@ export default function LandingPage() {
       </div>
 
       {/* Bottom rule */}
-      <div className="page-enter page-enter-delay-5 relative z-10 px-8 py-6 border-t border-border/40">
+      <div className="page-enter page-enter-delay-5 relative z-[var(--z-raised)] px-8 py-6 border-t border-border/40">
         <p className="label opacity-40">
           Real-time · WebSocket · Anonymous Participants
         </p>

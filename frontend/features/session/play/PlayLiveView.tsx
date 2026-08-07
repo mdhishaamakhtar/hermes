@@ -80,7 +80,7 @@ export function PlayLiveView({ session }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur relative">
+      <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/95 backdrop-blur relative">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
@@ -93,7 +93,7 @@ export function PlayLiveView({ session }: Props) {
             />
           </div>
         </div>
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-full z-[var(--z-raised)] mt-2 -translate-x-1/2">
           <ConnectionStatusBadge connected={connected} />
         </div>
       </header>
@@ -107,11 +107,15 @@ export function PlayLiveView({ session }: Props) {
               <span className="label tabular-nums">
                 {currentQuestionsLabel}
               </span>
-              <span className="text-xs text-muted/40">·</span>
+              <span aria-hidden className="text-xs text-muted/40">
+                ·
+              </span>
               <span className="label text-accent">{headerStatus}</span>
               {isPassage ? (
                 <>
-                  <span className="text-xs text-muted/40">·</span>
+                  <span aria-hidden className="text-xs text-muted/40">
+                    ·
+                  </span>
                   <span className="label text-warning">Passage</span>
                 </>
               ) : null}
@@ -177,7 +181,9 @@ export function PlayLiveView({ session }: Props) {
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <p className="label">Passage</p>
-                    <span className="text-xs text-muted/40">·</span>
+                    <span aria-hidden className="text-xs text-muted/40">
+                      ·
+                    </span>
                     <span className="text-xs text-muted tabular-nums">
                       Q{activePassage.questionIndex}
                       {maxQuestionIndex > activePassage.questionIndex
@@ -185,7 +191,9 @@ export function PlayLiveView({ session }: Props) {
                         : ""}{" "}
                       of {activePassage.totalQuestions}
                     </span>
-                    <span className="text-xs text-muted/40">·</span>
+                    <span aria-hidden className="text-xs text-muted/40">
+                      ·
+                    </span>
                     <span className="text-xs text-muted">
                       {activePassage.timerMode === "ENTIRE_PASSAGE"
                         ? "All sub-questions together"
@@ -274,7 +282,9 @@ export function PlayLiveView({ session }: Props) {
                 <span className="tabular-nums">
                   {selectedQuestionCount} ready
                 </span>
-                <span className="text-muted/40">·</span>
+                <span aria-hidden className="text-muted/40">
+                  ·
+                </span>
                 <span className="tabular-nums">
                   {activeQuestions.length} visible
                 </span>
