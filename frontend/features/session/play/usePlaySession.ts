@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
-import { WS_ACK_TIMEOUT_MS } from "@/lib/session-constants";
 import {
   normalizeCounts,
   normalizeIdList,
@@ -33,6 +32,13 @@ import type {
   RejoinResponse,
   ParticipantLeaderboardEntry,
 } from "@/lib/types";
+
+/**
+ * Max wait for a STOMP answer/lock-in ack before falling back to HTTP.
+ * Typical RabbitMQ round-trip is <100ms; 2000ms gives ample headroom for
+ * high-latency clients.
+ */
+const WS_ACK_TIMEOUT_MS = 2000;
 
 export type SessionState = "LOBBY" | "ACTIVE" | "ENDED";
 export type { QuestionLifecycle } from "@/features/session/shared/session-types";

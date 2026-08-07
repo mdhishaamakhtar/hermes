@@ -7,17 +7,24 @@
    purposeful. Every token is named for its meaning, not its value.
 
    Sections:
-     1. Primitive palette     — raw hex values, only referenced by semantic tokens
-     2. Semantic tokens       — colour intent, exposed to Tailwind via @theme
-     3. Motion tokens         — durations, easings (in :root)
-     4. Layer tokens          — z-index semantic scale (in :root)
-     5. Border & shape tokens — radius, border widths (in :root)
-     6. Option colour tokens  — A/B/C/D quiz answer colours (in :root)
-     7. Base styles           — body defaults, font stack
-     8. Utility classes       — @utility definitions
-     9. Component patterns    — live-dot
-    10. Animations            — @keyframes
-    11. Accessibility         — reduced-motion overrides
+     1. Primitive palette  — raw hex values, only referenced by semantic tokens
+     2. Semantic tokens    — colour intent, exposed to Tailwind via @theme
+     3. Motion tokens      — durations, easings (in :root)
+     4. Layer tokens       — z-index semantic scale (in :root)
+     5. Border tokens      — border widths (in :root)
+     6. Base styles        — body defaults, font stack
+     7. Utility classes    — @utility definitions
+     8. Component patterns — live-dot, skeleton
+     9. Animations         — @keyframes
+    10. Accessibility      — reduced-motion overrides
+
+   This file is the source of truth for colours, durations, easings, and
+   z-index. The one deliberate exception is answer-option colours, which live
+   in lib/design-tokens.ts because only TypeScript consumes them (see §5).
+
+   Nothing is defined here "for future flexibility". If it has no consumer,
+   it is deleted — an unused token is a value waiting to disagree with the
+   one that is actually used.
 
    Theming:
      Colour tokens are defined on [data-theme="dark"] (the current default).
@@ -62,12 +69,6 @@
   --palette-red-600: #dc2626;
   --palette-red-500: #ef4444;
   --palette-red-400: #f87171;
-
-  /* Answer option colours (A B C D) */
-  --palette-option-a: #2563eb; /* blue   */
-  --palette-option-b: #7c3aed; /* violet */
-  --palette-option-c: #d97706; /* amber  */
-  --palette-option-d: #e11d48; /* rose   */
 }
 
 /* ── 2. Semantic tokens (Tailwind v4 @theme) ─────────────────────────────── */
@@ -114,12 +115,6 @@
   --color-warning-hover: var(--palette-amber-700);
   --color-danger: var(--palette-red-500);
   --color-danger-hover: var(--palette-red-600);
-
-  /* Answer options — generated as text-option-a etc. */
-  --color-option-a: var(--palette-option-a);
-  --color-option-b: var(--palette-option-b);
-  --color-option-c: var(--palette-option-c);
-  --color-option-d: var(--palette-option-d);
 
   /* Typography */
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
@@ -180,42 +175,25 @@
   --z-tooltip: 600;
 }
 
-/* ── 5. Border & shape tokens ────────────────────────────────────────────── */
+/* ── 5. Border tokens ────────────────────────────────────────────────────── */
 /*
- * Hermes uses sharp corners as a design principle (quiz/terminal aesthetic).
- * Radius tokens exist for completeness and future flexibility.
+ * Hermes uses sharp corners as a design principle (quiz/terminal aesthetic),
+ * so there are deliberately no radius tokens — a radius scale existed here
+ * previously and was referenced by nothing, including other CSS.
  */
 :root {
-  --radius-none: 0;
-  --radius-sm: 0.125rem; /* 2px — very subtle rounding */
-  --radius-md: 0.25rem; /* 4px — component-level rounding */
-
   --border-width-thin: 1px;
   --border-width-emphasis: 2px;
 }
 
-/* ── 6. Answer option colour tokens ─────────────────────────────────────── */
 /*
- * Quiz answer options A–D each have a distinct colour identity used on
- * selection floods, letter badges, and host response charts.
- *
- * These are also available in lib/session-constants.ts for JS/inline use.
- * Prefer CSS variables here; use JS values only when dynamic rgba() is needed.
+ * Answer option colours (A–D) are NOT defined here. Their only consumer is
+ * TypeScript, which needs rgb triplets to build dynamic rgba() values for
+ * Framer Motion — something a CSS variable cannot hand to JS. They live at a
+ * single definition site in lib/design-tokens.ts (OPTION_META).
  */
-:root {
-  --option-a-color: var(--palette-option-a); /* blue   */
-  --option-b-color: var(--palette-option-b); /* violet */
-  --option-c-color: var(--palette-option-c); /* amber  */
-  --option-d-color: var(--palette-option-d); /* rose   */
 
-  /* RGB triplets for rgba() usage in inline styles */
-  --option-a-rgb: 37, 99, 235;
-  --option-b-rgb: 124, 58, 237;
-  --option-c-rgb: 217, 119, 6;
-  --option-d-rgb: 225, 29, 72;
-}
-
-/* ── 7. Base styles ──────────────────────────────────────────────────────── */
+/* ── 6. Base styles ──────────────────────────────────────────────────────── */
 /*
  * Type scale (1.25 modular ratio, rem-based for zoom-safety):
  *
@@ -244,7 +222,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── 8. Utility classes ──────────────────────────────────────────────────── */
+/* ── 7. Utility classes ──────────────────────────────────────────────────── */
 
 /*
  * label
@@ -436,40 +414,6 @@ body {
 }
 
 /*
- * surface-card
- * A bordered, surfaced container for grouped content.
- * Use for: question cards, session rows, form panels.
- * Do NOT nest surface-card inside surface-card.
- */
-@utility surface-card {
-  background-color: var(--color-surface);
-  border: var(--border-width-thin) solid var(--color-border);
-  padding: 1.5rem;
-}
-
-/*
- * interactive-row
- * A clickable list row — hover reveals border highlight.
- * Use for: event list, quiz list, any navigable list item.
- */
-@utility interactive-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
-  background-color: var(--color-surface);
-  border: var(--border-width-thin) solid var(--color-border);
-  cursor: pointer;
-  transition:
-    border-color var(--duration-base) var(--ease-standard),
-    background-color var(--duration-base) var(--ease-standard);
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-}
-
-/*
  * list-stack
  * Shared vertical rhythm for resource lists.
  * Use for: events, quizzes, sessions, and matching loading states.
@@ -480,7 +424,7 @@ body {
   gap: 0.5rem;
 }
 
-/* ── 9. Component patterns ───────────────────────────────────────────────── */
+/* ── 8. Component patterns ───────────────────────────────────────────────── */
 
 /*
  * .live-dot
@@ -519,49 +463,7 @@ body {
   animation: skeleton-shimmer 2s linear infinite;
 }
 
-.loader-orbit {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.loader-ring,
-.loader-core {
-  position: absolute;
-  border-radius: 9999px;
-}
-
-.loader-ring {
-  inset: 0;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.loader-ring::after {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 50%;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: var(--color-accent);
-  transform-origin: 0 calc(50% + 1px);
-  animation: loader-orbit 900ms linear infinite;
-}
-
-.loader-core {
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--color-accent) 70%, white) 0%,
-    var(--color-primary) 55%,
-    transparent 70%
-  );
-}
-
-/* ── 10. Animations ──────────────────────────────────────────────────────── */
+/* ── 9. Animations ───────────────────────────────────────────────────────── */
 
 @keyframes pulse-dot {
   0%,
@@ -572,15 +474,6 @@ body {
   50% {
     opacity: 0.5;
     transform: scale(1.3);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
   }
 }
 
@@ -606,15 +499,6 @@ body {
   }
 }
 
-@keyframes loader-orbit {
-  from {
-    transform: translateX(-50%) rotate(0deg);
-  }
-  to {
-    transform: translateX(-50%) rotate(360deg);
-  }
-}
-
 @keyframes skeleton-shimmer {
   0% {
     transform: translateX(-100%);
@@ -624,7 +508,7 @@ body {
   }
 }
 
-/* ── 11. Accessibility ───────────────────────────────────────────────────── */
+/* ── 10. Accessibility ───────────────────────────────────────────────────── */
 /*
  * Respect prefers-reduced-motion for CSS animations and transitions.
  */

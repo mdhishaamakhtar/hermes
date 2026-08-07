@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { OPTION_META } from "@/lib/session-constants";
+import { OPTION_META } from "@/lib/design-tokens";
 import OptionRow from "@/components/ui/OptionRow";
 import { CardBadge } from "./CardBadge";
 

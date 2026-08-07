@@ -1,4 +1,4 @@
-import { OPTION_META } from "@/lib/session-constants";
+import { OPTION_META } from "@/lib/design-tokens";
 
 export function formatTime(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds));

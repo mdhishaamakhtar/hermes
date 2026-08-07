@@ -61,8 +61,7 @@ desynchronising them again and reintroducing the flicker.
 |---|---|
 | `surface-card` utility | 0 |
 | `interactive-row` utility | 0 |
-| `line-reveal` utility + keyframe | 0 |
-| `.loader-orbit` / `.loader-ring` / `.loader-core` | 0 |
+| `.loader-orbit` / `.loader-ring` / `.loader-core` | 0 real — used only by the dead `Spinner.tsx` |
 | `@keyframes fade-in` | 0 |
 | `--radius-none` / `-sm` / `-md` | 0 (not even within CSS) |
 | `--option-{a..d}-color` | 0 |
@@ -76,6 +75,10 @@ desynchronising them again and reintroducing the flicker.
 `interactive-row` is notable: it is unused *while* `ResourceRow` hand-rolls the same
 visual treatment. `surface-card` ships with a documented rule ("Do NOT nest
 surface-card inside surface-card") that no code could violate.
+
+The `line-reveal` utility and its keyframe are **live** (`app/page.tsx`) and are
+retained. The `loader-*` block is reachable only through `Spinner.tsx`, which nothing
+imports, so both are removed together.
 
 **Option colours have four definition sites; only one is live.** `--palette-option-*`,
 `@theme --color-option-*`, `--option-*-color` + `--option-*-rgb`, and `OPTION_META`
