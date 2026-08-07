@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { duration } from "@/lib/motion";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { eventsApi } from "@/components/events/events-api";
@@ -162,7 +163,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
               deleteAriaLabel={`Delete quiz: ${quiz.title}`}
               initial={animateEntrance ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: duration.base }}
             >
               <div className="flex items-center gap-4">
                 <span className="font-mono text-xs text-muted tabular-nums w-5">

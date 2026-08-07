@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { passagesApi } from "@/components/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
+import { duration } from "@/lib/motion";
 import QuestionCard from "@/components/quizzes/QuestionCard";
 import QuestionDraftEditor from "@/components/quizzes/QuestionDraftEditor";
 import CustomSelect from "@/components/ui/CustomSelect";
@@ -179,8 +180,8 @@ export default function PassageCard({
           key="view"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, transition: { duration: 0.12 } }}
-          transition={{ duration: 0.18 }}
+          exit={{ opacity: 0, transition: { duration: duration.fast } }}
+          transition={{ duration: duration.enter }}
           className="border border-accent/35 bg-surface"
         >
           <div className="border-b border-accent/20 px-5 py-5 md:px-6 md:py-6">
@@ -313,7 +314,7 @@ export default function PassageCard({
           key="edit"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+          exit={{ opacity: 0, y: -8, transition: { duration: duration.fast } }}
           action={savePassageFormAction}
           className="border border-warning/35 bg-surface px-5 py-5 md:px-6 md:py-6"
         >

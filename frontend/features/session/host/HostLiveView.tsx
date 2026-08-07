@@ -12,7 +12,7 @@ import {
   formatCountdownClock,
   formatParticipantCountPhrase,
 } from "@/lib/session-utils";
-import { enterAnimation } from "@/lib/design-tokens";
+import { revealRow, rise, timerTick } from "@/lib/motion";
 import { buildActiveQuestionCard, useHostSession } from "./useHostSession";
 
 interface Props {
@@ -121,7 +121,7 @@ export function HostLiveView({ session }: Props) {
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <motion.section
-            {...enterAnimation}
+            {...rise}
             className="border border-border bg-surface p-6"
           >
             <div className="flex flex-wrap items-center gap-3">
@@ -159,7 +159,7 @@ export function HostLiveView({ session }: Props) {
                       animate={{
                         width: `${Math.max(0, Math.min(100, timerPct))}%`,
                       }}
-                      transition={{ duration: 1, ease: "linear" }}
+                      transition={timerTick}
                       style={{ backgroundColor: timerColour }}
                     />
                   </div>
@@ -231,7 +231,7 @@ export function HostLiveView({ session }: Props) {
 
           {isCodeDisplay ? (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-6"
             >
               {/* Join code — compact inline bar */}
@@ -293,7 +293,7 @@ export function HostLiveView({ session }: Props) {
             <AnimatePresence mode="wait">
               <motion.div
                 key={`${questionLifecycle}-${effectiveDisplayMode}`}
-                {...enterAnimation}
+                {...rise}
               >
                 {passageBannerText ? (
                   <div className="border border-border bg-surface p-6">
@@ -356,7 +356,7 @@ export function HostLiveView({ session }: Props) {
             </AnimatePresence>
           ) : (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-8"
             >
               <p className="label mb-3">Waiting</p>
@@ -391,9 +391,7 @@ export function HostLiveView({ session }: Props) {
                     displayName={entry.displayName}
                     score={entry.score}
                     variant="compact"
-                    initial={{ opacity: 0, x: 12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                    {...revealRow(index)}
                   />
                 ))
               )}

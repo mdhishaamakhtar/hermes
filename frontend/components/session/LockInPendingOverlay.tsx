@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { pendingSweep } from "@/lib/motion";
 
 export type LockInPendingTone = "primary" | "surface";
 
@@ -30,11 +31,7 @@ export function LockInPendingOverlay({ tone }: { tone: LockInPendingTone }) {
         aria-hidden
         className="absolute inset-y-0 left-0 flex w-[200%]"
         animate={{ x: ["-50%", "0%"] }}
-        transition={{
-          duration: 1.35,
-          repeat: Infinity,
-          ease: "linear",
-        }}
+        transition={pendingSweep}
       >
         <div
           className="h-full w-1/2 shrink-0 bg-no-repeat"

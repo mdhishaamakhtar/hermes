@@ -10,6 +10,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { QuestionReviewCard } from "@/components/session/QuestionReviewCard";
 import { formatParticipantCount } from "@/lib/session-utils";
+import { revealRow, rise } from "@/lib/motion";
 import type { SessionResults } from "@/lib/types";
 
 export default function ReviewClient({ sessionId }: { sessionId: string }) {
@@ -120,13 +121,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
 
       <AnimatePresence mode="wait">
         {activeTab === "leaderboard" && (
-          <motion.div
-            key="leaderboard"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.div key="leaderboard" {...rise}>
             {results.leaderboard.length === 0 ? (
               <EmptyState message="No results yet." />
             ) : (
@@ -138,9 +133,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
                     displayName={entry.displayName}
                     score={entry.score}
                     variant="review"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                    {...revealRow(index)}
                   />
                 ))}
               </div>
@@ -149,14 +142,7 @@ export default function ReviewClient({ sessionId }: { sessionId: string }) {
         )}
 
         {activeTab === "questions" && (
-          <motion.div
-            key="questions"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-8"
-          >
+          <motion.div key="questions" {...rise} className="space-y-8">
             {(() => {
               const groups: (
                 | {

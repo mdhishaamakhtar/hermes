@@ -9,7 +9,7 @@ import { QuestionCard } from "@/components/session/QuestionCard";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";
-import { enterAnimation } from "@/lib/design-tokens";
+import { revealRow, rise, stagger } from "@/lib/motion";
 import type { SessionResults } from "@/lib/types";
 import {
   buildResultsQuestionCard,
@@ -63,10 +63,7 @@ export function HostEndedView({ id, session }: Props) {
 
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
-          <motion.div
-            {...enterAnimation}
-            className="border border-border bg-surface p-6"
-          >
+          <motion.div {...rise} className="border border-border bg-surface p-6">
             <p className="label mb-2">Session complete</p>
             <h1 className="text-3xl font-bold text-foreground">Final review</h1>
             <p className="mt-3 max-w-2xl text-sm text-muted">
@@ -137,10 +134,10 @@ export function HostEndedView({ id, session }: Props) {
                     return (
                       <motion.div
                         key={`q-${group.question.id}`}
-                        {...enterAnimation}
+                        {...rise}
                         transition={{
-                          ...enterAnimation.transition,
-                          delay: gIdx * 0.03,
+                          ...rise.transition,
+                          delay: stagger(gIdx),
                         }}
                       >
                         <QuestionCard
@@ -155,10 +152,10 @@ export function HostEndedView({ id, session }: Props) {
                   return (
                     <motion.div
                       key={`p-${group.passageId}`}
-                      {...enterAnimation}
+                      {...rise}
                       transition={{
-                        ...enterAnimation.transition,
-                        delay: gIdx * 0.03,
+                        ...rise.transition,
+                        delay: stagger(gIdx),
                       }}
                       className="border border-border bg-surface overflow-hidden"
                     >
@@ -217,9 +214,7 @@ export function HostEndedView({ id, session }: Props) {
                     displayName={entry.displayName}
                     score={entry.score}
                     variant="review"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                    {...revealRow(index)}
                   />
                 ))
               )}

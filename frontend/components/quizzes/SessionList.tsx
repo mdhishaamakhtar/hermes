@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { fade } from "@/lib/motion";
 import type { SessionItem } from "@/lib/types";
 
 interface Props {
@@ -37,12 +38,10 @@ export default function SessionList({
         )}
       </div>
       <div className="list-stack">
-        {sessions.map((session, index) => (
+        {sessions.map((session) => (
           <motion.div
             key={session.id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, delay: index * 0.04 }}
+            {...fade}
             className="flex items-center justify-between px-6 py-4 bg-surface border border-border"
           >
             <div className="flex items-center gap-4">

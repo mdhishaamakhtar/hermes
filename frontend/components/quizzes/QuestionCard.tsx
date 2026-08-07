@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { questionsApi } from "@/components/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
+import { duration, stagger } from "@/lib/motion";
 import {
   DISPLAY_MODE_OPTIONS,
   displayModeLabel,
@@ -170,8 +171,8 @@ export default function QuestionCard({
           key="view"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, transition: { duration: 0.12 } }}
-          transition={{ duration: 0.18, delay: index * 0.03 }}
+          exit={{ opacity: 0, transition: { duration: duration.fast } }}
+          transition={{ duration: duration.enter, delay: stagger(index) }}
           className={shellClass}
         >
           <div className="mb-4 flex items-start justify-between gap-4">
@@ -262,7 +263,7 @@ export default function QuestionCard({
           key="edit"
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6, transition: { duration: 0.12 } }}
+          exit={{ opacity: 0, y: -6, transition: { duration: duration.fast } }}
           action={saveFormAction}
           className={shellClass}
         >

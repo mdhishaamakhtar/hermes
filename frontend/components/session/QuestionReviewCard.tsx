@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import OptionRow from "@/components/ui/OptionRow";
+import { spring } from "@/lib/motion";
 import type { QuestionResult } from "@/lib/types";
 
 interface Props {
@@ -95,11 +96,7 @@ export function QuestionReviewCard({
                   <motion.div
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: barWidth / 100 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 32,
-                    }}
+                    transition={spring.bar}
                     className="h-full absolute inset-0 origin-left rounded-full"
                     style={{
                       background: option.isCorrect

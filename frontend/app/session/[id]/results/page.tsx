@@ -9,7 +9,7 @@ import Logo from "@/components/Logo";
 import { ResultsPageSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";
 import { QuestionResultCard } from "@/components/session/QuestionResultCard";
-import { enterAnimation } from "@/lib/design-tokens";
+import { rise, stagger } from "@/lib/motion";
 import { getStoredRejoinToken } from "@/lib/session-storage";
 import { sessionsApi } from "@/features/session/session-api";
 import { apiErrorMessage } from "@/lib/api";
@@ -102,7 +102,7 @@ export default function ResultsPage() {
         <BackLink href="/" label="Back to Home" />
 
         <motion.section
-          {...enterAnimation}
+          {...rise}
           className="mt-6 border border-border bg-surface p-6 sm:p-8"
         >
           <div className="flex flex-wrap items-end justify-between gap-6">
@@ -184,10 +184,10 @@ export default function ResultsPage() {
                   return (
                     <motion.div
                       key={group.question.questionId}
-                      {...enterAnimation}
+                      {...rise}
                       transition={{
-                        ...enterAnimation.transition,
-                        delay: gIdx * 0.03,
+                        ...rise.transition,
+                        delay: stagger(gIdx),
                       }}
                     >
                       <QuestionResultCard question={group.question} />
@@ -197,10 +197,10 @@ export default function ResultsPage() {
                 return (
                   <motion.div
                     key={`p-${group.passageId}`}
-                    {...enterAnimation}
+                    {...rise}
                     transition={{
-                      ...enterAnimation.transition,
-                      delay: gIdx * 0.03,
+                      ...rise.transition,
+                      delay: stagger(gIdx),
                     }}
                     className="border border-border bg-surface overflow-hidden"
                   >

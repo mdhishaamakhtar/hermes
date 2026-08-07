@@ -124,26 +124,33 @@
 /* ── 3. Motion tokens ────────────────────────────────────────────────────── */
 /*
  * Transition durations and easing functions.
- * Used in CSS transitions; Framer Motion uses its own values directly.
  *
- * Duration hierarchy:
+ * These are the canonical values. lib/motion.ts mirrors them for Framer
+ * Motion, which needs numbers in JS and cannot read a CSS variable. If a
+ * value changes here, change it there.
+ *
+ * Duration scale — five steps, each perceptibly different from its
+ * neighbours. Roles are expressed by choosing from the scale, not by adding
+ * aliases: a --duration-exit that equals --duration-base is two names for one
+ * number, and they drift the moment someone tunes one of them.
+ *
  *   instant  — immediate feedback, hover border changes
- *   fast     — micro-interactions, button state changes
+ *   fast     — micro-interactions, exits (leaving is quicker than arriving)
  *   base     — standard UI transitions (most common)
+ *   enter    — elements arriving on screen
  *   slow     — page-level entrances, complex state changes
  *
  * Easing:
- *   ease-out — elements entering the screen (start fast, settle gently)
- *   ease-in  — elements leaving the screen (start slow, exit fast)
- *   standard — general-purpose transitions
+ *   ease-out — anything entering (fast start, gentle settle)
+ *   ease-in-out — anything moving between two on-screen states
+ *   standard — general-purpose CSS transitions
  */
 :root {
   --duration-instant: 50ms;
   --duration-fast: 100ms;
   --duration-base: 150ms;
-  --duration-slow: 250ms;
   --duration-enter: 200ms;
-  --duration-exit: 150ms;
+  --duration-slow: 250ms;
 
   --ease-standard: ease;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out: fast settle */
@@ -239,6 +246,19 @@ body {
   color: var(--color-muted);
 }
 
+/*
+ * page-enter
+ * The CSS twin of `rise` in lib/motion.ts — same 8px travel, same duration,
+ * same easing. Not a competing system: pick between them by what the
+ * component is, not by taste.
+ *
+ *   page-enter — server components (the landing page, auth shells). Costs no
+ *                JS and paints before React hydrates.
+ *   rise       — client components already using Framer, and anything that
+ *                needs AnimatePresence to animate on the way out.
+ *
+ * If one changes, change the other.
+ */
 @utility page-enter {
   animation: slide-up var(--duration-enter) var(--ease-out) both;
 }

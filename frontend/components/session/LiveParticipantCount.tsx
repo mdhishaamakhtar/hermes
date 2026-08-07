@@ -1,8 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-
-const easeOutExpo: [number, number, number, number] = [0.22, 1, 0.36, 1];
+import { duration, ease } from "@/lib/motion";
 
 type LiveParticipantCountProps = {
   count: number;
@@ -42,7 +41,7 @@ export function LiveParticipantCount({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2, ease: easeOutExpo }}
+          transition={{ duration: duration.enter, ease: ease.out }}
         >
           {count}
         </motion.span>

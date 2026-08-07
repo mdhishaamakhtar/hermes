@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { OPTION_META } from "@/lib/design-tokens";
+import { spring } from "@/lib/motion";
 import OptionRow from "@/components/ui/OptionRow";
 import { CardBadge } from "./CardBadge";
 
@@ -199,11 +200,7 @@ export function QuestionCard({
                   <motion.div
                     initial={false}
                     animate={{ scaleX: pct / 100 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 240,
-                      damping: 30,
-                    }}
+                    transition={spring.bar}
                     className="h-full origin-left"
                     style={{
                       backgroundColor: option.isCorrect

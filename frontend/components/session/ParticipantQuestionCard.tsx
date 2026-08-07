@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
 import OptionRow from "@/components/ui/OptionRow";
 import { colorRgb } from "@/lib/design-tokens";
+import { spring } from "@/lib/motion";
 import { optionLabel } from "@/lib/session-utils";
 import type { QuestionType } from "@/lib/types";
 
@@ -210,7 +211,7 @@ export function ParticipantQuestionCard({
                 <motion.div
                   className="h-full origin-left"
                   animate={{ scaleX: barWidth / 100 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                  transition={spring.bar}
                   style={{
                     backgroundColor:
                       resolved && isCorrect

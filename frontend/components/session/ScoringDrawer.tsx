@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { enterAnimation } from "@/lib/design-tokens";
+import { rise } from "@/lib/motion";
 import OptionRow from "@/components/ui/OptionRow";
 
 export interface CorrectionDraftOption {
@@ -33,7 +33,7 @@ export function ScoringDrawer({
   return (
     <AnimatePresence>
       {open ? (
-        <motion.div {...enterAnimation} className="fixed inset-0 z-40">
+        <motion.div {...rise} className="fixed inset-0 z-40">
           <button
             type="button"
             aria-label="Close scoring editor"

@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { duration } from "@/lib/motion";
 
 // Rendered in session headers. Silent when the WebSocket is live, visibly
 // amber when reconnecting so users (host and participants alike) know the UI
@@ -15,7 +16,7 @@ export function ConnectionStatusBadge({ connected }: { connected: boolean }) {
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18 }}
+          transition={{ duration: duration.enter }}
           className="inline-flex items-center gap-2 border border-warning/30 bg-warning/8 px-2 py-1 text-[11px] tracking-[0.18em] uppercase text-warning"
           role="status"
           aria-live="polite"

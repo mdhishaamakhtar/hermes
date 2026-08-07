@@ -41,24 +41,4 @@ export const colorRgb = {
   warning: "217,119,6" /* --palette-amber-600 */,
 } as const;
 
-/* ── Motion ───────────────────────────────────────────────────────────────── */
-/*
- * TEMPORARY — relocated to lib/motion.ts in the motion-unification stage,
- * where these numbers will be reconciled with the --duration-* tokens in
- * globals.css (they currently disagree: base is 150ms there, 200ms here).
- *
- * The unused presets (fast, slow, spring, springGentle, springSnappy) have
- * been removed; only what is actually referenced remains.
- */
-export const transitions = {
-  /** Standard UI transitions: panel slides, card entrances */
-  base: { duration: 0.2 },
-} as const;
-
-/** Standard fade+slide entrance (use with Framer Motion) */
-export const enterAnimation = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
-  transition: transitions.base,
-} as const;
+/* Motion lives in lib/motion.ts. */

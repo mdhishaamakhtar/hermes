@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { duration } from "@/lib/motion";
 import useSWR from "swr";
 import { eventsApi } from "@/components/events/events-api";
 import { EventListSkeleton } from "@/components/PageSkeleton";
@@ -86,7 +87,7 @@ export default function DashboardClient() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: duration.base }}
             action={createAction}
             className="mb-8 border border-border bg-surface p-6 space-y-4"
           >
@@ -139,7 +140,7 @@ export default function DashboardClient() {
                 initial={animateEntrance ? { opacity: 0 } : false}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: duration.base }}
                 layout
               >
                 <h2 className="text-foreground font-medium group-hover:text-accent transition-colors">
