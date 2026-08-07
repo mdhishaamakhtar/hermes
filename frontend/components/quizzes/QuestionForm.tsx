@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { motion } from "framer-motion";
-import { quizzesApi } from "@/lib/apiClient";
+import { quizzesApi } from "@/components/quizzes/quiz-api";
+import { apiErrorMessage } from "@/lib/api";
 import {
   createDefaultOptions,
   DISPLAY_MODE_OPTIONS,
@@ -93,32 +94,32 @@ export default function QuestionForm({
     setValidationError(null);
     setCreating(true);
 
-    const res = await quizzesApi.createQuestion(quizId, {
-      text: qText.trim(),
-      questionType,
-      orderIndex: nextOrderIndex,
-      timeLimitSeconds: typeof qTime === "string" ? parseInt(qTime, 10) : qTime,
-      displayModeOverride:
-        displayModeOverride === "INHERIT" ? null : displayModeOverride,
-      options: options.map((option, index) => ({
-        text: option.text.trim(),
-        pointValue:
-          typeof option.pointValue === "string"
-            ? parseInt(option.pointValue, 10) || 0
-            : option.pointValue,
-        orderIndex: index,
-      })),
-    });
-
-    if (res.success) {
-      onAdded(res.data);
+    try {
+      const created = await quizzesApi.createQuestion(quizId, {
+        text: qText.trim(),
+        questionType,
+        orderIndex: nextOrderIndex,
+        timeLimitSeconds:
+          typeof qTime === "string" ? parseInt(qTime, 10) : qTime,
+        displayModeOverride:
+          displayModeOverride === "INHERIT" ? null : displayModeOverride,
+        options: options.map((option, index) => ({
+          text: option.text.trim(),
+          pointValue:
+            typeof option.pointValue === "string"
+              ? parseInt(option.pointValue, 10) || 0
+              : option.pointValue,
+          orderIndex: index,
+        })),
+      });
+      onAdded(created);
       setQText("");
       setQTime(30);
       setQuestionType("SINGLE_SELECT");
       setDisplayModeOverride("INHERIT");
       setOptions(createDefaultOptions("SINGLE_SELECT"));
-    } else {
-      setValidationError(res.error?.message ?? "Failed to add question.");
+    } catch (err) {
+      setValidationError(apiErrorMessage(err, "Failed to add question."));
     }
 
     setCreating(false);

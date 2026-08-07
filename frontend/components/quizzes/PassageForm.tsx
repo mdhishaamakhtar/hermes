@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { motion } from "framer-motion";
-import { passagesApi } from "@/lib/apiClient";
+import { passagesApi } from "@/components/quizzes/quiz-api";
+import { apiErrorMessage } from "@/lib/api";
 import {
   createQuestionDraft,
   PASSAGE_TIMER_MODE_OPTIONS,
@@ -101,46 +102,45 @@ export default function PassageForm({
     setValidationError(null);
     setSaving(true);
 
-    const res = await passagesApi.create(quizId, {
-      text: text.trim(),
-      orderIndex: nextOrderIndex,
-      timerMode,
-      timeLimitSeconds:
-        timerMode === "ENTIRE_PASSAGE"
-          ? typeof timeLimitSeconds === "string"
-            ? parseInt(timeLimitSeconds, 10)
-            : timeLimitSeconds
-          : null,
-      subQuestions: subQuestions.map((draft, index) => ({
-        text: draft.text.trim(),
-        questionType: draft.questionType,
-        orderIndex: index,
+    try {
+      const created = await passagesApi.create(quizId, {
+        text: text.trim(),
+        orderIndex: nextOrderIndex,
+        timerMode,
         timeLimitSeconds:
-          timerMode === "PER_SUB_QUESTION"
-            ? typeof draft.timeLimitSeconds === "string"
-              ? parseInt(draft.timeLimitSeconds, 10)
-              : draft.timeLimitSeconds
-            : undefined,
-        displayModeOverride: draft.displayModeOverride,
-        options: draft.options.map((option, optionIndex) => ({
-          text: option.text.trim(),
-          pointValue:
-            typeof option.pointValue === "string"
-              ? parseInt(option.pointValue, 10) || 0
-              : option.pointValue,
-          orderIndex: optionIndex,
+          timerMode === "ENTIRE_PASSAGE"
+            ? typeof timeLimitSeconds === "string"
+              ? parseInt(timeLimitSeconds, 10)
+              : timeLimitSeconds
+            : null,
+        subQuestions: subQuestions.map((draft, index) => ({
+          text: draft.text.trim(),
+          questionType: draft.questionType,
+          orderIndex: index,
+          timeLimitSeconds:
+            timerMode === "PER_SUB_QUESTION"
+              ? typeof draft.timeLimitSeconds === "string"
+                ? parseInt(draft.timeLimitSeconds, 10)
+                : draft.timeLimitSeconds
+              : undefined,
+          displayModeOverride: draft.displayModeOverride,
+          options: draft.options.map((option, optionIndex) => ({
+            text: option.text.trim(),
+            pointValue:
+              typeof option.pointValue === "string"
+                ? parseInt(option.pointValue, 10) || 0
+                : option.pointValue,
+            orderIndex: optionIndex,
+          })),
         })),
-      })),
-    });
-
-    if (res.success) {
-      onAdded(res.data);
+      });
+      onAdded(created);
       setText("");
       setTimerMode("PER_SUB_QUESTION");
       setTimeLimitSeconds(120);
       setSubQuestions([createQuestionDraft(0)]);
-    } else {
-      setValidationError(res.error?.message ?? "Failed to create passage.");
+    } catch (err) {
+      setValidationError(apiErrorMessage(err, "Failed to create passage."));
     }
 
     setSaving(false);

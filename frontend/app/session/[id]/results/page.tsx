@@ -11,7 +11,8 @@ import BackLink from "@/components/ui/BackLink";
 import { QuestionResultCard } from "@/components/session/QuestionResultCard";
 import { enterAnimation } from "@/lib/design-tokens";
 import { getStoredRejoinToken } from "@/lib/session-storage";
-import { fetchMyResults } from "@/lib/fetcher";
+import { sessionsApi } from "@/features/session/session-api";
+import { apiErrorMessage } from "@/lib/api";
 import type { MyResults } from "@/lib/types";
 
 export default function ResultsPage() {
@@ -26,15 +27,12 @@ export default function ResultsPage() {
     sessionId && rejoinToken
       ? (["my-results", sessionId, rejoinToken] as const)
       : null,
-    ([, sid, token]) => fetchMyResults(sid, token),
+    ([, sid, token]) => sessionsApi.myResults(sid, token),
   );
 
-  const fetchErrorMessage =
-    error instanceof Error
-      ? error.message
-      : error
-        ? "Failed to load results"
-        : "";
+  const fetchErrorMessage = error
+    ? apiErrorMessage(error, "Failed to load results")
+    : "";
 
   const accuracy = useMemo(
     () =>

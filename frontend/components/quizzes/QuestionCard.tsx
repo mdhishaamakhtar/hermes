@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { questionsApi } from "@/lib/apiClient";
+import { questionsApi } from "@/components/quizzes/quiz-api";
+import { apiErrorMessage } from "@/lib/api";
 import {
   DISPLAY_MODE_OPTIONS,
   displayModeLabel,
@@ -123,33 +124,34 @@ export default function QuestionCard({
     setValidationError(null);
     setSaving(true);
 
-    const res = await questionsApi.update(question.id, {
-      text: editText.trim(),
-      questionType: editQuestionType,
-      orderIndex: question.orderIndex,
-      timeLimitSeconds:
-        nested && question.timeLimitSeconds === 0
-          ? 0
-          : typeof editTime === "string"
-            ? parseInt(editTime, 10)
-            : editTime,
-      displayModeOverride:
-        editDisplayModeOverride === "INHERIT" ? null : editDisplayModeOverride,
-      options: editOptions.map((option, index) => ({
-        text: option.text.trim(),
-        pointValue:
-          typeof option.pointValue === "string"
-            ? parseInt(option.pointValue, 10) || 0
-            : option.pointValue,
-        orderIndex: index,
-      })),
-    });
-
-    if (res.success) {
-      onSaved(res.data);
+    try {
+      const saved = await questionsApi.update(question.id, {
+        text: editText.trim(),
+        questionType: editQuestionType,
+        orderIndex: question.orderIndex,
+        timeLimitSeconds:
+          nested && question.timeLimitSeconds === 0
+            ? 0
+            : typeof editTime === "string"
+              ? parseInt(editTime, 10)
+              : editTime,
+        displayModeOverride:
+          editDisplayModeOverride === "INHERIT"
+            ? null
+            : editDisplayModeOverride,
+        options: editOptions.map((option, index) => ({
+          text: option.text.trim(),
+          pointValue:
+            typeof option.pointValue === "string"
+              ? parseInt(option.pointValue, 10) || 0
+              : option.pointValue,
+          orderIndex: index,
+        })),
+      });
+      onSaved(saved);
       setIsEditing(false);
-    } else {
-      setValidationError(res.error?.message ?? "Failed to save question.");
+    } catch (err) {
+      setValidationError(apiErrorMessage(err, "Failed to save question."));
     }
 
     setSaving(false);

@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, HermesError } from "@/lib/api";
 import { setStoredAuthToken } from "@/lib/auth-storage";
 import MinimalNav from "@/components/MinimalNav";
 
@@ -23,7 +23,7 @@ export default function RegisterPage() {
       const password = formData.get("password") as string;
       const displayName = formData.get("displayName") as string;
       try {
-        const regRes = await api.post<{
+        await api.post<{
           id: number;
           email: string;
           displayName: string;
@@ -33,10 +33,17 @@ export default function RegisterPage() {
           { email, password, displayName },
           { skipAuth: true },
         );
-        if (!regRes.success) {
-          return { error: regRes.error?.message || "Registration failed" };
+      } catch (err) {
+        if (err instanceof HermesError && err.isFromServer) {
+          return { error: err.message || "Registration failed" };
         }
-        const loginRes = await api.post<{
+        return { error: "Connection failed" };
+      }
+
+      // The account exists now, so no failure past this point is worth an
+      // error message — the worst case is signing in manually.
+      try {
+        const { token } = await api.post<{
           token: string;
           user: {
             id: number;
@@ -45,18 +52,14 @@ export default function RegisterPage() {
             createdAt: string;
           };
         }>("/api/auth/login", { email, password }, { skipAuth: true });
-        if (loginRes.success) {
-          setStoredAuthToken(loginRes.data.token);
-          // Full page load: resets the SWR cache and the Next.js router
-          // cache so nothing fetched pre-login leaks into the new session.
-          window.location.assign("/dashboard");
-        } else {
-          router.push("/auth/login");
-        }
-        return { error: "" };
+        setStoredAuthToken(token);
+        // Full page load: resets the SWR cache and the Next.js router
+        // cache so nothing fetched pre-login leaks into the new session.
+        window.location.assign("/dashboard");
       } catch {
-        return { error: "Connection failed" };
+        router.push("/auth/login");
       }
+      return { error: "" };
     },
     { error: "" },
   );

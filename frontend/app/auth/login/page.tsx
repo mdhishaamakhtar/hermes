@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, HermesError } from "@/lib/api";
 import { setStoredAuthToken } from "@/lib/auth-storage";
 import MinimalNav from "@/components/MinimalNav";
 
@@ -16,7 +16,7 @@ export default function LoginPage() {
       const email = formData.get("email") as string;
       const password = formData.get("password") as string;
       try {
-        const res = await api.post<{
+        const { token } = await api.post<{
           token: string;
           user: {
             id: number;
@@ -25,15 +25,17 @@ export default function LoginPage() {
             createdAt: string;
           };
         }>("/api/auth/login", { email, password }, { skipAuth: true });
-        if (res.success) {
-          setStoredAuthToken(res.data.token);
-          // Full page load: resets the SWR cache and the Next.js router
-          // cache so nothing fetched pre-login leaks into the new session.
-          window.location.assign("/dashboard");
-          return { error: "" };
+        setStoredAuthToken(token);
+        // Full page load: resets the SWR cache and the Next.js router
+        // cache so nothing fetched pre-login leaks into the new session.
+        window.location.assign("/dashboard");
+        return { error: "" };
+      } catch (err) {
+        // The server refusing the credentials is worth quoting back; a request
+        // that never landed is not — the user needs to know it was the network.
+        if (err instanceof HermesError && err.isFromServer) {
+          return { error: err.message || "Invalid credentials" };
         }
-        return { error: res.error?.message || "Invalid credentials" };
-      } catch {
         return { error: "Connection failed" };
       }
     },

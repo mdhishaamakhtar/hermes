@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { eventsApi } from "@/lib/apiClient";
+import { eventsApi } from "@/components/events/events-api";
 import { EventDetailSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import BackLink from "@/components/ui/BackLink";
@@ -43,18 +43,21 @@ export default function EventClient({ eventId }: { eventId: string }) {
     if (!title.trim()) return null;
     if (isNaN(order) || order < 0) return null;
 
-    const res = await eventsApi.createQuiz(eventId, {
-      title,
-      orderIndex: order,
-    });
-
-    if (res.success && event) {
-      const updated = [...event.quizzes, res.data].toSorted(
-        (a, b) => a.orderIndex - b.orderIndex,
-      );
-      mutate({ ...event, quizzes: updated }, { revalidate: false });
-      setQuizTitle("");
-      setShowForm(false);
+    try {
+      const created = await eventsApi.createQuiz(eventId, {
+        title,
+        orderIndex: order,
+      });
+      if (event) {
+        const updated = [...event.quizzes, created].toSorted(
+          (a, b) => a.orderIndex - b.orderIndex,
+        );
+        mutate({ ...event, quizzes: updated }, { revalidate: false });
+        setQuizTitle("");
+        setShowForm(false);
+      }
+    } catch {
+      // Leave the form open with its values intact so the user can retry.
     }
 
     return null;
@@ -66,12 +69,14 @@ export default function EventClient({ eventId }: { eventId: string }) {
     if (confirmQuizId === null || !event) return;
     const id = confirmQuizId;
     setConfirmQuizId(null);
-    const res = await eventsApi.deleteQuiz(id);
-    if (res.success) {
+    try {
+      await eventsApi.deleteQuiz(id);
       mutate(
         { ...event, quizzes: event.quizzes.filter((q) => q.id !== id) },
         { revalidate: false },
       );
+    } catch {
+      // The quiz stays; the list still reflects the server.
     }
   };
 

@@ -7,8 +7,9 @@ import {
   passagesApi,
   questionsApi,
   quizzesApi,
-  sessionsApi,
-} from "@/lib/apiClient";
+} from "@/components/quizzes/quiz-api";
+import { sessionsApi } from "@/features/session/session-api";
+import { apiErrorMessage } from "@/lib/api";
 import { storeSessionJoinCode } from "@/lib/session-storage";
 import type {
   DisplayMode,
@@ -203,12 +204,13 @@ export function useQuizEditor({
     setConfirmAction(() => async () => {
       if (!quiz) return;
       setConfirmMessage(null);
-      const response = await questionsApi.delete(questionId);
-
-      if (response.success) {
+      try {
+        await questionsApi.delete(questionId);
         mutateQuiz(withQuestionRemoved(quiz, questionId), {
           revalidate: false,
         });
+      } catch {
+        // The question stays; the editor still reflects the server.
       }
     });
   };
@@ -222,9 +224,8 @@ export function useQuizEditor({
     setConfirmAction(() => async () => {
       if (!quiz) return;
       setConfirmMessage(null);
-      const response = await passagesApi.delete(passageId);
-
-      if (response.success) {
+      try {
+        await passagesApi.delete(passageId);
         mutateQuiz(
           {
             ...quiz,
@@ -234,6 +235,8 @@ export function useQuizEditor({
           },
           { revalidate: false },
         );
+      } catch {
+        // The passage stays; the editor still reflects the server.
       }
     });
   };
@@ -244,13 +247,12 @@ export function useQuizEditor({
     setSavingQuizSettings(true);
     setSettingsError(null);
 
-    const response = await quizzesApi.update(quizId, {
-      title: quiz.title,
-      orderIndex: quiz.orderIndex,
-      displayMode: nextDisplayMode,
-    });
-
-    if (response.success) {
+    try {
+      await quizzesApi.update(quizId, {
+        title: quiz.title,
+        orderIndex: quiz.orderIndex,
+        displayMode: nextDisplayMode,
+      });
       mutateQuiz(
         {
           ...quiz,
@@ -258,9 +260,9 @@ export function useQuizEditor({
         },
         { revalidate: false },
       );
-    } else {
+    } catch (err) {
       setSettingsError(
-        response.error?.message ?? "Failed to save quiz display settings.",
+        apiErrorMessage(err, "Failed to save quiz display settings."),
       );
     }
 
@@ -270,17 +272,15 @@ export function useQuizEditor({
   const handleLaunch = async () => {
     setLaunching(true);
     setLaunchError(null);
-    const response = await sessionsApi.create(Number(quizId));
-
-    if (response.success) {
-      storeSessionJoinCode(response.data.id, response.data.joinCode);
+    try {
+      const session = await sessionsApi.create(Number(quizId));
+      storeSessionJoinCode(session.id, session.joinCode);
       router.refresh();
-      router.push(`/session/${response.data.id}/host`);
-      return;
+      router.push(`/session/${session.id}/host`);
+    } catch (err) {
+      setLaunchError(apiErrorMessage(err, "Failed to create session"));
+      setLaunching(false);
     }
-
-    setLaunchError(response.error?.message ?? "Failed to create session");
-    setLaunching(false);
   };
 
   const handleAbandon = (sessionId: number) => {
@@ -292,8 +292,8 @@ export function useQuizEditor({
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
-      const response = await sessionsApi.abandon(sessionId);
-      if (response.success) {
+      try {
+        await sessionsApi.abandon(sessionId);
         mutateSessions(
           sessions.map((session) =>
             session.id === sessionId
@@ -302,6 +302,8 @@ export function useQuizEditor({
           ),
           { revalidate: false },
         );
+      } catch {
+        // The session stays active; the list still reflects the server.
       }
       setAbandoning(false);
     });
@@ -321,7 +323,11 @@ export function useQuizEditor({
     setConfirmAction(() => async () => {
       setConfirmMessage(null);
       setAbandoning(true);
-      await Promise.all(nonEndedIds.map((id) => sessionsApi.abandon(id)));
+      // allSettled, not all: one failed abandon must not skip the state
+      // reset below and strand the UI in its "abandoning" state.
+      await Promise.allSettled(
+        nonEndedIds.map((id) => sessionsApi.abandon(id)),
+      );
       mutateSessions(
         sessions.map((session) =>
           nonEndedIds.includes(session.id)

@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import useSWR from "swr";
-import { eventsApi } from "@/lib/apiClient";
+import { eventsApi } from "@/components/events/events-api";
 import { EventListSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
@@ -28,10 +28,12 @@ export default function DashboardClient() {
   const handleCreate = async (_prev: null, formData: FormData) => {
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
-    const res = await eventsApi.create({ title, description });
-    if (res.success) {
-      mutate([res.data, ...(events ?? [])], { revalidate: false });
+    try {
+      const created = await eventsApi.create({ title, description });
+      mutate([created, ...(events ?? [])], { revalidate: false });
       setShowForm(false);
+    } catch {
+      // Leave the form open with its values intact so the user can retry.
     }
     return null;
   };
@@ -42,12 +44,14 @@ export default function DashboardClient() {
     if (confirmId === null) return;
     const id = confirmId;
     setConfirmId(null);
-    const res = await eventsApi.delete(id);
-    if (res.success) {
+    try {
+      await eventsApi.delete(id);
       mutate(
         (events ?? []).filter((event) => event.id !== id),
         { revalidate: false },
       );
+    } catch {
+      // The row stays; the list still reflects the server.
     }
   };
 

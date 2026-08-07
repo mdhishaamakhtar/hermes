@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, HermesError } from "@/lib/api";
 import MinimalNav from "@/components/MinimalNav";
 import {
   getStoredRejoinToken,
@@ -33,9 +33,7 @@ export default function JoinPage() {
         { skipAuth: true },
       )
       .then((res) => {
-        if (res.success && res.data.status !== "ENDED") {
-          setActiveSession({ sessionId, token });
-        }
+        if (res.status !== "ENDED") setActiveSession({ sessionId, token });
       })
       .catch(() => {});
   }, []);
@@ -53,7 +51,7 @@ export default function JoinPage() {
         return { error: "Enter your display name" };
       }
       try {
-        const res = await api.post<{
+        const { sessionId, rejoinToken } = await api.post<{
           participantId: number;
           rejoinToken: string;
           sessionId: number;
@@ -62,19 +60,17 @@ export default function JoinPage() {
           { joinCode: code.toUpperCase(), displayName: displayName.trim() },
           { skipAuth: true },
         );
-        if (res.success) {
-          const sessionId = res.data.sessionId;
-          const existingToken = getStoredRejoinToken(sessionId);
-          if (existingToken) {
-            router.push(`/session/${sessionId}/play`);
-          } else {
-            storeRejoinToken(sessionId, res.data.rejoinToken);
-            router.push(`/session/${sessionId}/play`);
-          }
-          return { error: "" };
+        // Keep the token already on this device: it identifies an existing
+        // participant row, whereas the fresh one would orphan their answers.
+        if (!getStoredRejoinToken(sessionId)) {
+          storeRejoinToken(sessionId, rejoinToken);
         }
-        return { error: res.error?.message || "Invalid join code" };
-      } catch {
+        router.push(`/session/${sessionId}/play`);
+        return { error: "" };
+      } catch (err) {
+        if (err instanceof HermesError && err.isFromServer) {
+          return { error: err.message || "Invalid join code" };
+        }
         return { error: "Connection failed" };
       }
     },

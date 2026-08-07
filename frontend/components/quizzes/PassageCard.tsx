@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { passagesApi } from "@/lib/apiClient";
+import { passagesApi } from "@/components/quizzes/quiz-api";
+import { apiErrorMessage } from "@/lib/api";
 import QuestionCard from "@/components/quizzes/QuestionCard";
 import QuestionDraftEditor from "@/components/quizzes/QuestionDraftEditor";
 import CustomSelect from "@/components/ui/CustomSelect";
@@ -99,23 +100,22 @@ export default function PassageCard({
     setErrorMessage(null);
     setSaving(true);
 
-    const response = await passagesApi.update(passage.id, {
-      text: editText.trim(),
-      orderIndex: passage.orderIndex,
-      timerMode: editTimerMode,
-      timeLimitSeconds:
-        editTimerMode === "ENTIRE_PASSAGE"
-          ? typeof editTimeLimitSeconds === "string"
-            ? parseInt(editTimeLimitSeconds, 10)
-            : editTimeLimitSeconds
-          : null,
-    });
-
-    if (response.success) {
-      onSaved(response.data);
+    try {
+      const saved = await passagesApi.update(passage.id, {
+        text: editText.trim(),
+        orderIndex: passage.orderIndex,
+        timerMode: editTimerMode,
+        timeLimitSeconds:
+          editTimerMode === "ENTIRE_PASSAGE"
+            ? typeof editTimeLimitSeconds === "string"
+              ? parseInt(editTimeLimitSeconds, 10)
+              : editTimeLimitSeconds
+            : null,
+      });
+      onSaved(saved);
       setIsEditing(false);
-    } else {
-      setErrorMessage(response.error?.message ?? "Failed to save passage.");
+    } catch (err) {
+      setErrorMessage(apiErrorMessage(err, "Failed to save passage."));
     }
 
     setSaving(false);
@@ -134,35 +134,32 @@ export default function PassageCard({
     setErrorMessage(null);
     setCreatingSubQuestion(true);
 
-    const response = await passagesApi.addSubQuestion(passage.id, {
-      text: subQuestionDraft.text.trim(),
-      orderIndex: passage.subQuestions.length,
-      timeLimitSeconds:
-        passage.timerMode === "PER_SUB_QUESTION"
-          ? typeof subQuestionDraft.timeLimitSeconds === "string"
-            ? parseInt(subQuestionDraft.timeLimitSeconds, 10)
-            : subQuestionDraft.timeLimitSeconds
-          : undefined,
-      questionType: subQuestionDraft.questionType,
-      displayModeOverride: subQuestionDraft.displayModeOverride,
-      options: subQuestionDraft.options.map((option, index) => ({
-        text: option.text.trim(),
-        pointValue:
-          typeof option.pointValue === "string"
-            ? parseInt(option.pointValue, 10) || 0
-            : option.pointValue,
-        orderIndex: index,
-      })),
-    });
-
-    if (response.success) {
-      onSubQuestionAdded(passage.id, response.data);
+    try {
+      const created = await passagesApi.addSubQuestion(passage.id, {
+        text: subQuestionDraft.text.trim(),
+        orderIndex: passage.subQuestions.length,
+        timeLimitSeconds:
+          passage.timerMode === "PER_SUB_QUESTION"
+            ? typeof subQuestionDraft.timeLimitSeconds === "string"
+              ? parseInt(subQuestionDraft.timeLimitSeconds, 10)
+              : subQuestionDraft.timeLimitSeconds
+            : undefined,
+        questionType: subQuestionDraft.questionType,
+        displayModeOverride: subQuestionDraft.displayModeOverride,
+        options: subQuestionDraft.options.map((option, index) => ({
+          text: option.text.trim(),
+          pointValue:
+            typeof option.pointValue === "string"
+              ? parseInt(option.pointValue, 10) || 0
+              : option.pointValue,
+          orderIndex: index,
+        })),
+      });
+      onSubQuestionAdded(passage.id, created);
       setShowSubQuestionForm(false);
       setSubQuestionDraft(createQuestionDraft(passage.subQuestions.length + 1));
-    } else {
-      setErrorMessage(
-        response.error?.message ?? "Failed to add passage question.",
-      );
+    } catch (err) {
+      setErrorMessage(apiErrorMessage(err, "Failed to add passage question."));
     }
 
     setCreatingSubQuestion(false);

@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, apiErrorMessage, HermesError } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import {
@@ -800,18 +800,15 @@ export function usePlaySession(sessionId: string) {
         rejoinToken,
         sessionId: Number(sessionId),
       });
-
-      if (!response.success) {
-        if (response.error?.code === "NOT_FOUND") {
-          removeStoredRejoinToken(sessionId);
-        }
+      dispatch({ type: "REJOIN_LOADED", response });
+    } catch (err) {
+      // A refusal from the server is final — settle into the hydrated state.
+      // A request that never landed is not: stay unhydrated so the next
+      // reconnect retries rather than rendering an empty session.
+      if (err instanceof HermesError && err.isFromServer) {
+        if (err.code === "NOT_FOUND") removeStoredRejoinToken(sessionId);
         dispatch({ type: "HYDRATED" });
-        return;
       }
-
-      dispatch({ type: "REJOIN_LOADED", response: response.data });
-    } catch (_e) {
-      // ignore
     }
   }, [sessionId, rejoinToken]);
 
@@ -1090,19 +1087,17 @@ export function usePlaySession(sessionId: string) {
         status: "retrying",
         message: "Realtime save stalled. Retrying.",
       });
-      const response = await api.post<void>(
-        `/api/sessions/${sessionId}/answers`,
-        {
+      try {
+        await api.post<void>(`/api/sessions/${sessionId}/answers`, {
           rejoinToken,
           questionId,
           selectedOptionIds,
-        },
-      );
-      if (!response.success) {
+        });
+      } catch (err) {
         dispatch({
           type: "SYNC_STATUS",
           status: "error",
-          message: response.error?.message ?? "Failed to save answer",
+          message: apiErrorMessage(err, "Failed to save answer"),
         });
         void loadSessionContext();
         return false;
@@ -1121,27 +1116,26 @@ export function usePlaySession(sessionId: string) {
         status: "retrying",
         message: "Realtime lock-in stalled. Retrying.",
       });
-      const response = await api.post<void>(
-        `/api/sessions/${sessionId}/lock-in`,
-        {
+      try {
+        await api.post<void>(`/api/sessions/${sessionId}/lock-in`, {
           rejoinToken,
           questionId,
-        },
-      );
-      if (!response.success) {
-        const err = response.error;
-        if (
-          err?.code === "CONFLICT" &&
-          typeof err.message === "string" &&
-          err.message.toLowerCase().includes("frozen")
-        ) {
+        });
+      } catch (err) {
+        // Already frozen means the server did what we asked, just earlier —
+        // treat it as success rather than alarming the participant.
+        const alreadyFrozen =
+          err instanceof HermesError &&
+          err.code === "CONFLICT" &&
+          err.message.toLowerCase().includes("frozen");
+        if (alreadyFrozen) {
           dispatch({ type: "SYNC_STATUS", status: "idle", message: "" });
           return true;
         }
         dispatch({
           type: "SYNC_STATUS",
           status: "error",
-          message: err?.message ?? "Failed to lock in answer",
+          message: apiErrorMessage(err, "Failed to lock in answer"),
         });
         void loadSessionContext();
         return false;

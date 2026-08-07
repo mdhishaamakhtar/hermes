@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { sessionsApi } from "@/lib/apiClient";
+import { sessionsApi } from "@/features/session/session-api";
+import { apiErrorMessage } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 import { useStompClient } from "@/hooks/useStompClient";
 import {
@@ -18,7 +19,7 @@ import type {
   PassageTimerMode,
   SessionResults,
 } from "@/lib/types";
-import type { SessionLifecycleStatus } from "@/lib/apiClient";
+import type { SessionLifecycleStatus } from "@/features/session/session-api";
 import type {
   QuestionLifecycle,
   TimerStartMsg,
@@ -665,32 +666,37 @@ export function useHostSession(id: string) {
 
   const loadResults = useCallback(async () => {
     if (!id) return;
-    const response = await sessionsApi.results(id);
-    if (response.success) {
-      dispatch({ type: "RESULTS_LOADED", results: response.data });
+    try {
+      const results = await sessionsApi.results(id);
+      dispatch({ type: "RESULTS_LOADED", results });
+    } catch {
+      // Keep whatever results are already on screen.
     }
   }, [id]);
 
   const loadSessionContext = useCallback(async () => {
     if (!id) return;
 
-    const [syncResponse, lobbyResponse, statusResponse] = await Promise.all([
+    // allSettled, not all: each of the three feeds a different slice of state
+    // and any of them may fail on its own. Rejecting the whole batch would
+    // also skip the terminal CONTEXT_LOADED dispatch that clears loading.
+    const [syncResult, lobbyResult, statusResult] = await Promise.allSettled([
       sessionsApi.hostSync(id),
       sessionsApi.lobby(id),
       sessionsApi.sessionStatus(id),
     ]);
 
-    if (syncResponse.success) {
-      dispatch({ type: "SYNC_LOADED", sync: syncResponse.data });
+    if (syncResult.status === "fulfilled") {
+      dispatch({ type: "SYNC_LOADED", sync: syncResult.value });
     }
 
-    if (lobbyResponse.success) {
-      dispatch({ type: "CONTEXT_LOADED", lobby: lobbyResponse.data });
+    if (lobbyResult.status === "fulfilled") {
+      dispatch({ type: "CONTEXT_LOADED", lobby: lobbyResult.value });
     }
 
-    if (statusResponse.success) {
-      dispatch({ type: "CONTEXT_LOADED", status: statusResponse.data });
-      if (statusResponse.data === "ENDED") {
+    if (statusResult.status === "fulfilled") {
+      dispatch({ type: "CONTEXT_LOADED", status: statusResult.value });
+      if (statusResult.value === "ENDED") {
         void loadResults();
       }
     }
@@ -921,46 +927,69 @@ export function useHostSession(id: string) {
     setScoringDraft([]);
   }, []);
 
+  // Every host control clears its loading state in `finally`: a failed call
+  // must never leave the button stuck mid-action during a live session.
   const handleStartSession = useCallback(async () => {
     if (!id) return;
     setLoadingAction("start-session");
-    const response = await sessionsApi.start(id);
-    if (response.success) {
+    try {
+      await sessionsApi.start(id);
       dispatch({ type: "SESSION_STARTED" });
+    } catch {
+      // Session did not start; the lobby controls stay as they were.
+    } finally {
+      setLoadingAction(null);
     }
-    setLoadingAction(null);
   }, [id]);
 
   const handleStartTimer = useCallback(async () => {
     if (!id) return;
     setLoadingAction("start-timer");
-    await sessionsApi.startTimer(id);
-    setLoadingAction(null);
+    try {
+      await sessionsApi.startTimer(id);
+    } catch {
+      // The authoritative timer state arrives over STOMP regardless.
+    } finally {
+      setLoadingAction(null);
+    }
   }, [id]);
 
   const handleEndTimerEarly = useCallback(async () => {
     if (!id) return;
     setLoadingAction("end-timer");
-    await sessionsApi.endTimer(id);
-    setLoadingAction(null);
+    try {
+      await sessionsApi.endTimer(id);
+    } catch {
+      // The authoritative timer state arrives over STOMP regardless.
+    } finally {
+      setLoadingAction(null);
+    }
   }, [id]);
 
   const handleNextQuestion = useCallback(async () => {
     if (!id) return;
     setLoadingAction("next");
-    await sessionsApi.next(id);
-    setLoadingAction(null);
+    try {
+      await sessionsApi.next(id);
+    } catch {
+      // QUESTION_START over STOMP is what actually advances the view.
+    } finally {
+      setLoadingAction(null);
+    }
   }, [id]);
 
   const handleForceEnd = useCallback(async () => {
     if (!id) return;
     setLoadingAction("end-session");
-    const res = await sessionsApi.end(id);
-    if (res.success) {
+    try {
+      await sessionsApi.end(id);
       await loadResults();
       dispatch({ type: "SESSION_END" });
+    } catch {
+      // Session did not end; the host stays on the live view.
+    } finally {
+      setLoadingAction(null);
     }
-    setLoadingAction(null);
   }, [id, loadResults]);
 
   const handleCopyCode = useCallback(() => {
@@ -980,37 +1009,30 @@ export function useHostSession(id: string) {
         optionId: option.optionId,
         pointValue: Number(option.pointValue) || 0,
       }));
-      const response = await sessionsApi.correctScoring(
-        id,
-        scoringQuestionId,
-        payload,
-      );
+      await sessionsApi.correctScoring(id, scoringQuestionId, payload);
 
-      if (response.success) {
-        const nextPoints = Object.fromEntries(
-          payload.map((option) => [option.optionId, option.pointValue]),
-        ) as Record<number, number>;
-        const nextCorrectIds = payload
-          .filter((option) => option.pointValue > 0)
-          .map((option) => option.optionId);
+      const nextPoints = Object.fromEntries(
+        payload.map((option) => [option.optionId, option.pointValue]),
+      ) as Record<number, number>;
+      const nextCorrectIds = payload
+        .filter((option) => option.pointValue > 0)
+        .map((option) => option.optionId);
 
-        dispatch({
-          type: "SCORING_CORRECTED_LOCAL",
-          questionId: scoringQuestionId,
-          optionPoints: nextPoints,
-          correctOptionIds: nextCorrectIds,
-        });
+      dispatch({
+        type: "SCORING_CORRECTED_LOCAL",
+        questionId: scoringQuestionId,
+        optionPoints: nextPoints,
+        correctOptionIds: nextCorrectIds,
+      });
 
-        if (sessionStatus === "ENDED") {
-          await loadResults();
-        }
-        setScoringQuestionId(null);
-        setScoringQuestionTitle("");
-        setScoringDraft([]);
-        return;
+      if (sessionStatus === "ENDED") {
+        await loadResults();
       }
-
-      setScoringError(response.error?.message ?? "Failed to update scoring.");
+      setScoringQuestionId(null);
+      setScoringQuestionTitle("");
+      setScoringDraft([]);
+    } catch (err) {
+      setScoringError(apiErrorMessage(err, "Failed to update scoring."));
     } finally {
       setDrawerSaving(false);
     }
