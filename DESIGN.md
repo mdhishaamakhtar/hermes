@@ -1,6 +1,6 @@
 ---
 name: Hermes
-description: Live polling quiz platform — broadcast energy in a terminal-precise dark room.
+description: Live polling quiz platform with broadcast energy and terminal precision.
 colors:
   midnight-stage: "#0a0a0f"
   booth-charcoal: "#0f1117"
@@ -25,17 +25,15 @@ colors:
 typography:
   display:
     fontFamily: "Geist Sans, system-ui, sans-serif"
-    fontSize: "clamp(2.25rem, 8vw, 5rem)"
+    fontSize: "clamp(2.5rem, 8vw, 5rem)"
     fontWeight: 900
     lineHeight: 1
-    letterSpacing: "normal"
     fontFeature: "tabular-nums"
   headline:
     fontFamily: "Geist Sans, system-ui, sans-serif"
     fontSize: "1.5rem"
     fontWeight: 700
     lineHeight: 1.3
-    letterSpacing: "normal"
   title:
     fontFamily: "Geist Sans, system-ui, sans-serif"
     fontSize: "1.125rem"
@@ -50,8 +48,14 @@ typography:
     fontFamily: "Geist Sans, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 600
-    lineHeight: 1
+    lineHeight: 1rem
     letterSpacing: "0.1em"
+  field-label:
+    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 500
+    lineHeight: 1.25rem
+    letterSpacing: "0.01em"
   mono:
     fontFamily: "Geist Mono, Courier New, monospace"
     fontSize: "1rem"
@@ -59,8 +63,6 @@ typography:
     lineHeight: 1.4
 rounded:
   none: "0"
-  sm: "2px"
-  md: "4px"
 spacing:
   xs: "0.5rem"
   sm: "0.75rem"
@@ -70,13 +72,13 @@ spacing:
 components:
   button-primary:
     backgroundColor: "{colors.broadcast-blue}"
-    textColor: "#ffffff"
+    textColor: "{colors.signal-white}"
     rounded: "{rounded.none}"
     padding: "1rem 2rem"
     typography: "{typography.label}"
   button-primary-hover:
     backgroundColor: "{colors.deep-broadcast-blue}"
-    textColor: "#ffffff"
+    textColor: "{colors.signal-white}"
   button-ghost:
     backgroundColor: "transparent"
     textColor: "{colors.quiet-slate}"
@@ -94,15 +96,21 @@ components:
   input-field-focus:
     backgroundColor: "{colors.booth-charcoal}"
     textColor: "{colors.signal-white}"
-  surface-card:
-    backgroundColor: "{colors.booth-charcoal}"
-    rounded: "{rounded.none}"
-    padding: "1.5rem"
-  interactive-row:
+  resource-row:
     backgroundColor: "{colors.booth-charcoal}"
     textColor: "{colors.signal-white}"
     rounded: "{rounded.none}"
     padding: "1rem 1.5rem"
+  answer-option:
+    backgroundColor: "{colors.midnight-stage}"
+    textColor: "{colors.signal-white}"
+    rounded: "{rounded.none}"
+    padding: "0.75rem"
+  leaderboard-row:
+    backgroundColor: "{colors.booth-charcoal}"
+    textColor: "{colors.signal-white}"
+    rounded: "{rounded.none}"
+    padding: "0.75rem 1rem"
   label-eyebrow:
     textColor: "{colors.quiet-slate}"
     typography: "{typography.label}"
@@ -110,168 +118,165 @@ components:
 
 # Design System: Hermes
 
-## 1. Overview
+## Overview
 
 **Creative North Star: "Stage Lights, Dark Room"**
 
-Hermes is a live broadcast staged in a near-black room. The surround stays flat and silent so the question of the moment — the timer, the answer, the leaderboard delta — can step into the spotlight unchallenged. The atmosphere is theatrical and precise at the same time: a terminal's clarity wearing a broadcaster's stakes. Every element earns its colour because the room behind it doesn't compete.
+Hermes is a live broadcast staged in a near-black room. The surround stays flat and quiet so the question, timer, answer state, or leaderboard delta can take the spotlight. The atmosphere is theatrical and precise at once: terminal clarity carrying broadcaster stakes. Colour is scarce by design, so an active state reads immediately under time pressure.
 
-This system rejects four families by name: the candy-coloured carnival of Kahoot, the rounded-card soft-gradient politeness of generic SaaS dashboards, retro CRT kitsch (scanlines, phosphor bloom, fake noise), and crypto/gaming neon (cyan-on-black, glowing borders, gradient text). The terminal is the *soul* — monospace inputs, uppercase tracked labels, hairline borders — never a costume.
+The implementation is a dark, sharp-edged system built from semantic CSS tokens and a small set of shared utility patterns. The terminal influence appears in uppercase tracked labels, hairline rules, monospace typed content, and deliberate status feedback, not in CRT effects or retro decoration. Surfaces are mostly flat tonal layers, with localized depth where an open dropdown or drawer needs separation.
 
 **Key Characteristics:**
-- Flat near-black canvas (`#0a0a0f`), one step lighter for surfaces (`#0f1117`). No gradients, no blooms, no glassmorphism.
-- Sharp corners as foundational identity. The radius scale exists for completeness; production UI uses `0` almost everywhere.
-- One accent at a time — the spotlight metaphor. Signal-white text, quiet-slate context, broadcast-blue for action, on-air sky for liveness.
-- Geist Sans for everything visible; Geist Mono reserved strictly for typed user input.
-- `tabular-nums` mandatory on every live-updating digit (timers, scores, counts) — the room must not jitter.
-- Motion is choreography, never decoration. Enter animations carry meaning (a new question arrives, an answer locks, the reveal lands).
+- Flat near-black canvas and charcoal surfaces with a compact neutral range.
+- Sharp rectangular controls and 1px borders as the default geometry.
+- Geist Sans for interface text and live numerals; Geist Mono for typed identifiers and scoring fields.
+- Broadcast blue for action, sky blue for liveness, and a protected A/B/C/D option palette.
+- Motion is state communication: fade for content appearing in place, rise for surfaces that genuinely arrive, spring for response bars.
 
-## 2. Colors
+## Colors
 
-A near-black, neutral-tinted dark mode with high-saturation status accents and a four-colour A/B/C/D option palette. The neutrals never tint warm; the accents never run pastel.
+The palette is cool, high-contrast, and intentionally restrained: neutrals carry most of the screen while saturated colors identify action, liveness, answer identity, and status.
 
 ### Primary
-- **Broadcast Blue** (`#2563eb`): The single CTA colour. Worn by primary buttons, focus rings, the "on" state of interactive controls. Saturated enough to read as action from across a room.
-- **Deep Broadcast Blue** (`#1d4ed8`): Hover state for primary. Same hue, two steps deeper — the button presses *into* the dark room rather than lifting off it.
+- **Broadcast Blue** (`colors.broadcast-blue`): Primary actions, focus treatment, selected controls, and the participant's current answer state.
+- **Deep Broadcast Blue** (`colors.deep-broadcast-blue`): Primary action hover state; it presses the control into the stage rather than adding lift.
 
 ### Secondary
-- **On-Air Sky** (`#38bdf8`): Liveness signal. Links, the live-dot, "now happening" accents, hover treatment on ghost buttons. The colour that says *broadcasting*.
-- **Sky Glow** (`#7dd3fc`): Hover variant for sky. Lighter, almost vapor.
+- **On-Air Sky** (`colors.on-air-sky`): Links, live participant counts, selected navigation emphasis, and active broadcast signals.
+- **Sky Glow** (`colors.sky-glow`): The lighter hover companion for sky accents.
 
-### Tertiary — Status
-- **Go Green** (`#22c55e`): Correct answers, confirmations, "reviewed" badges. Never used decoratively.
-- **Amber Edit** (`#d97706`): Edit mode, pending review, passage badges. The "yellow light" state — something is in progress and the operator should pay attention.
-- **Deep Amber Edit** (`#b45309`): Hover for amber.
-- **Alert Red** (`#ef4444`): Errors, incorrect answers, destructive confirms. Reserved for genuine danger.
-- **Deep Alert Red** (`#dc2626`): Hover for danger.
+### Tertiary
+- **Go Green** (`colors.go-green`): Correct answers, successful completion, and positive score states.
+- **Amber Edit** (`colors.amber-edit`): Reconnecting, pending review, passage metadata, and editing attention states.
+- **Alert Red** (`colors.alert-red`): Incorrect answers, errors, and destructive actions.
 
 ### Neutral
-- **Midnight Stage** (`#0a0a0f`): The page canvas. The room.
-- **Booth Charcoal** (`#0f1117`): Cards, panels, inputs. Exactly one tonal step above the canvas — discernible but never floating.
-- **Rule Line** (`#1a1f2e`): Hairline borders, dividers, the timer track. Visible as structure, not as decoration.
-- **Overlay Graphite** (`#252b3b`): Reserved for overlay scrims (modal backdrops, drawer dimming).
-- **Signal White** (`#f8fafc`): Primary readable text and display numerals. Tinted toward cool to sit in the neutral family rather than reading warm.
-- **Quiet Slate** (`#94a3b8`): Secondary text, eyebrow labels, captions, metadata.
-- **Shadow Slate** (`#4b5563`): Disabled state and placeholder text. The "off" register.
+- **Midnight Stage** (`colors.midnight-stage`): Page canvas and inactive answer-option background.
+- **Booth Charcoal** (`colors.booth-charcoal`): Cards, rows, inputs, dropdowns, and session surfaces.
+- **Rule Line** (`colors.rule-line`): Borders, dividers, timer tracks, and structural separation.
+- **Overlay Graphite** (`colors.overlay-graphite`): Available overlay tone; current drawer scrims use a black alpha layer for stronger occlusion.
+- **Signal White** (`colors.signal-white`): Primary text, headings, and display values.
+- **Quiet Slate** (`colors.quiet-slate`): Supporting text, labels, metadata, and inactive controls.
+- **Shadow Slate** (`colors.shadow-slate`): Disabled and lowest-emphasis text.
 
-### Option Palette (A/B/C/D)
-These four are mutually distinct and are reserved exclusively for answer-option identity. They do not appear on chrome.
-- **Option A — Broadcast Blue** (`#2563eb`)
-- **Option B — Violet** (`#7c3aed`)
-- **Option C — Option Amber** (`#d97706`)
-- **Option D — Rose** (`#e11d48`)
+### Option Palette
+- **Option A Blue** (`colors.option-a-blue`): First answer identity.
+- **Option B Violet** (`colors.option-b-violet`): Second answer identity.
+- **Option C Amber** (`colors.option-c-amber`): Third answer identity.
+- **Option D Rose** (`colors.option-d-rose`): Fourth answer identity.
 
 ### Named Rules
+**The Spotlight Rule.** Let one saturated color act at a time. Keep surrounding controls neutral or muted so the active state wins without visual noise.
 
-**The Spotlight Rule.** At any moment, exactly one colour is permitted to *act*. Everything else is neutral, muted, or status. If two saturated colours are competing for attention in the same view, the design is wrong — pick the one that is on-air and quiet the other.
+**The Option Palette Is Sacred.** A/B/C/D colors mean answer choice. Do not reuse them for chrome, navigation, generic icons, or unrelated status.
 
-**The No-Tint-on-White Rule.** There is no white surface in Hermes. Text appears on near-black; primary actions appear on near-black; cards sit on near-black. Any urge to drop a panel onto white means the design has slipped out of the broadcast room.
+## Typography
 
-**The Option Palette Is Sacred.** A/B/C/D colours mean "answer choice." They do not appear in chrome, in marketing surfaces, in icons, or in status messaging. Misusing them dissolves the most important affordance in the product.
+**Display Font:** Geist Sans (with `system-ui, sans-serif`)
+**Body Font:** Geist Sans (with `system-ui, sans-serif`)
+**Label/Mono Font:** Geist Sans for labels; Geist Mono (with `Courier New, monospace`) for typed content only.
 
-## 3. Typography
-
-**Display / UI Font:** Geist Sans (with `system-ui, sans-serif`)
-**Mono Font:** Geist Mono (with `Courier New, monospace`) — typed input only
-
-**Character:** Geist Sans is the entire visible voice — for body, headings, scores, timers, leaderboard digits, and large display numerals. Geist Mono never appears as display text; it is reserved as the typewriter behind form fields and the join-code entry. The pairing reads as broadcast-modern, not corporate-bland — geometric without becoming sterile.
+**Character:** Geist Sans keeps the product broadcast-modern and highly legible. Geist Mono is a functional typewriter register for input, codes, and scoring values, never a decorative display face.
 
 ### Hierarchy
-- **Display** (Geist Sans 900, `clamp(2.25rem, 8vw, 5rem)`, line-height 1): Hero numerals — final scores, the join code on the host screen, the countdown timer. Always `tabular-nums`.
-- **Headline** (Geist Sans 700, 1.5rem / 24px, line-height 1.3): Question text during play, end-of-session leaderboard heading. Max width 65–75ch for long prompts.
-- **Title** (Geist Sans 700, 1.125rem / 18px, line-height 1.4): Stat values, leaderboard scores, secondary headings.
-- **Body** (Geist Sans 400–500, 1rem / 16px, line-height 1.6): All paragraph text. Form inputs render at 16px to prevent iOS Safari auto-zoom.
-- **Label / Eyebrow** (Geist Sans 600, 0.75rem / 12px, letter-spacing 0.1em, UPPERCASE, colour Quiet Slate): Section labels, status chips, metadata captions. This is the *terminal voice* — clipped, tracked, monospace-adjacent in mood without being mono in family.
-- **Field Label** (Geist Sans 500, 0.8125rem / 13px, letter-spacing 0.01em, sentence case): Used only on `<label>` elements above form inputs. Sentence-cased deliberately — uppercase labels above inputs feel hostile.
+- **Display** (900, `clamp(2.5rem, 8vw, 5rem)`, line-height 1): Hero numbers, join codes, timers, and final scores. Use `tabular-nums` whenever the value changes.
+- **Headline** (700, 1.5rem, line-height 1.3): Question prompts and major result headings, generally constrained to a readable measure.
+- **Title** (700, 1.125rem, line-height 1.4): Page titles, stat values, and secondary headings.
+- **Body** (400, 1rem, line-height 1.6): Explanations, descriptions, and default form text. Keep inputs at 16px to avoid mobile browser zoom.
+- **Label** (600, 0.75rem, line-height 1rem, `0.1em` tracking, uppercase): Eyebrows, status labels, metadata, and CTA text.
+- **Field Label** (500, 0.8125rem, line-height 1.25rem, `0.01em` tracking, sentence case): Labels associated with form fields.
 
 ### Named Rules
+**The Tabular Digit Rule.** Timers, scores, ranks, counts, and response totals use `tabular-nums` so live updates do not move the surrounding layout.
 
-**The Tabular Digit Rule.** Every numeric value that updates live — timers, scores, counts, ranks, participant tallies — uses `font-variant-numeric: tabular-nums`. The room must not breathe sideways when a digit ticks.
+**The Mono Stays in the Field Rule.** Geist Mono belongs in inputs, identifiers, codes, and scoring fields. It does not belong in headings, display numerals, or general labels.
 
-**The Mono Stays in the Field Rule.** Geist Mono lives inside form inputs, code badges, and typed identifiers (join codes, emails). It does NOT appear in headings, display numerals, scores, or labels. Geist Mono is not a display face and breaks at large sizes.
+## Layout
 
-**The Uppercase Tracked Voice.** Section labels, status chips, button CTAs, and metadata captions are uppercase with 0.1em letter-spacing. Body and headline text are sentence case. The two registers stay separate — never mix uppercase-tracked with sentence-case in the same atom.
+Hermes uses a responsive utility layout rather than a separate grid framework. Organiser pages typically center content in a `max-w-4xl` column; session and result surfaces expand toward `max-w-7xl` when the stage needs room. Auth and focused lobby content use narrower `max-w-3xl` compositions. Common spacing is built from the Tailwind rhythm, with `gap-2` through `gap-6`, `p-4` through `p-8`, and larger page padding at `sm`, `md`, and `lg` breakpoints.
 
-## 4. Elevation
+Answer options switch to two columns at `sm`. Session stage/sidebar compositions switch at `xl`. Headers, page titles, and editor layouts grow at `md`. Mobile layouts remain single-column, full-width, and touch-oriented; controls use at least the established 40px lifted tap targets where a compact label would otherwise be too small.
 
-**Hermes is flat by doctrine.** There are no `box-shadow` values anywhere in the system. Depth is conveyed by tonal step (Booth Charcoal `#0f1117` sits one step above Midnight Stage `#0a0a0f`) and by hairline borders (Rule Line `#1a1f2e`). The room is a stage, not a diorama — surfaces don't levitate, they're spotlit.
+## Elevation & Depth
 
-Sticky surfaces (the session header) hold themselves above scrolling content via a 95% background opacity backdrop on the same near-black, never via shadow. Modals and drawers dim the room with an Overlay Graphite scrim — again, no shadow on the modal surface itself.
+The default depth model is flat: page, surface, and border tones do most of the work. Most cards and rows use a 1px border rather than a shadow. Two intentional exceptions are present in the implementation: the open `CustomSelect` dropdown uses a layered shadow to clear nearby content, and the `ScoringDrawer` uses a strong shadow while it occupies the edge of the viewport. Sticky headers use translucent background plus backdrop blur.
+
+### Motion Vocabulary
+- **Fade:** Content appearing in its existing place (`duration.base`, 150ms).
+- **Rise:** A new surface such as a drawer, dropdown, or question arriving with an 8px travel (`duration.enter`, 200ms).
+- **Reveal row:** Leaderboard and result rows use an 8px rise with a capped 30ms stagger.
+- **Spring bar:** Response bars use a shared spring (`stiffness: 300`, `damping: 32`).
+- **Pending sweep:** Lock-in feedback loops a 1.35s linear stripe while the request is unresolved.
+- **Reduced motion:** CSS animations and transitions collapse under `prefers-reduced-motion`; key Framer interactions also check reduced-motion where their movement is most consequential.
 
 ### Named Rules
+**The Movement Must Tell the Truth Rule.** Use fade when cached or existing content appears in place. Reserve travel for something that genuinely arrived, such as a drawer, dropdown, or next question.
 
-**The Flat-By-Default Rule.** Surfaces never cast shadows. If a panel feels like it needs depth, the issue is contrast, border, or grouping — solve it there, not with `box-shadow`. Drop shadows are a tell that the design has reverted to SaaS-dashboard reflexes.
+## Shapes
 
-**The Tonal Step Rule.** Exactly three tonal steps exist for surfaces: page (`#0a0a0f`), card (`#0f1117`), inset/border (`#1a1f2e`). Nesting four levels of tonal step is forbidden — if a panel needs to feel "deeper than its container," redesign the hierarchy.
+The system has no radius scale in its live CSS tokens. Controls, rows, cards, inputs, badges, and session panels are sharp rectangles with 1px borders. Circular geometry is reserved for live status dots and progress indicators. Clipping is used for answer bars, skeletons, and pending overlays so motion stays inside the component boundary.
 
-## 5. Components
+## Components
 
-For every component, the character is "pixel-precise, sharp, broadcast-confident." Hairline 1px borders are the standard structural device. Buttons and inputs do not round.
+The component language is pixel-precise, rectangular, and broadcast-confident. Shared components own their loading geometry where possible so placeholders do not shift the final layout.
 
 ### Buttons
-- **Shape:** Sharp corners (`border-radius: 0`). No exceptions for primary, ghost, or destructive variants.
-- **Primary** (`.btn-primary`): Background Broadcast Blue (`#2563eb`), text white, padding `1rem 2rem`, uppercase tracked label typography (0.1em letter-spacing, 0.875rem). Hover slides to Deep Broadcast Blue (`#1d4ed8`) over 150ms. Disabled state drops to 40% opacity.
-- **Ghost** (`.btn-ghost`): Transparent background, 1px Rule Line border, Quiet Slate text. Hover shifts the border toward a 50%-mixed Broadcast Blue and text toward On-Air Sky. Used for secondary actions, cancel flows, "Leave session."
-- **Focus:** `box-shadow: inset 0 0 0 2px {colors.broadcast-blue}`. No outline ring — the inset stroke keeps the broadcast-blue identity inside the rectangle.
-- **Lock-In Pending** (`.btn-lock-in-pending`): The button maintains full opacity (no fade-to-disabled) and switches to `cursor: wait`. A Framer overlay animates inside the button while the network round-trip resolves. This is the system's signature interaction — the act of locking in must feel suspended, not greyed.
+- **Primary:** Blue fill, signal-white uppercase tracked text, `1rem 2rem` padding, rectangular shape. Hover uses the deeper blue token; disabled state lowers opacity.
+- **Ghost / secondary:** Transparent surface, 1px rule border, muted text, and the same uppercase tracked register. Hover moves the border toward primary and the text toward sky.
+- **Focus:** Inset primary stroke or a primary focus ring, depending on the component pattern. Keep focus visible without adding a rounded halo.
+- **Lock-in pending:** Preserve full opacity, use a wait cursor, change the label to indicate progress, and animate the contained sweep. This is a functional network state, not a generic disabled state.
 
 ### Chips / Badges
-- **Style:** 1px Rule Line border, no fill, `0.5rem 0.75rem` padding, label typography (uppercase tracked).
-- **Toned variants:** A status chip can adopt a single tone via `tone="success" | "warning" | "accent" | "danger"`, which colours the text and border (never the fill). Filled chips are forbidden — they fight the spotlight rule.
+- **Style:** Compact uppercase tracked text with a 1px tone-colored border. Current status badges also use a low-alpha tone fill (`bg-success/8`, `bg-warning/8`, `bg-primary/8`, or `bg-danger/8`) to distinguish live states at a glance.
+- **States:** Muted, success, warning, accent, and danger. Reconnecting adds a pulsing status dot and polite live-region status.
 
-### Cards / Containers (`surface-card`)
-- **Corner Style:** Sharp (`border-radius: 0`).
-- **Background:** Booth Charcoal (`#0f1117`) — exactly one tonal step above the page.
-- **Border:** 1px Rule Line (`#1a1f2e`) on all four sides. The border *is* the affordance.
-- **Internal Padding:** `1.5rem` (`p-6`) default. Dense list rows step down to `1rem 1.5rem`.
-- **Nesting:** Forbidden. Never place a `surface-card` inside another `surface-card`. If grouping is needed inside a card, use hairline dividers (`border-t border-border/50`) or background tonal step to Midnight Stage for inset panels.
+### Cards / Containers
+- **Shape:** Rectangular, generally `border border-border bg-surface`.
+- **Padding:** Primary cards use `p-5` to `p-6`; dense resource rows use `px-6 py-4`.
+- **Loading:** Page headers, resource rows, and leaderboard rows expose matching skeleton twins. The `Shimmer` primitive replaces content while retaining geometry.
 
-### Inputs / Fields (`input-field`)
-- **Style:** Background Booth Charcoal, 1px Rule Line border, sharp corners, padding `0.75rem 1rem`. Font size 16px (prevents iOS Safari auto-zoom). Placeholder text uses Quiet Slate at 30% opacity.
-- **Focus:** Border shifts to Broadcast Blue with an *inset* 1px box-shadow of the same colour — a doubled stroke that reads as "selected, broadcast-blue." No glow, no outer ring.
-- **Disabled:** 50% opacity, `cursor: not-allowed`.
-- **Typed content:** Inputs accept Geist Mono via the `font-mono` class where the content is identifier-like (join codes, code displays).
+### Inputs / Fields
+- **Style:** Full-width surface background, 1px border, `0.75rem 1rem` padding, 16px body text, and no radius.
+- **Focus:** Border changes to primary with an inset primary stroke. Disabled fields reduce opacity and block interaction.
+- **Typed content:** Apply Geist Mono to join codes, identifiers, and scoring inputs; keep normal prose in Geist Sans.
 
-### Navigation (the live-session header)
-- **Style:** Sticky, full-width, 1px bottom border Rule Line, 95%-opacity Midnight Stage background with `backdrop-blur`. Logo left, status chips + participant count + join-code button right.
-- **Typography:** Logo at headline weight, labels uppercase tracked, counts `tabular-nums`.
-- **Active states:** A live connection status badge dangles centred below the header — visible but pointer-events-none, dimensioned so it never overlaps interactive controls.
+### Navigation
+- **Style:** Sticky full-width bar with a bottom rule, translucent background, backdrop blur, and a centered max-width content row. Logo and wordmark sit left; account actions or session state sit right.
+- **Typography:** Wordmark is black-weight, uppercase, and widely tracked. Account actions use the label register; live counts use tabular numerals.
+- **Mobile:** Content compresses within the same single-row structure; action hit areas are lifted with vertical padding rather than changing the visual baseline.
 
-### Leaderboard Row (signature component)
-- **Style:** Single-line list-stack, rank + display name + score, score `tabular-nums` and right-aligned.
-- **Variants:** `compact` (host sidebar, no avatar), `review` (participant-facing, supports an `isMe` flag that adds a Broadcast-Blue left highlight and bumps the score weight).
-- **Motion:** Rows fade-in with a 40ms stagger when leaderboards rebuild. Reordering uses `transitions.spring` (stiffness 200, damping 25).
+### Resource Row
+- **Style:** Motion-capable rectangular surface with a full-row link target, title content on the left, and a destructive delete action plus directional cue on the right.
+- **State:** Hover raises border contrast and softens the surface; delete remains a separately clickable target above the link layer.
+- **Loading:** Skeleton shares the same shell constants as the real row.
 
-### Live Dot (signature primitive)
-- **Pattern:** A `0.5rem` filled circle (typically Go Green or On-Air Sky) animated via `pulse-dot` (1.5s ease-in-out infinite). Pair with a colour utility class on the dot itself.
-- **Use:** Connection status, "live" indicators, "now broadcasting" affordances. Reserved for genuinely-active state; static dots are forbidden — if it's not pulsing, it's not a live dot.
+### Answer Option
+- **Style:** Responsive two-column set of bordered option controls. Each option gets one protected A/B/C/D identity color, a letter marker, readable option text, and an optional response bar.
+- **State:** Selected, correct, missed, and incorrect-selected states use tone-aware borders and low-alpha fills. Response bars animate from the origin with the shared spring.
 
-### Loader Orbit
-- **Pattern:** A 1px Rule Line ring with an On-Air Sky satellite dot orbiting at 900ms linear. Pair with a soft radial-gradient core blended Accent → Primary → transparent.
-- **Use:** Skeleton page loaders and any indeterminate state longer than 200ms. Avoid spinners that look like generic loaders — the orbit is the signature.
+### Leaderboard Row
+- **Style:** Single-line rank, display name, and right-aligned score with `tabular-nums`. `compact`, `default`, and `review` variants change padding and type scale while retaining the same geometry.
+- **State:** The current participant gets a primary border and subtle primary wash. Revealing lists use the shared staggered rise.
 
-## 6. Do's and Don'ts
+### Live Participant Count
+- **Style:** Accent-colored black-weight number paired with an uppercase tracked caption. Inline mode suits headers; stacked mode suits lobbies.
+- **State:** Count changes animate vertically through an accessible live region, with reduced-motion fallback to a static number.
+
+## Do's and Don'ts
 
 ### Do:
-- **Do** keep page backgrounds at Midnight Stage (`#0a0a0f`) — flat, no gradient, no vignette. The room is the room.
-- **Do** use `tabular-nums` on every live-updating digit. Timer, score, rank, count, participant total, points awarded.
-- **Do** reserve A/B/C/D option colours (`#2563eb`, `#7c3aed`, `#d97706`, `#e11d48`) for answer choices and nothing else.
-- **Do** apply one accent at a time per view (the Spotlight Rule). If two saturated colours are competing, redesign.
-- **Do** use hairline 1px Rule Line borders as the default structural device.
-- **Do** preserve the `btn-lock-in-pending` interaction — full opacity, `cursor: wait`, Framer overlay inside the button. It's the most important micro-state in the product.
-- **Do** use Framer's `enterAnimation` (opacity + 8px slide-up over 200ms) for new content arriving on screen.
-- **Do** keep Geist Mono inside form fields and code identifiers only.
-- **Do** respect `prefers-reduced-motion` — the global CSS rule is in place; don't bypass it with `!important` in component code.
+- **Do** keep page backgrounds in the Midnight Stage family and use semantic tokens instead of raw component colors.
+- **Do** reserve A/B/C/D colors for answer options.
+- **Do** use hairline rule borders as the default structural device.
+- **Do** apply `tabular-nums` to values that update live.
+- **Do** use Geist Mono only for typed identifiers, form content, and scoring inputs.
+- **Do** keep loading twins geometrically coupled to their rendered components.
+- **Do** use motion to explain arrival, change, locking, or reveal, and honor reduced-motion preferences.
 
 ### Don't:
-- **Don't** look like Kahoot. No bright primaries on white, no confetti, no cartoon shapes. Hermes is staged, not slapstick.
-- **Don't** look like a generic SaaS dashboard. No rounded cards (radius stays `0`), no soft gradient hero panels, no gray-on-color body text. Sharp corners, near-black canvas, signal-white text.
-- **Don't** drift into retro CRT kitsch. No scanlines, phosphor bloom, fake noise, or vintage-monitor curvature. The terminal is the *soul* — monospace inputs, uppercase tracked labels — not a costume.
-- **Don't** chase crypto / gaming neon. No cyan-on-black glow, no rainbow gradient text, no neon stroke effects. Saturated accents on flat dark, never light-leaks or bloom.
-- **Don't** use `box-shadow` on surfaces. Depth comes from the three tonal steps and from hairline borders. Drop shadows are a SaaS reflex.
-- **Don't** use gradient text. `background-clip: text` with a gradient fill is forbidden. Emphasis uses weight and size.
-- **Don't** nest a `surface-card` inside a `surface-card`. Re-architect the hierarchy.
-- **Don't** use Geist Mono for display numerals. It was not designed as a display face and breaks at large sizes — Geist Sans 900 with `tabular-nums` is the correct display digit.
-- **Don't** use light mode. Hermes is dark mode only by product doctrine; the token system supports a future light theme behind `[data-theme]` but no surface should be authored for light right now.
-- **Don't** introduce raw hex values in components. All colour goes through semantic tokens (`var(--color-*)` in CSS, `colors.*` in `lib/design-tokens.ts`).
-- **Don't** animate for decoration. Every motion must communicate a state change. If it could be removed without the user losing information, remove it.
+- **Don't** introduce light surfaces, rounded SaaS cards, confetti, CRT scanlines, fake noise, or gradient text.
+- **Don't** reuse the answer palette for navigation, chrome, or unrelated status.
+- **Don't** use shadows as the default card treatment; reserve them for localized overlay separation like the dropdown and scoring drawer.
+- **Don't** use Geist Mono for display numerals or headings.
+- **Don't** animate decoration that does not communicate a state change.
+- **Don't** hand-copy skeleton geometry when the source component can expose its layout shell.
