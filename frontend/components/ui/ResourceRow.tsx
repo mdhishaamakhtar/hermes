@@ -32,7 +32,16 @@ export default function ResourceRow({
   return (
     <motion.div
       {...motionProps}
-      className={`group relative ${ROW_SHELL} hover:border-primary/40 hover:bg-surface/80 transition-all`}
+      // transition-colors, never transition-all. The hover styles below only
+      // need border-color and background-color, but `all` also covers the
+      // opacity and transform this element is animated on by Framer. Framer
+      // ends a WAAPI animation by writing the final value to inline style and
+      // then cancelling the animation (motion-dom NativeAnimation.onfinish);
+      // where an engine does not count the running animation as the
+      // transition's before-change style, that write starts a second 150ms
+      // fade after the first one finished — the cold-load card flicker seen
+      // in Safari but not Chrome.
+      className={`group relative ${ROW_SHELL} hover:border-primary/40 hover:bg-surface/80 transition-colors`}
     >
       <Link
         href={href}
