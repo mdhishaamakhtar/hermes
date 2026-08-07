@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, HermesError } from "@/lib/api";
 import { setStoredAuthToken } from "@/lib/auth-storage";
 import MinimalNav from "@/components/MinimalNav";
 
@@ -23,7 +23,7 @@ export default function RegisterPage() {
       const password = formData.get("password") as string;
       const displayName = formData.get("displayName") as string;
       try {
-        const regRes = await api.post<{
+        await api.post<{
           id: number;
           email: string;
           displayName: string;
@@ -33,10 +33,17 @@ export default function RegisterPage() {
           { email, password, displayName },
           { skipAuth: true },
         );
-        if (!regRes.success) {
-          return { error: regRes.error?.message || "Registration failed" };
+      } catch (err) {
+        if (err instanceof HermesError && err.isFromServer) {
+          return { error: err.message || "Registration failed" };
         }
-        const loginRes = await api.post<{
+        return { error: "Connection failed" };
+      }
+
+      // The account exists now, so no failure past this point is worth an
+      // error message — the worst case is signing in manually.
+      try {
+        const { token } = await api.post<{
           token: string;
           user: {
             id: number;
@@ -45,18 +52,14 @@ export default function RegisterPage() {
             createdAt: string;
           };
         }>("/api/auth/login", { email, password }, { skipAuth: true });
-        if (loginRes.success) {
-          setStoredAuthToken(loginRes.data.token);
-          // Full page load: resets the SWR cache and the Next.js router
-          // cache so nothing fetched pre-login leaks into the new session.
-          window.location.assign("/dashboard");
-        } else {
-          router.push("/auth/login");
-        }
-        return { error: "" };
+        setStoredAuthToken(token);
+        // Full page load: resets the SWR cache and the Next.js router
+        // cache so nothing fetched pre-login leaks into the new session.
+        window.location.assign("/dashboard");
       } catch {
-        return { error: "Connection failed" };
+        router.push("/auth/login");
       }
+      return { error: "" };
     },
     { error: "" },
   );
@@ -65,7 +68,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
-      <div className="flex-1 flex items-center justify-center px-6 relative z-10">
+      <div className="flex-1 flex items-center justify-center px-6 relative z-[var(--z-raised)]">
         <div className="page-enter w-full max-w-sm">
           <div className="mb-8">
             <p className="label mb-2">New Organiser</p>
@@ -76,8 +79,11 @@ export default function RegisterPage() {
 
           <form action={formAction} className="space-y-4">
             <div>
-              <label className="field-label block mb-2">Display Name</label>
+              <label htmlFor="register-name" className="field-label block mb-2">
+                Display Name
+              </label>
               <input
+                id="register-name"
                 type="text"
                 name="displayName"
                 required
@@ -87,8 +93,14 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="field-label block mb-2">Email</label>
+              <label
+                htmlFor="register-email"
+                className="field-label block mb-2"
+              >
+                Email
+              </label>
               <input
+                id="register-email"
                 type="email"
                 name="email"
                 required
@@ -97,8 +109,14 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="field-label block mb-2">Password</label>
+              <label
+                htmlFor="register-password"
+                className="field-label block mb-2"
+              >
+                Password
+              </label>
               <input
+                id="register-password"
                 type="password"
                 name="password"
                 required

@@ -1,11 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CardBadge } from "@/components/session/CardBadge";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import { CardBadge } from "@/features/session/components/CardBadge";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
 import Logo from "@/components/Logo";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";
-import { enterAnimation } from "@/lib/design-tokens";
+import { rise } from "@/lib/motion";
 import { useHostSession } from "@/features/session/host/useHostSession";
 
 interface Props {
@@ -40,10 +40,7 @@ export function HostLobbyView({ session }: Props) {
       </header>
 
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col items-center justify-center px-4 sm:px-6 py-10">
-        <motion.div
-          {...enterAnimation}
-          className="flex w-full flex-col items-center"
-        >
+        <motion.div {...rise} className="flex w-full flex-col items-center">
           <p className="label mb-8">Share this code with participants</p>
 
           <div className="w-full max-w-lg bg-surface px-6 py-8 sm:px-10 sm:py-10">

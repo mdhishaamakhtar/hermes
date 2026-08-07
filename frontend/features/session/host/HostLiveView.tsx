@@ -3,16 +3,16 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import { CardBadge } from "@/components/session/CardBadge";
-import { ConnectionStatusBadge } from "@/components/session/ConnectionStatusBadge";
-import { QuestionCard } from "@/components/session/QuestionCard";
-import { ScoringDrawer } from "@/components/session/ScoringDrawer";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import { CardBadge } from "@/features/session/components/CardBadge";
+import { ConnectionStatusBadge } from "@/features/session/components/ConnectionStatusBadge";
+import { QuestionCard } from "@/features/session/components/QuestionCard";
+import { ScoringDrawer } from "@/features/session/components/ScoringDrawer";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
 import {
   formatCountdownClock,
   formatParticipantCountPhrase,
 } from "@/lib/session-utils";
-import { enterAnimation } from "@/lib/design-tokens";
+import { revealRow, rise, timerTick } from "@/lib/motion";
 import { buildActiveQuestionCard, useHostSession } from "./useHostSession";
 
 interface Props {
@@ -83,7 +83,7 @@ export function HostLiveView({ session }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur relative">
+      <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/95 backdrop-blur relative">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
@@ -113,7 +113,7 @@ export function HostLiveView({ session }: Props) {
             </button>
           </div>
         </div>
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-full z-[var(--z-raised)] mt-2 -translate-x-1/2">
           <ConnectionStatusBadge connected={connected} />
         </div>
       </header>
@@ -121,16 +121,20 @@ export function HostLiveView({ session }: Props) {
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <motion.section
-            {...enterAnimation}
+            {...rise}
             className="border border-border bg-surface p-6"
           >
             <div className="flex flex-wrap items-center gap-3">
               <span className="label tabular-nums">{progressLabel}</span>
-              <span className="text-xs text-muted/50">·</span>
+              <span aria-hidden className="text-xs text-muted/50">
+                ·
+              </span>
               <span className="label text-accent">{activeModeLabel}</span>
               {passageBannerText ? (
                 <>
-                  <span className="text-xs text-muted/50">·</span>
+                  <span aria-hidden className="text-xs text-muted/50">
+                    ·
+                  </span>
                   <span className="label text-warning">Passage</span>
                 </>
               ) : null}
@@ -159,7 +163,7 @@ export function HostLiveView({ session }: Props) {
                       animate={{
                         width: `${Math.max(0, Math.min(100, timerPct))}%`,
                       }}
-                      transition={{ duration: 1, ease: "linear" }}
+                      transition={timerTick}
                       style={{ backgroundColor: timerColour }}
                     />
                   </div>
@@ -231,7 +235,7 @@ export function HostLiveView({ session }: Props) {
 
           {isCodeDisplay ? (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-6"
             >
               {/* Join code — compact inline bar */}
@@ -293,7 +297,7 @@ export function HostLiveView({ session }: Props) {
             <AnimatePresence mode="wait">
               <motion.div
                 key={`${questionLifecycle}-${effectiveDisplayMode}`}
-                {...enterAnimation}
+                {...rise}
               >
                 {passageBannerText ? (
                   <div className="border border-border bg-surface p-6">
@@ -356,7 +360,7 @@ export function HostLiveView({ session }: Props) {
             </AnimatePresence>
           ) : (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-8"
             >
               <p className="label mb-3">Waiting</p>
@@ -391,9 +395,7 @@ export function HostLiveView({ session }: Props) {
                     displayName={entry.displayName}
                     score={entry.score}
                     variant="compact"
-                    initial={{ opacity: 0, x: 12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                    {...revealRow(index)}
                   />
                 ))
               )}

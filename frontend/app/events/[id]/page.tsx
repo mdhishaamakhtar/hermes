@@ -1,4 +1,4 @@
-import EventClient from "@/components/events/EventClient";
+import EventClient from "@/features/events/EventClient";
 
 export default async function EventPage({
   params,

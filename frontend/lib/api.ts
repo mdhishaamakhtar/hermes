@@ -4,10 +4,55 @@ import { clearStoredAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
-export interface ApiResponse<T> {
+/**
+ * The envelope the backend wraps every response in. Internal to this module —
+ * callers never see it, because `request` unwraps success and throws failure.
+ */
+interface ApiEnvelope<T> {
   success: boolean;
   data: T;
-  error: { code: string; message: string; status?: number } | null;
+  error: { code: string; message: string } | null;
+}
+
+/**
+ * Every API failure, whether the server rejected the request or it never
+ * arrived.
+ *
+ * `status` is the discriminator that matters to callers:
+ *   - set        → the server responded and refused (bad credentials, 404, …).
+ *                  `message` is the server's own, and is safe to show a user.
+ *   - undefined  → the request never completed (offline, DNS, CORS, timeout).
+ *                  `message` is a fetch-level string; show your own copy.
+ */
+export class HermesError extends Error {
+  readonly status?: number;
+  readonly code: string;
+
+  constructor(message: string, code: string, status?: number) {
+    super(message);
+    this.name = "HermesError";
+    this.code = code;
+    this.status = status;
+  }
+
+  /** True when the server responded, however unhappily. */
+  get isFromServer(): boolean {
+    return this.status !== undefined;
+  }
+}
+
+/**
+ * The message worth showing a user: the server's own when it sent one,
+ * otherwise `fallback`.
+ *
+ * Network-level text ("Failed to fetch", "NetworkError when attempting…")
+ * never reaches the UI — it names a cause the user cannot act on.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof HermesError && error.isFromServer) {
+    return error.message || fallback;
+  }
+  return fallback;
 }
 
 export function getAuthToken(): string | null {
@@ -47,89 +92,93 @@ function handleUnauthorized() {
   window.location.assign("/auth/login");
 }
 
-async function requestWrapper<T>(
-  requestFn: () => Promise<Response>,
-  {
-    is204 = false,
-    skipAuth = false,
-  }: { is204?: boolean; skipAuth?: boolean } = {},
-): Promise<ApiResponse<T>> {
-  try {
-    const response = await requestFn();
-    if (is204 || response.status === 204) {
-      return { success: true, data: null as unknown as T, error: null };
-    }
-    const data = (await response.json()) as ApiResponse<T>;
-    return data;
-  } catch (error) {
-    if (error instanceof HTTPError) {
-      const status = error.response.status;
-      if (status === 401 && !skipAuth) {
-        handleUnauthorized();
-      }
-      try {
-        const data = (await error.response.json()) as ApiResponse<T>;
-        if (data.error) data.error.status = status;
-        return data;
-      } catch {
-        return {
-          success: false,
-          data: null as unknown as T,
-          error: { code: "HTTP_ERROR", message: error.message, status },
-        };
-      }
-    }
-    return {
-      success: false,
-      data: null as unknown as T,
-      error: {
-        code: "UNKNOWN_ERROR",
-        message:
-          error instanceof Error ? error.message : "An unknown error occurred",
-      },
-    };
-  }
-}
-
 // ky's prefixUrl requires no leading slash
 function normalizePath(path: string): string {
   return path.startsWith("/") ? path.slice(1) : path;
 }
 
+/**
+ * Resolves to the unwrapped payload, or throws {@link HermesError}.
+ *
+ * 204s and bodiless responses resolve to `undefined`; call those as
+ * `api.post<void>(…)`.
+ */
+async function request<T>(
+  send: () => Promise<Response>,
+  { expectNoBody = false, skipAuth = false } = {},
+): Promise<T> {
+  let response: Response;
+
+  try {
+    response = await send();
+  } catch (error) {
+    if (!(error instanceof HTTPError)) {
+      throw new HermesError(
+        error instanceof Error ? error.message : "An unknown error occurred",
+        "NETWORK_ERROR",
+      );
+    }
+
+    const status = error.response.status;
+    if (status === 401 && !skipAuth) handleUnauthorized();
+
+    // Prefer the server's own error message when it sent an envelope.
+    let envelope: ApiEnvelope<never> | null = null;
+    try {
+      envelope = (await error.response.json()) as ApiEnvelope<never>;
+    } catch {
+      // Non-JSON error body (gateway HTML, empty response) — fall through.
+    }
+
+    if (envelope?.error) {
+      throw new HermesError(
+        envelope.error.message,
+        envelope.error.code,
+        status,
+      );
+    }
+    throw new HermesError(error.message, "HTTP_ERROR", status);
+  }
+
+  if (expectNoBody || response.status === 204) {
+    return undefined as T;
+  }
+
+  const envelope = (await response.json()) as ApiEnvelope<T>;
+  if (!envelope.success) {
+    throw new HermesError(
+      envelope.error?.message ?? "Request failed",
+      envelope.error?.code ?? "UNKNOWN_ERROR",
+      response.status,
+    );
+  }
+  return envelope.data;
+}
+
 export const api = {
   get: <T>(path: string, extraHeaders?: Record<string, string>) =>
-    requestWrapper<T>(() =>
-      kyInstance.get(normalizePath(path), {
-        headers: extraHeaders,
-      }),
+    request<T>(() =>
+      kyInstance.get(normalizePath(path), { headers: extraHeaders }),
     ),
 
   post: <T>(path: string, body?: unknown, opts?: { skipAuth?: boolean }) =>
-    requestWrapper<T>(
+    request<T>(
       () =>
         kyInstance.post(normalizePath(path), {
           json: body,
           skipAuth: opts?.skipAuth,
         } as RequestOptions),
-      { is204: !body, skipAuth: opts?.skipAuth },
+      { expectNoBody: !body, skipAuth: opts?.skipAuth },
     ),
 
   put: <T>(path: string, body?: unknown) =>
-    requestWrapper<T>(() =>
-      kyInstance.put(normalizePath(path), {
-        json: body,
-      }),
-    ),
+    request<T>(() => kyInstance.put(normalizePath(path), { json: body })),
 
   patch: <T>(path: string, body?: unknown) =>
-    requestWrapper<T>(() =>
-      kyInstance.patch(normalizePath(path), {
-        json: body,
-      }),
-    ),
+    request<T>(() => kyInstance.patch(normalizePath(path), { json: body })),
 
-  delete: <T>(path: string) =>
-    requestWrapper<T>(() => kyInstance.delete(normalizePath(path)), {
-      is204: true,
+  delete: <T = void>(path: string) =>
+    request<T>(() => kyInstance.delete(normalizePath(path)), {
+      expectNoBody: true,
     }),
 };

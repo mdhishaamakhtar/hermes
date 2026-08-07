@@ -1,0 +1,285 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { motion } from "framer-motion";
+import { quizzesApi } from "@/features/quizzes/quiz-api";
+import { apiErrorMessage } from "@/lib/api";
+import {
+  createDefaultOptions,
+  DISPLAY_MODE_OPTIONS,
+  isNegativeOption,
+  isPositiveOption,
+  normalizeOptionsForQuestionType,
+  QUESTION_TYPE_OPTIONS,
+  validateQuestionDraft,
+  type QuestionDraftOption,
+} from "@/features/quizzes/editor-model";
+import CustomSelect from "@/components/ui/CustomSelect";
+import type { DisplayMode, Question, QuestionType } from "@/lib/types";
+
+interface Props {
+  quizId: string;
+  nextOrderIndex: number;
+  quizDisplayMode: DisplayMode;
+  onAdded: (question: Question) => void;
+  onCancel: () => void;
+}
+
+export default function QuestionForm({
+  quizId,
+  nextOrderIndex,
+  quizDisplayMode,
+  onAdded,
+  onCancel,
+}: Props) {
+  const [qText, setQText] = useState("");
+  const [qTime, setQTime] = useState<number | string>(30);
+  const [questionType, setQuestionType] =
+    useState<QuestionType>("SINGLE_SELECT");
+  const [displayModeOverride, setDisplayModeOverride] = useState<
+    DisplayMode | "INHERIT"
+  >("INHERIT");
+  const [options, setOptions] = useState<QuestionDraftOption[]>(
+    createDefaultOptions("SINGLE_SELECT"),
+  );
+  const [creating, setCreating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const setOptionText = (index: number, text: string) =>
+    setOptions((current) =>
+      current.map((option, currentIndex) =>
+        currentIndex === index ? { ...option, text } : option,
+      ),
+    );
+
+  const setOptionPoints = (index: number, pointValue: number | string) =>
+    setOptions((current) =>
+      current.map((option, currentIndex) =>
+        currentIndex === index ? { ...option, pointValue } : option,
+      ),
+    );
+
+  const addOption = () =>
+    setOptions((current) => [
+      ...current,
+      { text: "", pointValue: 0, orderIndex: current.length },
+    ]);
+
+  const removeOption = (index: number) =>
+    setOptions((current) =>
+      current
+        .filter((_, currentIndex) => currentIndex !== index)
+        .map((option, currentIndex) => ({
+          ...option,
+          orderIndex: currentIndex,
+        })),
+    );
+
+  const validate = () => {
+    return validateQuestionDraft({
+      text: qText,
+      timeLimitSeconds: qTime,
+      questionType,
+      options,
+    });
+  };
+
+  const addQuestionAction = async () => {
+    const error = validate();
+    if (error) {
+      setValidationError(error);
+      return null;
+    }
+
+    setValidationError(null);
+    setCreating(true);
+
+    try {
+      const created = await quizzesApi.createQuestion(quizId, {
+        text: qText.trim(),
+        questionType,
+        orderIndex: nextOrderIndex,
+        timeLimitSeconds:
+          typeof qTime === "string" ? parseInt(qTime, 10) : qTime,
+        displayModeOverride:
+          displayModeOverride === "INHERIT" ? null : displayModeOverride,
+        options: options.map((option, index) => ({
+          text: option.text.trim(),
+          pointValue:
+            typeof option.pointValue === "string"
+              ? parseInt(option.pointValue, 10) || 0
+              : option.pointValue,
+          orderIndex: index,
+        })),
+      });
+      onAdded(created);
+      setQText("");
+      setQTime(30);
+      setQuestionType("SINGLE_SELECT");
+      setDisplayModeOverride("INHERIT");
+      setOptions(createDefaultOptions("SINGLE_SELECT"));
+    } catch (err) {
+      setValidationError(apiErrorMessage(err, "Failed to add question."));
+    }
+
+    setCreating(false);
+    return null;
+  };
+
+  const [, formAction] = useActionState(addQuestionAction, null);
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      action={formAction}
+      className="mb-8 border-t border-border bg-surface/50 px-5 py-5 md:px-6 md:py-8"
+    >
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <p className="label text-accent">New Question</p>
+        <div className="flex items-center gap-3">
+          <div className="w-40">
+            <CustomSelect
+              value={questionType}
+              onChange={(v) => {
+                const nextType = v as QuestionType;
+                setQuestionType(nextType);
+                setOptions((current) =>
+                  normalizeOptionsForQuestionType(nextType, current),
+                );
+              }}
+              options={QUESTION_TYPE_OPTIONS}
+            />
+          </div>
+          <div className="w-40">
+            <CustomSelect
+              value={displayModeOverride}
+              onChange={(v) =>
+                setDisplayModeOverride(v as DisplayMode | "INHERIT")
+              }
+              options={[
+                { value: "INHERIT", label: "Inherit" },
+                ...DISPLAY_MODE_OPTIONS,
+              ]}
+              title={`Inherit uses quiz default: ${quizDisplayMode}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_7rem]">
+        <label className="block">
+          <span className="field-label mb-2 block">Question</span>
+          <textarea
+            value={qText}
+            onChange={(event) => setQText(event.target.value)}
+            rows={2}
+            className="input-field min-h-[5rem] resize-y"
+            placeholder="Enter your question text…"
+          />
+        </label>
+        <label className="block">
+          <span className="field-label mb-2 block">Timer (s)</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={qTime}
+            onChange={(event) => {
+              const val = event.target.value.replace(/[^0-9]/g, "");
+              setQTime(val === "" ? 0 : parseInt(val, 10));
+            }}
+            className="input-field font-mono tabular-nums"
+          />
+        </label>
+      </div>
+
+      <div className="mt-5">
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <p className="label text-muted">Options</p>
+          <button
+            type="button"
+            onClick={addOption}
+            className="label text-accent transition-colors hover:text-accent-hover"
+          >
+            + Add
+          </button>
+        </div>
+
+        <div className="space-y-1">
+          {options.map((option, index) => {
+            const letterClass = isPositiveOption(option.pointValue)
+              ? "text-success"
+              : isNegativeOption(option.pointValue)
+                ? "text-danger"
+                : "text-foreground/80";
+
+            return (
+              <div
+                key={index}
+                className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_1.75rem] items-start gap-2 border-b border-border/50 py-2"
+              >
+                <span className={`label shrink-0 ${letterClass}`}>
+                  {String.fromCharCode(65 + index)}
+                </span>
+                <textarea
+                  value={option.text}
+                  onChange={(event) => setOptionText(index, event.target.value)}
+                  placeholder={`Option ${index + 1}`}
+                  rows={2}
+                  className="input-field min-w-0 resize-y py-2 px-3 leading-6"
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={option.pointValue}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    if (raw === "-" || raw === "") {
+                      setOptionPoints(index, raw);
+                      return;
+                    }
+                    const parsed = parseInt(raw, 10);
+                    if (!isNaN(parsed)) {
+                      setOptionPoints(index, parsed);
+                    }
+                  }}
+                  className="input-field h-full min-h-16 py-2 px-2 text-center font-mono tabular-nums"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeOption(index)}
+                  disabled={options.length <= 2}
+                  className="flex items-center justify-center label text-muted transition-colors hover:text-danger disabled:opacity-30"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {validationError && (
+        <p className="mt-4 text-sm text-danger">{validationError}</p>
+      )}
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={creating}
+          className="btn-primary px-5 py-3"
+        >
+          {creating ? "Adding…" : "Add Question"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-ghost px-5 py-3"
+        >
+          Cancel
+        </button>
+      </div>
+    </motion.form>
+  );
+}

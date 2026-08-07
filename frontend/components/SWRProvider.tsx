@@ -1,7 +1,7 @@
 "use client";
 
 import { SWRConfig, type SWRConfiguration } from "swr";
-import { FetchError, fetcher } from "@/lib/fetcher";
+import { api, HermesError } from "@/lib/api";
 
 // Don't retry requests that will never succeed by retrying: expired/missing
 // auth (401 already triggers a redirect to login in lib/api.ts), forbidden,
@@ -18,7 +18,7 @@ const onErrorRetry: SWRConfiguration["onErrorRetry"] = (
   { retryCount },
 ) => {
   if (
-    error instanceof FetchError &&
+    error instanceof HermesError &&
     error.status !== undefined &&
     NO_RETRY_STATUSES.has(error.status)
   ) {
@@ -36,7 +36,7 @@ export default function SWRProvider({
   return (
     <SWRConfig
       value={{
-        fetcher,
+        fetcher: (path: string) => api.get(path),
         keepPreviousData: true,
         revalidateOnFocus: false,
         onErrorRetry,

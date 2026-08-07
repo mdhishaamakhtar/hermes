@@ -8,10 +8,11 @@ import useSWR from "swr";
 import Logo from "@/components/Logo";
 import { ResultsPageSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";
-import { QuestionResultCard } from "@/components/session/QuestionResultCard";
-import { enterAnimation } from "@/lib/design-tokens";
+import { QuestionResultCard } from "@/features/session/components/QuestionResultCard";
+import { rise, stagger } from "@/lib/motion";
 import { getStoredRejoinToken } from "@/lib/session-storage";
-import { fetchMyResults } from "@/lib/fetcher";
+import { sessionsApi } from "@/features/session/session-api";
+import { apiErrorMessage } from "@/lib/api";
 import type { MyResults } from "@/lib/types";
 
 export default function ResultsPage() {
@@ -26,15 +27,12 @@ export default function ResultsPage() {
     sessionId && rejoinToken
       ? (["my-results", sessionId, rejoinToken] as const)
       : null,
-    ([, sid, token]) => fetchMyResults(sid, token),
+    ([, sid, token]) => sessionsApi.myResults(sid, token),
   );
 
-  const fetchErrorMessage =
-    error instanceof Error
-      ? error.message
-      : error
-        ? "Failed to load results"
-        : "";
+  const fetchErrorMessage = error
+    ? apiErrorMessage(error, "Failed to load results")
+    : "";
 
   const accuracy = useMemo(
     () =>
@@ -104,7 +102,7 @@ export default function ResultsPage() {
         <BackLink href="/" label="Back to Home" />
 
         <motion.section
-          {...enterAnimation}
+          {...rise}
           className="mt-6 border border-border bg-surface p-6 sm:p-8"
         >
           <div className="flex flex-wrap items-end justify-between gap-6">
@@ -186,10 +184,10 @@ export default function ResultsPage() {
                   return (
                     <motion.div
                       key={group.question.questionId}
-                      {...enterAnimation}
+                      {...rise}
                       transition={{
-                        ...enterAnimation.transition,
-                        delay: gIdx * 0.03,
+                        ...rise.transition,
+                        delay: stagger(gIdx),
                       }}
                     >
                       <QuestionResultCard question={group.question} />
@@ -199,17 +197,19 @@ export default function ResultsPage() {
                 return (
                   <motion.div
                     key={`p-${group.passageId}`}
-                    {...enterAnimation}
+                    {...rise}
                     transition={{
-                      ...enterAnimation.transition,
-                      delay: gIdx * 0.03,
+                      ...rise.transition,
+                      delay: stagger(gIdx),
                     }}
                     className="border border-border bg-surface overflow-hidden"
                   >
                     <div className="bg-background/50 border-b border-border p-6 pb-8">
                       <div className="mb-4 flex items-center gap-2">
                         <span className="label text-warning">Passage</span>
-                        <span className="text-muted/40 text-xs">·</span>
+                        <span aria-hidden className="text-muted/40 text-xs">
+                          ·
+                        </span>
                         <span className="text-xs text-muted">
                           {group.questions.length} questions
                         </span>

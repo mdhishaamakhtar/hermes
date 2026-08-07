@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { duration, ease } from "@/lib/motion";
 
 export interface SelectOption {
   value: string;
@@ -158,7 +159,7 @@ export default function CustomSelect({
           fill="none"
           className="shrink-0 text-muted"
           animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: duration.base }}
         >
           <path
             d="M2.5 4.5L6 8L9.5 4.5"
@@ -183,8 +184,8 @@ export default function CustomSelect({
             initial={{ opacity: 0, y: dropUp ? 6 : -6, scaleY: 0.92 }}
             animate={{ opacity: 1, y: 0, scaleY: 1 }}
             exit={{ opacity: 0, y: dropUp ? 6 : -6, scaleY: 0.92 }}
-            transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-            className={`absolute left-0 right-0 z-[100] max-h-60 overflow-y-auto border border-border bg-surface shadow-[0_8px_24px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.3)] ${
+            transition={{ duration: duration.fast, ease: ease.out }}
+            className={`absolute left-0 right-0 z-[var(--z-dropdown)] max-h-60 overflow-y-auto border border-border bg-surface shadow-[0_8px_24px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.3)] ${
               dropUp ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
             }`}
             style={{ transformOrigin: dropUp ? "bottom" : "top" }}

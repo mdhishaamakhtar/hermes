@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CardBadge } from "@/components/session/CardBadge";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
-import { ScoringDrawer } from "@/components/session/ScoringDrawer";
-import { QuestionCard } from "@/components/session/QuestionCard";
+import { CardBadge } from "@/features/session/components/CardBadge";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
+import { ScoringDrawer } from "@/features/session/components/ScoringDrawer";
+import { QuestionCard } from "@/features/session/components/QuestionCard";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";
-import { enterAnimation } from "@/lib/design-tokens";
+import { revealRow, rise, stagger } from "@/lib/motion";
 import type { SessionResults } from "@/lib/types";
 import {
   buildResultsQuestionCard,
@@ -63,10 +63,7 @@ export function HostEndedView({ id, session }: Props) {
 
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
-          <motion.div
-            {...enterAnimation}
-            className="border border-border bg-surface p-6"
-          >
+          <motion.div {...rise} className="border border-border bg-surface p-6">
             <p className="label mb-2">Session complete</p>
             <h1 className="text-3xl font-bold text-foreground">Final review</h1>
             <p className="mt-3 max-w-2xl text-sm text-muted">
@@ -137,10 +134,10 @@ export function HostEndedView({ id, session }: Props) {
                     return (
                       <motion.div
                         key={`q-${group.question.id}`}
-                        {...enterAnimation}
+                        {...rise}
                         transition={{
-                          ...enterAnimation.transition,
-                          delay: gIdx * 0.03,
+                          ...rise.transition,
+                          delay: stagger(gIdx),
                         }}
                       >
                         <QuestionCard
@@ -155,17 +152,19 @@ export function HostEndedView({ id, session }: Props) {
                   return (
                     <motion.div
                       key={`p-${group.passageId}`}
-                      {...enterAnimation}
+                      {...rise}
                       transition={{
-                        ...enterAnimation.transition,
-                        delay: gIdx * 0.03,
+                        ...rise.transition,
+                        delay: stagger(gIdx),
                       }}
                       className="border border-border bg-surface overflow-hidden"
                     >
                       <div className="bg-background/50 border-b border-border p-6 pb-8">
                         <div className="mb-4 flex items-center gap-2">
                           <span className="label text-warning">Passage</span>
-                          <span className="text-muted/40 text-xs">·</span>
+                          <span aria-hidden className="text-muted/40 text-xs">
+                            ·
+                          </span>
                           <span className="text-xs text-muted">
                             {group.questions.length} questions
                           </span>
@@ -217,9 +216,7 @@ export function HostEndedView({ id, session }: Props) {
                     displayName={entry.displayName}
                     score={entry.score}
                     variant="review"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                    {...revealRow(index)}
                   />
                 ))
               )}

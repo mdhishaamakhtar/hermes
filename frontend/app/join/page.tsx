@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, HermesError } from "@/lib/api";
 import MinimalNav from "@/components/MinimalNav";
 import {
   getStoredRejoinToken,
@@ -33,9 +33,7 @@ export default function JoinPage() {
         { skipAuth: true },
       )
       .then((res) => {
-        if (res.success && res.data.status !== "ENDED") {
-          setActiveSession({ sessionId, token });
-        }
+        if (res.status !== "ENDED") setActiveSession({ sessionId, token });
       })
       .catch(() => {});
   }, []);
@@ -53,7 +51,7 @@ export default function JoinPage() {
         return { error: "Enter your display name" };
       }
       try {
-        const res = await api.post<{
+        const { sessionId, rejoinToken } = await api.post<{
           participantId: number;
           rejoinToken: string;
           sessionId: number;
@@ -62,19 +60,17 @@ export default function JoinPage() {
           { joinCode: code.toUpperCase(), displayName: displayName.trim() },
           { skipAuth: true },
         );
-        if (res.success) {
-          const sessionId = res.data.sessionId;
-          const existingToken = getStoredRejoinToken(sessionId);
-          if (existingToken) {
-            router.push(`/session/${sessionId}/play`);
-          } else {
-            storeRejoinToken(sessionId, res.data.rejoinToken);
-            router.push(`/session/${sessionId}/play`);
-          }
-          return { error: "" };
+        // Keep the token already on this device: it identifies an existing
+        // participant row, whereas the fresh one would orphan their answers.
+        if (!getStoredRejoinToken(sessionId)) {
+          storeRejoinToken(sessionId, rejoinToken);
         }
-        return { error: res.error?.message || "Invalid join code" };
-      } catch {
+        router.push(`/session/${sessionId}/play`);
+        return { error: "" };
+      } catch (err) {
+        if (err instanceof HermesError && err.isFromServer) {
+          return { error: err.message || "Invalid join code" };
+        }
         return { error: "Connection failed" };
       }
     },
@@ -85,7 +81,7 @@ export default function JoinPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <MinimalNav />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-[var(--z-raised)]">
         <div className="page-enter w-full max-w-sm">
           {/* Rejoin banner */}
           {activeSession && (
@@ -113,6 +109,9 @@ export default function JoinPage() {
             <div>
               <input
                 ref={codeRef}
+                id="join-code"
+                aria-label="Session code"
+                aria-describedby="join-code-hint"
                 type="text"
                 value={code}
                 onChange={(e) =>
@@ -131,15 +130,18 @@ export default function JoinPage() {
                 spellCheck={false}
                 autoFocus
               />
-              <p className="label text-center opacity-50 mt-2">
+              <p id="join-code-hint" className="label text-center mt-2">
                 6-character code
               </p>
             </div>
 
             {/* Display name */}
             <div>
-              <label className="field-label block mb-2">Your Name</label>
+              <label htmlFor="join-name" className="field-label block mb-2">
+                Your Name
+              </label>
               <input
+                id="join-name"
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value.slice(0, 30))}

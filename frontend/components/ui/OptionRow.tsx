@@ -36,14 +36,12 @@ export default function OptionRow({
   return (
     <div
       className={joinClasses(
-        "grid items-start gap-x-3 gap-y-2",
+        "grid items-center gap-x-3 gap-y-2",
         gridColumns,
         className,
       )}
     >
-      {marker ? (
-        <div className={joinClasses("mt-0.5", markerClassName)}>{marker}</div>
-      ) : null}
+      {marker ? <div className={markerClassName}>{marker}</div> : null}
       <div
         className={joinClasses(
           "min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground",
@@ -55,7 +53,7 @@ export default function OptionRow({
       {aside ? (
         <div
           className={joinClasses(
-            "mt-0.5 flex shrink-0 flex-wrap items-start justify-end gap-2 text-xs tabular-nums",
+            "flex shrink-0 flex-wrap items-center justify-end gap-2 text-xs tabular-nums",
             asideClassName,
           )}
         >

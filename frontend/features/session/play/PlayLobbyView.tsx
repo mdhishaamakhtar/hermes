@@ -1,11 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CardBadge } from "@/components/session/CardBadge";
+import { CardBadge } from "@/features/session/components/CardBadge";
 import Logo from "@/components/Logo";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";
-import { enterAnimation } from "@/lib/design-tokens";
+import { rise } from "@/lib/motion";
 import { usePlaySession } from "./usePlaySession";
 
 interface Props {
@@ -33,10 +33,7 @@ export function PlayLobbyView({ session }: Props) {
       </header>
 
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col items-center justify-center px-4 sm:px-6 py-10">
-        <motion.div
-          {...enterAnimation}
-          className="flex w-full flex-col items-center"
-        >
+        <motion.div {...rise} className="flex w-full flex-col items-center">
           <p className="label mb-6 text-accent">{sessionTitle}</p>
 
           <h1 className="text-center text-4xl font-black tracking-tight text-foreground sm:text-5xl">

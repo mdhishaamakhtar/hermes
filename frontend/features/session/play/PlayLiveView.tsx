@@ -4,11 +4,11 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
-import { ParticipantQuestionCard } from "@/components/session/ParticipantQuestionCard";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
-import { ConnectionStatusBadge } from "@/components/session/ConnectionStatusBadge";
-import { enterAnimation } from "@/lib/design-tokens";
+import { LockInPendingOverlay } from "@/features/session/components/LockInPendingOverlay";
+import { ParticipantQuestionCard } from "@/features/session/components/ParticipantQuestionCard";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
+import { ConnectionStatusBadge } from "@/features/session/components/ConnectionStatusBadge";
+import { revealRow, rise, stagger, timerTick } from "@/lib/motion";
 import {
   formatCountdownClock,
   formatParticipantCountPhrase,
@@ -80,7 +80,7 @@ export function PlayLiveView({ session }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur relative">
+      <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/95 backdrop-blur relative">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 py-4">
           <Logo size="sm" />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
@@ -93,24 +93,29 @@ export function PlayLiveView({ session }: Props) {
             />
           </div>
         </div>
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-full z-[var(--z-raised)] mt-2 -translate-x-1/2">
           <ConnectionStatusBadge connected={connected} />
         </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 sm:px-6 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
-          {/* Plain section: Framer enterAnimation on a parent applies transform and breaks %-width timer fills */}
+          {/* Deliberately not a motion.section: an entrance transform on this
+              parent breaks the %-width timer fill nested inside it. */}
           <section className="border border-border bg-surface p-6">
             <div className="flex flex-wrap items-center gap-3">
               <span className="label tabular-nums">
                 {currentQuestionsLabel}
               </span>
-              <span className="text-xs text-muted/40">·</span>
+              <span aria-hidden className="text-xs text-muted/40">
+                ·
+              </span>
               <span className="label text-accent">{headerStatus}</span>
               {isPassage ? (
                 <>
-                  <span className="text-xs text-muted/40">·</span>
+                  <span aria-hidden className="text-xs text-muted/40">
+                    ·
+                  </span>
                   <span className="label text-warning">Passage</span>
                 </>
               ) : null}
@@ -148,7 +153,7 @@ export function PlayLiveView({ session }: Props) {
                           ),
                         )}%`,
                       }}
-                      transition={{ duration: 1, ease: "linear" }}
+                      transition={timerTick}
                       style={{ backgroundColor: timerColour }}
                     />
                   </div>
@@ -169,14 +174,16 @@ export function PlayLiveView({ session }: Props) {
 
           {activePassage ? (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-6"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <p className="label">Passage</p>
-                    <span className="text-xs text-muted/40">·</span>
+                    <span aria-hidden className="text-xs text-muted/40">
+                      ·
+                    </span>
                     <span className="text-xs text-muted tabular-nums">
                       Q{activePassage.questionIndex}
                       {maxQuestionIndex > activePassage.questionIndex
@@ -184,7 +191,9 @@ export function PlayLiveView({ session }: Props) {
                         : ""}{" "}
                       of {activePassage.totalQuestions}
                     </span>
-                    <span className="text-xs text-muted/40">·</span>
+                    <span aria-hidden className="text-xs text-muted/40">
+                      ·
+                    </span>
                     <span className="text-xs text-muted">
                       {activePassage.timerMode === "ENTIRE_PASSAGE"
                         ? "All sub-questions together"
@@ -206,10 +215,10 @@ export function PlayLiveView({ session }: Props) {
               {activeQuestions.map((question, index) => (
                 <motion.div
                   key={question.id}
-                  {...enterAnimation}
+                  {...rise}
                   transition={{
-                    ...enterAnimation.transition,
-                    delay: index * 0.03,
+                    ...rise.transition,
+                    delay: stagger(index),
                   }}
                 >
                   <ParticipantQuestionCard
@@ -225,7 +234,7 @@ export function PlayLiveView({ session }: Props) {
               ))}
             </div>
           ) : activeQuestions[0] ? (
-            <motion.div {...enterAnimation}>
+            <motion.div {...rise}>
               <ParticipantQuestionCard
                 question={activeQuestions[0]}
                 lifecycle={questionLifecycle}
@@ -238,7 +247,7 @@ export function PlayLiveView({ session }: Props) {
             </motion.div>
           ) : (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-8"
             >
               <p className="label mb-3">Waiting</p>
@@ -253,7 +262,7 @@ export function PlayLiveView({ session }: Props) {
           )}
 
           <motion.section
-            {...enterAnimation}
+            {...rise}
             className="border border-border bg-surface p-4 sm:p-6"
           >
             <div className="hidden sm:flex flex-wrap items-start justify-between gap-4">
@@ -273,7 +282,9 @@ export function PlayLiveView({ session }: Props) {
                 <span className="tabular-nums">
                   {selectedQuestionCount} ready
                 </span>
-                <span className="text-muted/40">·</span>
+                <span aria-hidden className="text-muted/40">
+                  ·
+                </span>
                 <span className="tabular-nums">
                   {activeQuestions.length} visible
                 </span>
@@ -336,7 +347,7 @@ export function PlayLiveView({ session }: Props) {
 
         <aside className="space-y-6">
           <motion.section
-            {...enterAnimation}
+            {...rise}
             className="border border-border bg-surface p-6"
           >
             <div className="mb-4 flex items-center justify-between gap-4">
@@ -367,9 +378,7 @@ export function PlayLiveView({ session }: Props) {
                     score={entry.score}
                     variant="review"
                     isMe={entry.participantId === participantId}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15, delay: index * 0.04 }}
+                    {...revealRow(index)}
                   />
                 ))
               )}
@@ -400,7 +409,7 @@ export function PlayLiveView({ session }: Props) {
           </motion.section>
 
           <motion.section
-            {...enterAnimation}
+            {...rise}
             className="hidden xl:block border border-border bg-surface p-6"
           >
             <p className="label mb-4">Session details</p>
@@ -436,7 +445,7 @@ export function PlayLiveView({ session }: Props) {
 
           {questionLifecycle === "REVIEWING" && activeQuestions[0] ? (
             <motion.section
-              {...enterAnimation}
+              {...rise}
               className="border border-border bg-surface p-6"
             >
               <p className="label mb-4">Question score</p>

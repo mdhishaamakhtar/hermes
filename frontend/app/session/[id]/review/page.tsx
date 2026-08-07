@@ -1,5 +1,5 @@
 import Navbar from "@/components/Navbar";
-import ReviewClient from "@/components/session/ReviewClient";
+import ReviewClient from "@/features/session/components/ReviewClient";
 
 export default async function ReviewPage({
   params,

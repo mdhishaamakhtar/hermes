@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { duration } from "@/lib/motion";
 
 interface Props {
   message: string | null;
@@ -25,14 +26,14 @@ export default function ConfirmDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          transition={{ duration: duration.base }}
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-background/80 backdrop-blur-sm"
         >
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: duration.base }}
             className={`bg-surface border p-8 max-w-md w-full mx-6 space-y-6 ${
               isDanger ? "border-danger/40" : "border-warning/40"
             }`}
