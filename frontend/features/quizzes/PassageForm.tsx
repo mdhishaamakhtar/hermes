@@ -2,17 +2,17 @@
 
 import { useActionState, useState } from "react";
 import { motion } from "framer-motion";
-import { passagesApi } from "@/components/quizzes/quiz-api";
+import { passagesApi } from "@/features/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
 import {
   createQuestionDraft,
   PASSAGE_TIMER_MODE_OPTIONS,
   validateQuestionDraft,
-} from "@/components/quizzes/editor-model";
-import QuestionDraftEditor from "@/components/quizzes/QuestionDraftEditor";
+} from "@/features/quizzes/editor-model";
+import QuestionDraftEditor from "@/features/quizzes/QuestionDraftEditor";
 import CustomSelect from "@/components/ui/CustomSelect";
 import type { Passage, PassageTimerMode } from "@/lib/types";
-import type { QuestionDraft } from "@/components/quizzes/editor-model";
+import type { QuestionDraft } from "@/features/quizzes/editor-model";
 
 interface Props {
   quizId: string;

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { duration } from "@/lib/motion";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { eventsApi } from "@/components/events/events-api";
+import { eventsApi } from "@/features/events/events-api";
 import { EventDetailSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import BackLink from "@/components/ui/BackLink";

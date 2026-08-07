@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
+import { LockInPendingOverlay } from "@/features/session/components/LockInPendingOverlay";
 import OptionRow from "@/components/ui/OptionRow";
 import { colorRgb } from "@/lib/design-tokens";
 import { spring } from "@/lib/motion";

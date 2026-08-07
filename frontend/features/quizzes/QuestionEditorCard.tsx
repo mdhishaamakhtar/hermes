@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { questionsApi } from "@/components/quizzes/quiz-api";
+import { questionsApi } from "@/features/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
 import { duration, stagger } from "@/lib/motion";
 import {
@@ -14,7 +14,7 @@ import {
   questionTypeLabel,
   validateQuestionDraft,
   type QuestionDraftOption,
-} from "@/components/quizzes/editor-model";
+} from "@/features/quizzes/editor-model";
 import CustomSelect from "@/components/ui/CustomSelect";
 import OptionRow from "@/components/ui/OptionRow";
 import type { DisplayMode, Question, QuestionType } from "@/lib/types";
@@ -29,7 +29,7 @@ interface Props {
   onEditOpen: () => void;
 }
 
-export default function QuestionCard({
+export default function QuestionEditorCard({
   question,
   index,
   disabled,

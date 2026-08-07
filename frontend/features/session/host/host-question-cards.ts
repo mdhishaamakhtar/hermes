@@ -4,7 +4,7 @@
  * Split out of useHostSession.ts unchanged. Kept apart from the reducer
  * because these shape data for the view rather than owning any of it.
  */
-import type { QuestionCardData } from "@/components/session/QuestionCard";
+import type { QuestionCardData } from "@/features/session/components/QuestionCard";
 import type { SessionResults } from "@/lib/types";
 import type { ActiveQuestion, QuestionStats } from "./host-types";
 import { DEFAULT_STATS } from "./host-stats";

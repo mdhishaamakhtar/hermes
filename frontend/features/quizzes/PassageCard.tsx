@@ -2,20 +2,20 @@
 
 import { useActionState, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { passagesApi } from "@/components/quizzes/quiz-api";
+import { passagesApi } from "@/features/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
 import { duration } from "@/lib/motion";
-import QuestionCard from "@/components/quizzes/QuestionCard";
-import QuestionDraftEditor from "@/components/quizzes/QuestionDraftEditor";
+import QuestionEditorCard from "@/features/quizzes/QuestionEditorCard";
+import QuestionDraftEditor from "@/features/quizzes/QuestionDraftEditor";
 import CustomSelect from "@/components/ui/CustomSelect";
 import {
   createQuestionDraft,
   passageTimerModeLabel,
   PASSAGE_TIMER_MODE_OPTIONS,
   validateQuestionDraft,
-} from "@/components/quizzes/editor-model";
+} from "@/features/quizzes/editor-model";
 import type { Passage, PassageTimerMode, Question } from "@/lib/types";
-import type { QuestionDraft } from "@/components/quizzes/editor-model";
+import type { QuestionDraft } from "@/features/quizzes/editor-model";
 
 interface Props {
   passage: Passage;
@@ -295,7 +295,7 @@ export default function PassageCard({
 
             <div className="space-y-3">
               {sortedSubQuestions.map((question, index) => (
-                <QuestionCard
+                <QuestionEditorCard
                   key={question.id}
                   question={question}
                   index={index}

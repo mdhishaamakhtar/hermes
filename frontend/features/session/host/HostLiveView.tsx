@@ -3,11 +3,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import { CardBadge } from "@/components/session/CardBadge";
-import { ConnectionStatusBadge } from "@/components/session/ConnectionStatusBadge";
-import { QuestionCard } from "@/components/session/QuestionCard";
-import { ScoringDrawer } from "@/components/session/ScoringDrawer";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import { CardBadge } from "@/features/session/components/CardBadge";
+import { ConnectionStatusBadge } from "@/features/session/components/ConnectionStatusBadge";
+import { QuestionCard } from "@/features/session/components/QuestionCard";
+import { ScoringDrawer } from "@/features/session/components/ScoringDrawer";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
 import {
   formatCountdownClock,
   formatParticipantCountPhrase,

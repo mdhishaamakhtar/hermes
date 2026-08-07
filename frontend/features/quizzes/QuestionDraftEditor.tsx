@@ -4,10 +4,10 @@ import {
   DISPLAY_MODE_OPTIONS,
   normalizeOptionsForQuestionType,
   QUESTION_TYPE_OPTIONS,
-} from "@/components/quizzes/editor-model";
+} from "@/features/quizzes/editor-model";
 import CustomSelect from "@/components/ui/CustomSelect";
 import type { DisplayMode } from "@/lib/types";
-import type { QuestionDraft } from "@/components/quizzes/editor-model";
+import type { QuestionDraft } from "@/features/quizzes/editor-model";
 
 interface Props {
   draft: QuestionDraft;

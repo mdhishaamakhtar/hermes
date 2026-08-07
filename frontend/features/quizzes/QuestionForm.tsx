@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { motion } from "framer-motion";
-import { quizzesApi } from "@/components/quizzes/quiz-api";
+import { quizzesApi } from "@/features/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
 import {
   createDefaultOptions,
@@ -13,7 +13,7 @@ import {
   QUESTION_TYPE_OPTIONS,
   validateQuestionDraft,
   type QuestionDraftOption,
-} from "@/components/quizzes/editor-model";
+} from "@/features/quizzes/editor-model";
 import CustomSelect from "@/components/ui/CustomSelect";
 import type { DisplayMode, Question, QuestionType } from "@/lib/types";
 

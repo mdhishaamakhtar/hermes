@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { duration } from "@/lib/motion";
 import useSWR from "swr";
-import { eventsApi } from "@/components/events/events-api";
+import { eventsApi } from "@/features/events/events-api";
 import { EventListSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";

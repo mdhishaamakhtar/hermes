@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
-import DashboardClient from "@/components/dashboard/DashboardClient";
+import DashboardClient from "@/features/dashboard/DashboardClient";
 
 export const metadata: Metadata = {
   robots: {

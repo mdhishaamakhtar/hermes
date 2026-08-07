@@ -13,10 +13,10 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { sessionsApi } from "@/features/session/session-api";
 import { apiErrorMessage } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
-import { useStompClient } from "@/hooks/useStompClient";
+import { useStompClient } from "@/features/session/useStompClient";
 import { normalizeIdList, normalizePoints } from "@/lib/session-utils";
-import type { CorrectionDraftOption } from "@/components/session/ScoringDrawer";
-import type { QuestionCardData } from "@/components/session/QuestionCard";
+import type { CorrectionDraftOption } from "@/features/session/components/ScoringDrawer";
+import type { QuestionCardData } from "@/features/session/components/QuestionCard";
 import { hostSessionReducer, initHostSessionState } from "./host-reducer";
 import { DEFAULT_STATS, displayModeLabel } from "./host-stats";
 import type {

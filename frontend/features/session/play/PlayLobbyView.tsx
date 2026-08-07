@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CardBadge } from "@/components/session/CardBadge";
+import { CardBadge } from "@/features/session/components/CardBadge";
 import Logo from "@/components/Logo";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";
 import { rise } from "@/lib/motion";
 import { usePlaySession } from "./usePlaySession";

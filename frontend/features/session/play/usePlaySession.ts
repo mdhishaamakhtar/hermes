@@ -20,7 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { api, apiErrorMessage, HermesError } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
-import { useStompClient } from "@/hooks/useStompClient";
+import { useStompClient } from "@/features/session/useStompClient";
 import { normalizeIdList, normalizePoints } from "@/lib/session-utils";
 import {
   getStoredRejoinToken,

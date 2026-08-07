@@ -1,4 +1,4 @@
-import QuizEditorClient from "@/components/quizzes/QuizEditorClient";
+import QuizEditorClient from "@/features/quizzes/QuizEditorClient";
 
 export default async function QuizEditorPage({
   params,

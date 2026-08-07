@@ -8,7 +8,7 @@ import useSWR from "swr";
 import Logo from "@/components/Logo";
 import { ResultsPageSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";
-import { QuestionResultCard } from "@/components/session/QuestionResultCard";
+import { QuestionResultCard } from "@/features/session/components/QuestionResultCard";
 import { rise, stagger } from "@/lib/motion";
 import { getStoredRejoinToken } from "@/lib/session-storage";
 import { sessionsApi } from "@/features/session/session-api";

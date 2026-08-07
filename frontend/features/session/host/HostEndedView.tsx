@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CardBadge } from "@/components/session/CardBadge";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
-import { ScoringDrawer } from "@/components/session/ScoringDrawer";
-import { QuestionCard } from "@/components/session/QuestionCard";
+import { CardBadge } from "@/features/session/components/CardBadge";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
+import { ScoringDrawer } from "@/features/session/components/ScoringDrawer";
+import { QuestionCard } from "@/features/session/components/QuestionCard";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { formatParticipantCountPhrase } from "@/lib/session-utils";

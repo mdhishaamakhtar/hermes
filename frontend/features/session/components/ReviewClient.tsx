@@ -8,7 +8,7 @@ import BackLink from "@/components/ui/BackLink";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import { QuestionReviewCard } from "@/components/session/QuestionReviewCard";
+import { QuestionReviewCard } from "@/features/session/components/QuestionReviewCard";
 import { formatParticipantCount } from "@/lib/session-utils";
 import { revealRow, rise } from "@/lib/motion";
 import type { SessionResults } from "@/lib/types";

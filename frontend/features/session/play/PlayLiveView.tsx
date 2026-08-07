@@ -4,10 +4,10 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
-import { LockInPendingOverlay } from "@/components/session/LockInPendingOverlay";
-import { ParticipantQuestionCard } from "@/components/session/ParticipantQuestionCard";
-import { LiveParticipantCount } from "@/components/session/LiveParticipantCount";
-import { ConnectionStatusBadge } from "@/components/session/ConnectionStatusBadge";
+import { LockInPendingOverlay } from "@/features/session/components/LockInPendingOverlay";
+import { ParticipantQuestionCard } from "@/features/session/components/ParticipantQuestionCard";
+import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
+import { ConnectionStatusBadge } from "@/features/session/components/ConnectionStatusBadge";
 import { revealRow, rise, stagger, timerTick } from "@/lib/motion";
 import {
   formatCountdownClock,

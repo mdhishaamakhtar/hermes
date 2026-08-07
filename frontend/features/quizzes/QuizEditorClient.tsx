@@ -7,13 +7,13 @@ import CustomSelect from "@/components/ui/CustomSelect";
 import BackLink from "@/components/ui/BackLink";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
-import PassageCard from "@/components/quizzes/PassageCard";
-import PassageForm from "@/components/quizzes/PassageForm";
-import QuestionCard from "@/components/quizzes/QuestionCard";
-import QuestionForm from "@/components/quizzes/QuestionForm";
-import SessionList from "@/components/quizzes/SessionList";
-import { useQuizEditor } from "@/components/quizzes/useQuizEditor";
-import { DISPLAY_MODE_OPTIONS } from "@/components/quizzes/editor-model";
+import PassageCard from "@/features/quizzes/PassageCard";
+import PassageForm from "@/features/quizzes/PassageForm";
+import QuestionEditorCard from "@/features/quizzes/QuestionEditorCard";
+import QuestionForm from "@/features/quizzes/QuestionForm";
+import SessionList from "@/features/quizzes/SessionList";
+import { useQuizEditor } from "@/features/quizzes/useQuizEditor";
+import { DISPLAY_MODE_OPTIONS } from "@/features/quizzes/editor-model";
 import type { DisplayMode, Passage, Question } from "@/lib/types";
 
 type CanvasItem =
@@ -230,7 +230,7 @@ export default function QuizEditorClient({
         <div className="mb-12 space-y-4">
           {canvasItems.map((item, index) =>
             item.kind === "question" ? (
-              <QuestionCard
+              <QuestionEditorCard
                 key={`question-${item.question.id}`}
                 question={item.question}
                 index={index}

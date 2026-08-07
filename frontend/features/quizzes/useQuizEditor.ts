@@ -7,7 +7,7 @@ import {
   passagesApi,
   questionsApi,
   quizzesApi,
-} from "@/components/quizzes/quiz-api";
+} from "@/features/quizzes/quiz-api";
 import { sessionsApi } from "@/features/session/session-api";
 import { apiErrorMessage } from "@/lib/api";
 import { storeSessionJoinCode } from "@/lib/session-storage";
