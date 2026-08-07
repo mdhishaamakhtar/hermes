@@ -176,8 +176,13 @@ Call sites convert from `if (!res.success)` to `try`/`catch`. One convention.
   surfaces that are genuinely new on screen — modals, drawers, question transitions —
   where movement carries meaning.
 - Replace all ~25 inline duration literals with named presets.
-- Delete `.page-enter` and `.page-enter-delay-1..5`; those four pages adopt the same
-  system as everything else.
+
+**Correction made during implementation:** the plan said to delete `.page-enter`.
+It was kept. Measured against `rise`, it is the same animation — same 8px travel,
+same `--duration-enter`, same `--ease-out` — so the two never competed. Deleting
+it would have forced the landing page, a server component, to become a client
+component solely to animate an entrance. Both are retained and documented as
+twins, chosen by server-vs-client rather than by taste.
 
 ### Stage 4 — Remove skeleton drift
 
@@ -208,6 +213,18 @@ accessibility, and responsive review. Fix what it surfaces.
 
 Deferred to this point deliberately: auditing before the duplication is removed would
 produce findings against code scheduled for deletion.
+
+**Outcome:** scored 15/20. Implementation integrity passed with zero detector
+findings; accessibility scored 2/4 and drove the fixes (no label was associated
+with its input, `text-muted/40` measured 2.15:1 on a destructive control, two
+targets were 16px tall). One finding was left unfixed by choice — the timer bar
+animates `width` — because the file records that transforms in that subtree break
+the fill, and it is a 1px bar.
+
+**Known drift, not repaired here:** DESIGN.md and its sidecar still document
+`surface-card`, `interactive-row`, and a radius scale, all removed as dead code in
+Stage 1. That is documentation, not code, and rewriting it is its own task
+(`/impeccable document`).
 
 ### Stage 7 — Consolidate the tree (mechanical)
 
