@@ -51,6 +51,10 @@ LOBBY → ACTIVE → ENDED
 - **Participants** are anonymous. They receive a rejoin token on `POST /api/sessions/join`, stored in `localStorage` as `hermes_rejoin_{sessionId}`.
 
 ### WebSocket Communication (STOMP)
+- **Broker mode:** `STOMP_BROKER_MODE` selects `simple` (default, in-process, no external
+  service) or `relay` (external STOMP broker via `BROKER_RELAY_*`). Switching is config-only.
+  The simple broker keeps subscriptions in the process holding the WebSocket, so it is correct
+  for a single instance only — running more than one replica requires `relay`.
 - **Endpoint:** `/ws-hermes`
 - **Client → Server:** `/app/session/{sessionId}/answer` — submit an answer
 - **Server → Client subscriptions:**
