@@ -13,7 +13,13 @@ import org.springframework.stereotype.Repository;
 public interface QuizSessionRepository extends JpaRepository<QuizSession, Long> {
   List<QuizSession> findByQuizIdOrderByCreatedAtDesc(Long quizId);
 
-  List<QuizSession> findByQuizIdIn(List<Long> quizIds);
+  /**
+   * Projects ids only. Deletion paths bulk-delete sessions and then cascade-remove the owning quiz
+   * or event; loading the session entities first would leave them managed and stale, and Hibernate
+   * would fail the flush on their now-removed quiz reference.
+   */
+  @Query("SELECT s.id FROM QuizSession s WHERE s.quiz.id IN :quizIds")
+  List<Long> findIdsByQuizIdIn(@Param("quizIds") List<Long> quizIds);
 
   boolean existsByQuizIdAndStatusIn(Long quizId, List<SessionStatus> statuses);
 
