@@ -1,5 +1,6 @@
 package dev.hishaam.hermes.dto.session;
 
+import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import java.util.List;
 import java.util.Map;
 
@@ -7,7 +8,7 @@ public record RejoinResponse(
     Long participantId,
     Long sessionId,
     String status,
-    String questionLifecycle,
+    QuestionLifecycleState questionLifecycle,
     String sessionTitle,
     int participantCount,
     Long currentQuestionId,
