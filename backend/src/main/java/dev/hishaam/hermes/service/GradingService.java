@@ -58,8 +58,7 @@ public class GradingService {
   public void gradeQuestion(Long sessionId, Long questionId) {
     String sid = sessionId.toString();
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
-    if (question == null) return;
+    QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(questionId);
 
     Long timerStartedAt = stateStore.getTimerStartedAt(sessionId);
     Map<Long, Integer> participantScores =
@@ -78,17 +77,14 @@ public class GradingService {
   public void gradePassage(Long sessionId, Long passageId) {
     String sid = sessionId.toString();
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
-    if (passage == null) return;
+    QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(passageId);
 
     Long timerStartedAt = stateStore.getTimerStartedAt(sessionId);
 
     // Grade each sub-question; accumulate per-participant totals for one leaderboard update
     Map<Long, Integer> totalScores = new HashMap<>();
     for (Long subQuestionId : passage.subQuestionIds()) {
-      QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(subQuestionId);
-      if (question == null) continue;
-
+      QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(subQuestionId);
       Map<Long, Integer> scores = gradeAndSave(sessionId, subQuestionId, question, timerStartedAt);
       scores.forEach(
           (pid, s) ->
@@ -104,10 +100,8 @@ public class GradingService {
 
     // Broadcast QUESTION_REVIEWED for each sub-question
     for (Long subQuestionId : passage.subQuestionIds()) {
-      QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(subQuestionId);
-      if (question != null) {
-        eventPublisher.publishQuestionReviewed(sessionId, subQuestionId, question);
-      }
+      eventPublisher.publishQuestionReviewed(
+          sessionId, subQuestionId, snapshot.requireQuestion(subQuestionId));
     }
     eventPublisher.publishLeaderboardUpdates(sessionId);
   }
@@ -122,8 +116,7 @@ public class GradingService {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
 
     if (session.getStatus() == SessionStatus.ACTIVE) {
-      String questionState = stateStore.getQuestionState(sessionId);
-      if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
+      if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.REVIEWING) {
         throw AppException.conflict(
             "Scoring can only be corrected while reviewing or after session ends");
       }
@@ -159,14 +152,15 @@ public class GradingService {
   private void regradeQuestion(Long sessionId, Long questionId) {
     String sid = sessionId.toString();
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
-    if (question == null) return;
+    QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(questionId);
 
     // Re-grade frozen answers for this question using updated point values
     List<ParticipantAnswer> answers =
         answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, questionId);
+    OffsetDateTime regradedAt = OffsetDateTime.now();
     for (ParticipantAnswer answer : answers) {
       answer.setScore(scoreCalculator.computeScore(answer, question));
+      answer.setGradedAt(regradedAt);
     }
     answerRepository.saveAll(answers);
 
@@ -194,10 +188,12 @@ public class GradingService {
         answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, questionId);
 
     Map<Long, Integer> participantScores = new HashMap<>();
+    OffsetDateTime gradedAt = OffsetDateTime.now();
 
     for (ParticipantAnswer answer : answers) {
       int score = scoreCalculator.computeScore(answer, question);
       answer.setScore(score);
+      answer.setGradedAt(gradedAt);
 
       if (answer.getAnsweredAt() != null && timerStartedAt != null) {
         long answerTimeMs =

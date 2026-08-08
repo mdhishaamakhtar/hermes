@@ -1,9 +1,11 @@
 package dev.hishaam.hermes.repository.redis;
 
+import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Function;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -28,7 +30,7 @@ public class SessionStateRedisRepository {
 
   /** Volatile state needed to rebuild a client's live view after reconnect. */
   public record RejoinContext(
-      String questionLifecycle,
+      QuestionLifecycleState questionLifecycle,
       Long currentQuestionId,
       Long currentPassageId,
       int participantCount,
@@ -99,23 +101,32 @@ public class SessionStateRedisRepository {
             SessionRedisKeys.SESSION_TTL);
   }
 
-  public String getStatus(Long sessionId) {
-    return redis.opsForValue().get(SessionRedisKeys.statusKey(sessionId.toString()));
+  public SessionStatus getStatus(Long sessionId) {
+    return parse(
+        redis.opsForValue().get(SessionRedisKeys.statusKey(sessionId.toString())),
+        SessionStatus::valueOf);
   }
 
-  public void setQuestionState(Long sessionId, String state) {
+  public void setQuestionState(Long sessionId, QuestionLifecycleState state) {
     String sid = sessionId.toString();
     redis
         .opsForValue()
-        .set(SessionRedisKeys.questionStateKey(sid), state, SessionRedisKeys.SESSION_TTL);
+        .set(SessionRedisKeys.questionStateKey(sid), state.name(), SessionRedisKeys.SESSION_TTL);
   }
 
-  public String getQuestionState(Long sessionId) {
-    return redis.opsForValue().get(SessionRedisKeys.questionStateKey(sessionId.toString()));
+  public QuestionLifecycleState getQuestionState(Long sessionId) {
+    return parse(
+        redis.opsForValue().get(SessionRedisKeys.questionStateKey(sessionId.toString())),
+        QuestionLifecycleState::valueOf);
   }
 
-  public String getCurrentQuestionId(Long sessionId) {
-    return redis.opsForValue().get(SessionRedisKeys.currentQuestionKey(sessionId.toString()));
+  /**
+   * Returns null when no question is current — the key is absent or holds the empty placeholder.
+   */
+  public Long getCurrentQuestionId(Long sessionId) {
+    return parse(
+        redis.opsForValue().get(SessionRedisKeys.currentQuestionKey(sessionId.toString())),
+        Long::valueOf);
   }
 
   public void setCurrentQuestion(Long sessionId, Long questionId) {
@@ -143,8 +154,11 @@ public class SessionStateRedisRepository {
             SessionRedisKeys.SESSION_TTL);
   }
 
-  public String getCurrentPassageId(Long sessionId) {
-    return redis.opsForValue().get(SessionRedisKeys.currentPassageKey(sessionId.toString()));
+  /** Returns null when the session is not inside an ENTIRE_PASSAGE block. */
+  public Long getCurrentPassageId(Long sessionId) {
+    return parse(
+        redis.opsForValue().get(SessionRedisKeys.currentPassageKey(sessionId.toString())),
+        Long::valueOf);
   }
 
   public void clearCurrentPassage(Long sessionId) {
@@ -260,25 +274,23 @@ public class SessionStateRedisRepository {
    * place, avoiding repeated round-trips from callers.
    */
   public RejoinContext readRejoinContext(Long sessionId) {
-    String questionLifecycle = getQuestionState(sessionId);
-
-    String currentQIdStr = getCurrentQuestionId(sessionId);
-    Long currentQId =
-        (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
-
-    String currentPassageIdStr = getCurrentPassageId(sessionId);
-    Long currentPassageId =
-        (currentPassageIdStr != null && !currentPassageIdStr.isEmpty())
-            ? Long.parseLong(currentPassageIdStr)
-            : null;
-
-    int participantCount = (int) getParticipantCount(sessionId);
-
     Long ttl = getTimerTtlSeconds(sessionId);
-    Integer timeLeftSeconds = (ttl != null && ttl > 0) ? ttl.intValue() : null;
 
     return new RejoinContext(
-        questionLifecycle, currentQId, currentPassageId, participantCount, timeLeftSeconds);
+        getQuestionState(sessionId),
+        getCurrentQuestionId(sessionId),
+        getCurrentPassageId(sessionId),
+        (int) getParticipantCount(sessionId),
+        (ttl != null && ttl > 0) ? ttl.intValue() : null);
+  }
+
+  /**
+   * Converts a raw Redis string into a typed value, treating both a missing key and the
+   * empty-string placeholder written by {@link #initSessionKeys} / {@link #clearCurrentQuestion} as
+   * absent.
+   */
+  private static <T> T parse(String raw, Function<String, T> converter) {
+    return (raw == null || raw.isEmpty()) ? null : converter.apply(raw);
   }
 
   // ─── Cleanup ───────────────────────────────────────────────────────────────────

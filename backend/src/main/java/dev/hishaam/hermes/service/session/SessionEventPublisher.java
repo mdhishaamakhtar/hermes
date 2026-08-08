@@ -73,10 +73,8 @@ public class SessionEventPublisher {
 
     WsPayloads.PassageContext passageContext = null;
     if (question.passageId() != null) {
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(question.passageId());
-      if (passage != null) {
-        passageContext = new WsPayloads.PassageContext(passage.id(), passage.text());
-      }
+      QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(question.passageId());
+      passageContext = new WsPayloads.PassageContext(passage.id(), passage.text());
     }
 
     send(
@@ -113,10 +111,7 @@ public class SessionEventPublisher {
                 })
             .toList();
 
-    String effectiveDisplayMode =
-        subQuestions.isEmpty()
-            ? DisplayMode.LIVE.name()
-            : subQuestions.getFirst().effectiveDisplayMode().name();
+    String effectiveDisplayMode = subQuestions.getFirst().effectiveDisplayMode().name();
 
     send(
         WsTopics.sessionQuestion(sessionId),

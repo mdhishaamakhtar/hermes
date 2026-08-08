@@ -36,8 +36,21 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
   @Query("DELETE FROM ParticipantAnswer a WHERE a.sessionId IN :sessionIds")
   void deleteBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
 
-  @Query("SELECT a FROM ParticipantAnswer a WHERE a.sessionId = :sessionId AND a.score IS NOT NULL")
+  @Query(
+      "SELECT a FROM ParticipantAnswer a WHERE a.sessionId = :sessionId AND a.gradedAt IS NOT NULL")
   List<ParticipantAnswer> findGradedBySessionId(@Param("sessionId") Long sessionId);
+
+  /**
+   * Counts submitted answers the grading engine has never scored. Used when ending a session whose
+   * Redis lifecycle state is gone, to decide whether the in-progress question still needs grading.
+   * Already-graded answers count zero, so this cannot trigger a double grade.
+   */
+  @Query(
+      "SELECT COUNT(a) FROM ParticipantAnswer a"
+          + " WHERE a.sessionId = :sessionId AND a.questionId IN :questionIds"
+          + " AND a.answeredAt IS NOT NULL AND a.gradedAt IS NULL")
+  long countUngradedAnswers(
+      @Param("sessionId") Long sessionId, @Param("questionIds") List<Long> questionIds);
 
   @Query(
       "SELECT a FROM ParticipantAnswer a"

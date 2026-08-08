@@ -13,9 +13,7 @@ import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.GradingService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,16 +63,11 @@ public class SessionEngine {
    */
   @Transactional
   public void advanceSessionInternal(Long sessionId) {
-    String sid = sessionId.toString();
-    String status = stateStore.getStatus(sessionId);
-    if (!SessionStatus.ACTIVE.name().equals(status)) return;
+    if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) return;
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    String currentQIdStr = stateStore.getCurrentQuestionId(sessionId);
-    Long currentQId =
-        (currentQIdStr != null && !currentQIdStr.isEmpty()) ? Long.parseLong(currentQIdStr) : null;
-
-    QuizSnapshot.QuestionSnapshot next = snapshot.findNextQuestion(currentQId);
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot.QuestionSnapshot next =
+        snapshot.findNextQuestion(stateStore.getCurrentQuestionId(sessionId));
     if (next == null) {
       doEndSession(sessionId, snapshot);
       return;
@@ -91,7 +84,7 @@ public class SessionEngine {
 
     stateStore.setCurrentQuestion(sessionId, next.id());
     stateStore.clearCurrentPassage(sessionId);
-    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
+    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED);
     scoringStore.initQuestionCounts(sessionId, next);
     eventPublisher.publishQuestionDisplayed(sessionId, next, snapshot);
     updateDbCurrentQuestion(sessionId, next);
@@ -106,55 +99,37 @@ public class SessionEngine {
    */
   @Transactional
   public void startTimerInternal(Long sessionId) {
-    String sid = sessionId.toString();
-    String status = stateStore.getStatus(sessionId);
-    if (!SessionStatus.ACTIVE.name().equals(status)) {
+    if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) {
       throw AppException.conflict("Session is not active");
     }
-
-    String questionState = stateStore.getQuestionState(sessionId);
-    if (!QuestionLifecycleState.DISPLAYED.name().equals(questionState)) {
+    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.DISPLAYED) {
       throw AppException.conflict("Timer can only be started when question is in DISPLAYED state");
     }
 
-    String currentPassageIdStr = stateStore.getCurrentPassageId(sessionId);
-    String currentQIdStr = stateStore.getCurrentQuestionId(sessionId);
-
-    if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
-      Long passageId = Long.parseLong(currentPassageIdStr);
-      QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
-      if (passage == null || passage.timeLimitSeconds() == null) {
-        throw AppException.conflict("Passage has no time limit configured");
-      }
-
-      stateStore.setQuestionState(sessionId, QuestionLifecycleState.TIMED.name());
-      stateStore.setTimer(sessionId, passage.timeLimitSeconds());
-      stateStore.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
-      eventPublisher.publishTimerStart(sessionId, null, passageId, passage.timeLimitSeconds());
-
-      long seqAtStart = stateStore.getQuestionSequence(sessionId);
-      timerScheduler.scheduleQuestionTimer(sessionId, passage.timeLimitSeconds(), seqAtStart);
-
-    } else {
-      if (currentQIdStr == null || currentQIdStr.isEmpty()) {
-        throw AppException.conflict("No current question to start timer for");
-      }
-      Long questionId = Long.parseLong(currentQIdStr);
-      QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-      QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
-      if (question == null) {
-        throw AppException.notFound("Question not found in session snapshot");
-      }
-
-      stateStore.setQuestionState(sessionId, QuestionLifecycleState.TIMED.name());
-      stateStore.setTimer(sessionId, question.timeLimitSeconds());
-      stateStore.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
-      eventPublisher.publishTimerStart(sessionId, questionId, null, question.timeLimitSeconds());
-
-      long seqAtStart = stateStore.getQuestionSequence(sessionId);
-      timerScheduler.scheduleQuestionTimer(sessionId, question.timeLimitSeconds(), seqAtStart);
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    CurrentTarget target = resolveCurrentTarget(sessionId, snapshot);
+    if (target == null) {
+      throw AppException.conflict("No current question to start timer for");
     }
+
+    // Only a passage can reach here without a limit, and creation validation already rejects that;
+    // the guard exists so a corrupted snapshot fails as a conflict rather than an unboxing NPE.
+    Integer timeLimit = target.timeLimitSeconds();
+    if (timeLimit == null) {
+      throw AppException.conflict("Current question or passage has no time limit configured");
+    }
+
+    stateStore.setQuestionState(sessionId, QuestionLifecycleState.TIMED);
+    stateStore.setTimer(sessionId, timeLimit);
+    stateStore.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
+    switch (target) {
+      case CurrentTarget.Passage p ->
+          eventPublisher.publishTimerStart(sessionId, null, p.passage().id(), timeLimit);
+      case CurrentTarget.Question q ->
+          eventPublisher.publishTimerStart(sessionId, q.question().id(), null, timeLimit);
+    }
+    timerScheduler.scheduleQuestionTimer(
+        sessionId, timeLimit, stateStore.getQuestionSequence(sessionId));
   }
 
   /**
@@ -164,38 +139,26 @@ public class SessionEngine {
    */
   @Transactional
   public void onTimerExpired(Long sessionId) {
-    String sid = sessionId.toString();
-    String status = stateStore.getStatus(sessionId);
-    if (!SessionStatus.ACTIVE.name().equals(status)) return;
+    if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) return;
+    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.TIMED) return;
 
-    String questionState = stateStore.getQuestionState(sessionId);
-    if (!QuestionLifecycleState.TIMED.name().equals(questionState)) return;
-
-    String currentPassageIdStr = stateStore.getCurrentPassageId(sessionId);
-    String currentQIdStr = stateStore.getCurrentQuestionId(sessionId);
-
-    if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
-      Long passageId = Long.parseLong(currentPassageIdStr);
-      QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
-
-      List<Long> subQuestionIds = passage != null ? passage.subQuestionIds() : List.of();
-      subQuestionIds.forEach(
-          qid -> answerRepository.freezeAnswersForQuestion(sessionId, qid, OffsetDateTime.now()));
-
-      eventPublisher.publishPassageFrozen(sessionId, passageId, subQuestionIds);
-      gradingService.gradePassage(sessionId, passageId);
-
-    } else {
-      if (currentQIdStr != null && !currentQIdStr.isEmpty()) {
-        Long questionId = Long.parseLong(currentQIdStr);
-        answerRepository.freezeAnswersForQuestion(sessionId, questionId, OffsetDateTime.now());
-        eventPublisher.publishQuestionFrozen(sessionId, questionId);
-        gradingService.gradeQuestion(sessionId, questionId);
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    CurrentTarget target = resolveCurrentTarget(sessionId, snapshot);
+    if (target != null) {
+      freezeAnswers(sessionId, target);
+      switch (target) {
+        case CurrentTarget.Passage p -> {
+          eventPublisher.publishPassageFrozen(sessionId, p.passage().id(), p.questionIds());
+          gradingService.gradePassage(sessionId, p.passage().id());
+        }
+        case CurrentTarget.Question q -> {
+          eventPublisher.publishQuestionFrozen(sessionId, q.question().id());
+          gradingService.gradeQuestion(sessionId, q.question().id());
+        }
       }
     }
 
-    stateStore.setQuestionState(sessionId, QuestionLifecycleState.REVIEWING.name());
+    stateStore.setQuestionState(sessionId, QuestionLifecycleState.REVIEWING);
   }
 
   // ─── Session end ───────────────────────────────────────────────────────────────
@@ -219,38 +182,37 @@ public class SessionEngine {
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
     timerScheduler.cancelQuestionTimer(sessionId);
 
-    String currentPassageIdStr = stateStore.getCurrentPassageId(sessionId);
-    String currentQIdStr = stateStore.getCurrentQuestionId(sessionId);
-    String qState = stateStore.getQuestionState(sessionId);
-    boolean shouldGrade = QuestionLifecycleState.TIMED.name().equals(qState);
-
-    if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
-      Long passageId = Long.parseLong(currentPassageIdStr);
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
-      if (passage != null) {
-        passage
-            .subQuestionIds()
-            .forEach(
-                qid ->
-                    answerRepository.freezeAnswersForQuestion(
-                        sessionId, qid, OffsetDateTime.now()));
-        if (shouldGrade) {
-          gradingService.gradePassage(sessionId, passageId);
-        }
-      }
-    } else if (currentQIdStr != null && !currentQIdStr.isBlank()) {
-      Long questionId = Long.parseLong(currentQIdStr);
-      answerRepository.freezeAnswersForQuestion(sessionId, questionId, OffsetDateTime.now());
-      if (shouldGrade) {
-        gradingService.gradeQuestion(sessionId, questionId);
-      }
-    }
-
     QuizSession session =
         sessionRepository
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
     String joinCode = session.getJoinCode();
+
+    boolean timedInRedis = stateStore.getQuestionState(sessionId) == QuestionLifecycleState.TIMED;
+    CurrentTarget target = resolveCurrentTarget(sessionId, snapshot);
+    if (target == null) {
+      // Redis lost the live pointers; the session row still records the question in progress.
+      target = targetFromPersistedQuestion(session, snapshot);
+    }
+
+    if (target != null) {
+      freezeAnswers(sessionId, target);
+      // The lifecycle flag lives in Redis too, so an eviction loses the signal to grade. Fall back
+      // to the durable record: anything submitted and never graded still needs scoring.
+      // The lifecycle flag lives in Redis too, so an eviction loses the signal to grade. Fall back
+      // to the durable record: anything submitted and never graded still needs scoring. An
+      // already-graded answer carries a gradedAt stamp, so this cannot double-grade.
+      boolean shouldGrade =
+          timedInRedis
+              || answerRepository.countUngradedAnswers(sessionId, target.questionIds()) > 0;
+      if (shouldGrade) {
+        switch (target) {
+          case CurrentTarget.Passage p -> gradingService.gradePassage(sessionId, p.passage().id());
+          case CurrentTarget.Question q ->
+              gradingService.gradeQuestion(sessionId, q.question().id());
+        }
+      }
+    }
 
     if (session.getStatus() != SessionStatus.LOBBY) {
       eventPublisher.publishSessionEnd(sessionId);
@@ -268,30 +230,66 @@ public class SessionEngine {
 
   // ─── Helpers ───────────────────────────────────────────────────────────────────
 
+  /**
+   * Resolves what the session is currently sitting on. An active ENTIRE_PASSAGE block takes
+   * precedence over the current question, since the current-question key points at the passage's
+   * last sub-question while the block is displayed. Returns null when nothing is current — which
+   * happens when live state has been evicted, or before the session has started.
+   */
+  private CurrentTarget resolveCurrentTarget(Long sessionId, QuizSnapshot snapshot) {
+    Long passageId = stateStore.getCurrentPassageId(sessionId);
+    if (passageId != null) {
+      return new CurrentTarget.Passage(snapshot.requirePassage(passageId));
+    }
+
+    Long questionId = stateStore.getCurrentQuestionId(sessionId);
+    return questionId == null
+        ? null
+        : new CurrentTarget.Question(snapshot.requireQuestion(questionId));
+  }
+
+  /**
+   * Rebuilds the current target from the session row when Redis no longer has the live pointers.
+   * The row stores the last displayed question; if that question sits inside an ENTIRE_PASSAGE
+   * block the whole block is the unit that was on screen, so the block is returned instead.
+   */
+  private CurrentTarget targetFromPersistedQuestion(QuizSession session, QuizSnapshot snapshot) {
+    Long questionId = session.getCurrentQuestionId();
+    if (questionId == null) return null;
+
+    QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(questionId);
+    if (question.passageId() != null) {
+      QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(question.passageId());
+      if (PassageTimerMode.ENTIRE_PASSAGE == passage.timerMode()) {
+        return new CurrentTarget.Passage(passage);
+      }
+    }
+    return new CurrentTarget.Question(question);
+  }
+
+  private void freezeAnswers(Long sessionId, CurrentTarget target) {
+    OffsetDateTime frozenAt = OffsetDateTime.now();
+    target
+        .questionIds()
+        .forEach(qid -> answerRepository.freezeAnswersForQuestion(sessionId, qid, frozenAt));
+  }
+
   private void displayEntirePassage(
       Long sessionId, QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
-    List<QuizSnapshot.QuestionSnapshot> subQuestions =
-        passage.subQuestionIds().stream()
-            .map(snapshot::findQuestion)
-            .filter(Objects::nonNull)
-            .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-            .toList();
-
+    List<QuizSnapshot.QuestionSnapshot> subQuestions = snapshot.subQuestionsOf(passage);
     QuizSnapshot.QuestionSnapshot lastSub = subQuestions.getLast();
     stateStore.setCurrentQuestion(sessionId, lastSub.id());
     stateStore.setCurrentPassage(sessionId, passage.id());
-    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
+    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED);
     subQuestions.forEach(q -> scoringStore.initQuestionCounts(sessionId, q));
     eventPublisher.publishPassageDisplayed(sessionId, passage, subQuestions, snapshot);
   }
 
   private QuizSnapshot.QuestionSnapshot findLastSubQuestion(
       QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
-    return passage.subQuestionIds().stream()
-        .map(snapshot::findQuestion)
-        .filter(Objects::nonNull)
-        .max(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-        .orElseThrow(() -> AppException.badRequest("Passage has no sub-questions"));
+    // A passage only becomes current because one of its sub-questions was next in the ordering,
+    // so the list is never empty here.
+    return snapshot.subQuestionsOf(passage).getLast();
   }
 
   private void updateDbCurrentQuestion(Long sessionId, QuizSnapshot.QuestionSnapshot question) {

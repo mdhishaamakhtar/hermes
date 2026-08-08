@@ -87,10 +87,7 @@ public class SessionResultsService {
                         scoreCalculator.isCorrectSelection(
                             answer, snapshot.findQuestion(answer.getQuestionId())))
                 .count();
-    int totalScore =
-        answers.stream()
-            .mapToInt(answer -> answer.getScore() != null ? answer.getScore() : 0)
-            .sum();
+    int totalScore = answers.stream().mapToInt(ParticipantAnswer::getScore).sum();
 
     // Compute rank from all session answers
     List<ParticipantAnswer> allAnswers = answerRepository.findBySessionId(sessionId);
@@ -103,7 +100,7 @@ public class SessionResultsService {
         answer ->
             scores.merge(
                 answer.getParticipantId(),
-                (long) (answer.getScore() != null ? answer.getScore() : 0),
+                (long) answer.getScore(),
                 (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
 
     List<Long> sortedIds =
@@ -112,7 +109,6 @@ public class SessionResultsService {
             .map(Map.Entry::getKey)
             .toList();
     int rank = sortedIds.indexOf(participantId) + 1;
-    if (rank == 0) rank = (int) totalParticipants; // shouldn't happen now, but safety net
 
     List<MyResultsResponse.QuestionResult> questions =
         snapshot.questions().stream()
@@ -139,13 +135,9 @@ public class SessionResultsService {
                                       o.pointValue()))
                           .toList();
                   String passageText =
-                      q.passageId() != null
-                          ? snapshot.findPassage(q.passageId()) != null
-                              ? snapshot.findPassage(q.passageId()).text()
-                              : null
-                          : null;
+                      q.passageId() != null ? snapshot.requirePassage(q.passageId()).text() : null;
                   boolean isCorrect = scoreCalculator.isCorrectSelection(ans, q);
-                  int pointsEarned = ans != null && ans.getScore() != null ? ans.getScore() : 0;
+                  int pointsEarned = ans != null ? ans.getScore() : 0;
                   return new MyResultsResponse.QuestionResult(
                       q.id(),
                       q.text(),
@@ -214,11 +206,7 @@ public class SessionResultsService {
                           .filter(answer -> answer.getAnsweredAt() != null)
                           .count();
                   String passageText =
-                      q.passageId() != null
-                          ? snapshot.findPassage(q.passageId()) != null
-                              ? snapshot.findPassage(q.passageId()).text()
-                              : null
-                          : null;
+                      q.passageId() != null ? snapshot.requirePassage(q.passageId()).text() : null;
 
                   List<SessionResultsResponse.OptionInfo> options =
                       q.options().stream()
@@ -252,7 +240,7 @@ public class SessionResultsService {
         answer ->
             scores.merge(
                 answer.getParticipantId(),
-                (long) (answer.getScore() != null ? answer.getScore() : 0),
+                (long) answer.getScore(),
                 (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
 
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =

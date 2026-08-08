@@ -56,8 +56,21 @@ public class ParticipantAnswer {
   @Column(name = "answered_at")
   private OffsetDateTime answeredAt;
 
-  /** Computed by the grading engine after the question is frozen. Initializes to 0. */
-  @Column(name = "score")
+  /**
+   * Computed by the grading engine after the question is frozen. Always present — an answer starts
+   * at 0 and grading overwrites it — so readers never need to null-check it. Use {@link #gradedAt}
+   * to tell an ungraded answer from one correctly scored zero.
+   */
+  @Column(name = "score", nullable = false)
   @Builder.Default
-  private Integer score = 0;
+  private int score = 0;
+
+  /**
+   * When the grading engine last scored this answer, or null if it never has. Needed because {@code
+   * score} defaults to 0, which makes an ungraded answer indistinguishable from one correctly
+   * scored zero. Ending a session whose Redis lifecycle state was evicted relies on this to tell
+   * whether the in-progress question still needs grading.
+   */
+  @Column(name = "graded_at")
+  private OffsetDateTime gradedAt;
 }

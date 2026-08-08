@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,16 @@ import org.springframework.stereotype.Repository;
 public interface ParticipantRepository extends JpaRepository<Participant, Long> {
   Optional<Participant> findByRejoinToken(String rejoinToken);
 
-  void deleteBySessionIdIn(List<Long> sessionIds);
+  /**
+   * Bulk delete rather than a derived one, so it executes immediately instead of being queued until
+   * flush. Callers delete answers, then participants, then the sessions themselves — and {@code
+   * EventService} removes sessions with an immediate batch delete, which would hit the participant
+   * foreign key if these removals were still pending. Mirrors {@code
+   * ParticipantAnswerRepository#deleteBySessionIdIn}.
+   */
+  @Modifying
+  @Query("DELETE FROM Participant p WHERE p.session.id IN :sessionIds")
+  void deleteBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
 
   long countBySessionId(Long sessionId);
 

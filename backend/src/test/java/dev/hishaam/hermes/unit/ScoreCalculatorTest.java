@@ -70,7 +70,7 @@ class ScoreCalculatorTest {
     ParticipantAnswer first = answer(1L, 10L);
     first.setScore(7);
     ParticipantAnswer second = answer(1L, 11L);
-    second.setScore(null);
+    second.setScore(0);
     ParticipantAnswer third = answer(2L, 12L);
     third.setScore(4);
 

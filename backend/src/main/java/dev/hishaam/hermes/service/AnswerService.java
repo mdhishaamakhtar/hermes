@@ -120,32 +120,25 @@ public class AnswerService {
 
   private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(
       Long sessionId, Long questionId) {
-    String status = stateStore.getStatus(sessionId);
-    if (!SessionStatus.ACTIVE.name().equals(status)) {
+    if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) {
       throw AppException.conflict("Session is not accepting answers");
     }
 
-    String questionState = stateStore.getQuestionState(sessionId);
-    if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
+    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.TIMED) {
       throw AppException.conflict("Question is not currently accepting answers");
     }
 
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
 
     // For ENTIRE_PASSAGE mode: accept answers for any sub-question in the current passage
-    String currentPassageIdStr = stateStore.getCurrentPassageId(sessionId);
-    if (currentPassageIdStr != null && !currentPassageIdStr.isEmpty()) {
-      Long passageId = Long.parseLong(currentPassageIdStr);
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(passageId);
+    Long currentPassageId = stateStore.getCurrentPassageId(sessionId);
+    if (currentPassageId != null) {
+      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(currentPassageId);
       if (passage == null || !passage.subQuestionIds().contains(questionId)) {
         throw AppException.conflict("Question does not belong to the current passage");
       }
-    } else {
-      String currentQuestionId = stateStore.getCurrentQuestionId(sessionId);
-      if (currentQuestionId == null || !currentQuestionId.equals(questionId.toString())) {
-        throw AppException.conflict("Question is no longer active");
-      }
+    } else if (!questionId.equals(stateStore.getCurrentQuestionId(sessionId))) {
+      throw AppException.conflict("Question is no longer active");
     }
 
     QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);

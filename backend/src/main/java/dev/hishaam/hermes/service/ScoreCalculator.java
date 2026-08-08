@@ -64,7 +64,7 @@ public class ScoreCalculator {
         answer ->
             participantTotals.merge(
                 answer.getParticipantId(),
-                (long) (answer.getScore() != null ? answer.getScore() : 0),
+                (long) answer.getScore(),
                 (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
     return participantTotals;
   }

@@ -17,11 +17,9 @@ import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.*;
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -149,7 +147,7 @@ public class SessionService {
 
     stateStore.activateSession(sessionId, first.id());
     scoringStore.initQuestionCounts(sessionId, first);
-    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED.name());
+    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED);
     eventPublisher.publishQuestionDisplayed(sessionId, first, snapshot);
     // Timer is NOT started — host will call /start-timer
   }
@@ -168,8 +166,7 @@ public class SessionService {
    */
   public void endTimerEarly(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    String questionState = stateStore.getQuestionState(sessionId);
-    if (!QuestionLifecycleState.TIMED.name().equals(questionState)) {
+    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.TIMED) {
       throw AppException.conflict("Timer can only be ended while question is in TIMED state");
     }
 
@@ -182,8 +179,7 @@ public class SessionService {
 
   public void advanceSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    String questionState = stateStore.getQuestionState(sessionId);
-    if (!QuestionLifecycleState.REVIEWING.name().equals(questionState)) {
+    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.REVIEWING) {
       throw AppException.conflict("Cannot advance: current question is not in REVIEWING state");
     }
     stateStore.incrementQuestionSequence(sessionId);
@@ -262,47 +258,35 @@ public class SessionService {
 
     if (session.getStatus() == SessionStatus.ACTIVE && ctx.currentQuestionId() != null) {
       if (ctx.currentPassageId() != null) {
-        QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(ctx.currentPassageId());
-        if (passage != null) {
-          List<HostSessionSyncResponse.PassageQuestionInfo> subQuestions =
-              passage.subQuestionIds().stream()
-                  .map(snapshot::findQuestion)
-                  .filter(Objects::nonNull)
-                  .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-                  .map(
-                      q -> {
-                        questionStatsById.put(
-                            q.id(),
-                            buildQuestionStats(
-                                sessionId, q, totalParticipants, ctx.questionLifecycle()));
-                        return buildPassageQuestionInfo(q, snapshot);
-                      })
-                  .toList();
+        QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(ctx.currentPassageId());
+        List<HostSessionSyncResponse.PassageQuestionInfo> subQuestions =
+            snapshot.subQuestionsOf(passage).stream()
+                .map(
+                    q -> {
+                      questionStatsById.put(
+                          q.id(),
+                          buildQuestionStats(
+                              sessionId, q, totalParticipants, ctx.questionLifecycle()));
+                      return buildPassageQuestionInfo(q, snapshot);
+                    })
+                .toList();
 
-          currentPassage =
-              new HostSessionSyncResponse.CurrentPassage(
-                  passage.id(),
-                  passage.text(),
-                  passage.timerMode().name(),
-                  snapshot.questionPosition(
-                      subQuestions.isEmpty()
-                          ? ctx.currentQuestionId()
-                          : subQuestions.getFirst().id()),
-                  snapshot.questions().size(),
-                  passage.timeLimitSeconds(),
-                  subQuestions.isEmpty()
-                      ? DisplayMode.LIVE.name()
-                      : subQuestions.getFirst().effectiveDisplayMode(),
-                  subQuestions);
-        }
+        currentPassage =
+            new HostSessionSyncResponse.CurrentPassage(
+                passage.id(),
+                passage.text(),
+                passage.timerMode().name(),
+                snapshot.questionPosition(subQuestions.getFirst().id()),
+                snapshot.questions().size(),
+                passage.timeLimitSeconds(),
+                subQuestions.getFirst().effectiveDisplayMode(),
+                subQuestions);
       } else {
-        QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(ctx.currentQuestionId());
-        if (question != null) {
-          currentQuestion = buildCurrentQuestion(question, snapshot);
-          questionStatsById.put(
-              question.id(),
-              buildQuestionStats(sessionId, question, totalParticipants, ctx.questionLifecycle()));
-        }
+        QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(ctx.currentQuestionId());
+        currentQuestion = buildCurrentQuestion(question, snapshot);
+        questionStatsById.put(
+            question.id(),
+            buildQuestionStats(sessionId, question, totalParticipants, ctx.questionLifecycle()));
       }
     }
 
@@ -375,10 +359,8 @@ public class SessionService {
   private HostSessionSyncResponse.PassageInfo buildPassageInfo(
       QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
     if (question.passageId() == null) return null;
-    var passage = snapshot.findPassage(question.passageId());
-    return passage == null
-        ? null
-        : new HostSessionSyncResponse.PassageInfo(passage.id(), passage.text());
+    var passage = snapshot.requirePassage(question.passageId());
+    return new HostSessionSyncResponse.PassageInfo(passage.id(), passage.text());
   }
 
   private List<HostSessionSyncResponse.OptionInfo> buildOptionInfos(
@@ -392,7 +374,7 @@ public class SessionService {
       Long sessionId,
       QuizSnapshot.QuestionSnapshot question,
       int participantCount,
-      String questionLifecycle) {
+      QuestionLifecycleState questionLifecycle) {
     Map<Long, Integer> optionPoints = new LinkedHashMap<>();
     question.options().forEach(option -> optionPoints.put(option.id(), option.pointValue()));
     List<Long> correctOptionIds =
@@ -400,7 +382,7 @@ public class SessionService {
             .filter(option -> option.pointValue() > 0)
             .map(QuizSnapshot.OptionSnapshot::id)
             .toList();
-    boolean reviewed = QuestionLifecycleState.REVIEWING.name().equals(questionLifecycle);
+    boolean reviewed = questionLifecycle == QuestionLifecycleState.REVIEWING;
     boolean revealed =
         reviewed
             && (question.effectiveDisplayMode() == DisplayMode.BLIND

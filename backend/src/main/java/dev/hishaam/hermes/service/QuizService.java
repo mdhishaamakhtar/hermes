@@ -82,10 +82,7 @@ public class QuizService {
   @Transactional
   public void deleteQuiz(Long quizId, Long userId) {
     Quiz quiz = ownershipService.requireQuizOwner(quizId, userId);
-    List<Long> sessionIds =
-        sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId).stream()
-            .map(QuizSession::getId)
-            .toList();
+    List<Long> sessionIds = sessionRepository.findIdsByQuizIdIn(List.of(quizId));
     if (!sessionIds.isEmpty()) {
       participantAnswerRepository.deleteBySessionIdIn(sessionIds);
       participantRepository.deleteBySessionIdIn(sessionIds);
