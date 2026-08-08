@@ -4,24 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
-import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.converter.JacksonJsonMessageConverter;
-import org.springframework.messaging.simp.stomp.StompCommand;
-import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.web.socket.WebSocketHttpHeaders;
-import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 /**
@@ -141,6 +134,200 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
+   * Verifies that a refused answer or lock-in comes back to the submitting participant as an
+   * ANSWER_REJECTED frame carrying the originating error code and message, rather than failing
+   * silently. Covers all three rejection reasons the handler can surface: the question not being
+   * open for answers, a lock-in with nothing submitted, and a stale question id.
+   */
+  @Test
+  void answerAndLockInFailuresReachTheSubmittingParticipantAsRejectionFrames() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Rejection Event");
+    long quizId = createQuiz(organiser, eventId, "Rejection Quiz");
+    JsonNode first = createSingleSelectQuestion(organiser, quizId, "First question", 1, 30);
+    JsonNode second = createSingleSelectQuestion(organiser, quizId, "Second question", 2, 30);
+    long firstQuestionId = first.path("id").asLong();
+    long secondQuestionId = second.path("id").asLong();
+    long firstOptionId = first.path("options").get(0).path("id").asLong();
+    long secondOptionId = second.path("options").get(0).path("id").asLong();
+
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+
+    WebSocketStompClient participantClient = stompClient();
+    StompSession participantSession = connect(participantClient, null);
+    BlockingQueue<JsonNode> answerAcks = new LinkedBlockingQueue<>();
+    BlockingQueue<JsonNode> questionEvents = new LinkedBlockingQueue<>();
+    subscribe(participantSession, "/user/queue/answers", answerAcks);
+    subscribe(participantSession, "/topic/session." + sessionId + ".question", questionEvents);
+
+    String rejoinToken =
+        postJson(
+                "/api/sessions/join",
+                null,
+                Map.of("joinCode", session.path("joinCode").asText(), "displayName", "Rey"),
+                200)
+            .path("data")
+            .path("rejoinToken")
+            .asText();
+
+    // The question is DISPLAYED but the host has not started the timer, so it takes no answers yet.
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    waitForEvent(questionEvents, "QUESTION_DISPLAYED");
+
+    sendAnswer(participantSession, sessionId, rejoinToken, firstQuestionId, firstOptionId, "rej-1");
+    JsonNode tooEarly = waitForEvent(answerAcks, "ANSWER_REJECTED");
+    assertThat(tooEarly.path("clientRequestId").asText()).isEqualTo("rej-1");
+    assertThat(tooEarly.path("questionId").asLong()).isEqualTo(firstQuestionId);
+    assertThat(tooEarly.path("code").asText()).isEqualTo("CONFLICT");
+    assertThat(tooEarly.path("message").asText())
+        .isEqualTo("Question is not currently accepting answers");
+    assertThat(tooEarly.path("lockedIn").asBoolean()).isFalse();
+
+    postJson("/api/sessions/" + sessionId + "/start-timer", organiser, Map.of(), 200);
+    waitForEvent(questionEvents, "TIMER_START");
+
+    // Locking in before submitting anything must be refused, and flagged as a lock-in rejection.
+    StompHeaders lockHeaders = new StompHeaders();
+    lockHeaders.setDestination("/app/session/" + sessionId + "/lock-in");
+    participantSession.send(
+        lockHeaders,
+        Map.of(
+            "rejoinToken", rejoinToken, "questionId", firstQuestionId, "clientRequestId", "rej-2"));
+
+    JsonNode lockTooEarly = waitForEvent(answerAcks, "ANSWER_REJECTED");
+    assertThat(lockTooEarly.path("clientRequestId").asText()).isEqualTo("rej-2");
+    assertThat(lockTooEarly.path("code").asText()).isEqualTo("CONFLICT");
+    assertThat(lockTooEarly.path("message").asText())
+        .isEqualTo("Cannot lock in before submitting an answer");
+    assertThat(lockTooEarly.path("lockedIn").asBoolean()).isTrue();
+
+    // A late client answering the question that is not on screen must be refused too.
+    sendAnswer(
+        participantSession, sessionId, rejoinToken, secondQuestionId, secondOptionId, "rej-3");
+    JsonNode staleQuestion = waitForEvent(answerAcks, "ANSWER_REJECTED");
+    assertThat(staleQuestion.path("clientRequestId").asText()).isEqualTo("rej-3");
+    assertThat(staleQuestion.path("questionId").asLong()).isEqualTo(secondQuestionId);
+    assertThat(staleQuestion.path("message").asText()).isEqualTo("Question is no longer active");
+
+    // The same participant can still answer the live question afterwards.
+    sendAnswer(participantSession, sessionId, rejoinToken, firstQuestionId, firstOptionId, "rej-4");
+    assertThat(waitForEvent(answerAcks, "ANSWER_ACCEPTED").path("clientRequestId").asText())
+        .isEqualTo("rej-4");
+
+    participantSession.disconnect();
+  }
+
+  /** Connects with a verbatim Authorization header, bypassing the Bearer-prefixing helper. */
+  private StompSession connectWithRawAuthHeader(WebSocketStompClient client, String authHeader)
+      throws Exception {
+    StompHeaders headers = new StompHeaders();
+    headers.add("Authorization", authHeader);
+    StompSession session =
+        client
+            .connectAsync(
+                wsUrl(), new WebSocketHttpHeaders(), headers, new StompSessionHandlerAdapter() {})
+            .get(10, TimeUnit.SECONDS);
+    session.setAutoReceipt(true);
+    return session;
+  }
+
+  private void sendAnswer(
+      StompSession session,
+      long sessionId,
+      String rejoinToken,
+      long questionId,
+      long optionId,
+      String clientRequestId) {
+    StompHeaders headers = new StompHeaders();
+    headers.setDestination("/app/session/" + sessionId + "/answer");
+    session.send(
+        headers,
+        Map.of(
+            "rejoinToken",
+            rejoinToken,
+            "questionId",
+            questionId,
+            "selectedOptionIds",
+            List.of(optionId),
+            "clientRequestId",
+            clientRequestId));
+  }
+
+  /**
+   * Verifies that a credential the handshake cannot accept degrades the connection to anonymous
+   * rather than failing it — a participant with a stale or malformed token still joins the quiz,
+   * they just get no organiser privileges. Covers both an unusable scheme and an invalid token.
+   */
+  @Test
+  void unusableCredentialsFallBackToAnAnonymousConnectionInsteadOfFailing() throws Exception {
+    Auth owner = organiser();
+    long eventId = createEvent(owner, "Degraded Auth Event");
+    long quizId = createQuiz(owner, eventId, "Degraded Auth Quiz");
+    JsonNode question = createSingleSelectQuestion(owner, quizId, "Question", 1, 30);
+    long questionId = question.path("id").asLong();
+
+    JsonNode session = postJson("/api/sessions", owner, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+
+    // A token that is well-formed as a header but not a valid JWT.
+    WebSocketStompClient client = stompClient();
+    StompSession degraded = connect(client, "not-a-real-jwt");
+    BlockingQueue<JsonNode> questionEvents = new LinkedBlockingQueue<>();
+    subscribe(degraded, "/topic/session." + sessionId + ".question", questionEvents);
+
+    postJson(
+        "/api/sessions/join",
+        null,
+        Map.of("joinCode", session.path("joinCode").asText(), "displayName", "Stale"),
+        200);
+    postJson("/api/sessions/" + sessionId + "/start", owner, Map.of(), 200);
+    assertThat(waitForEvent(questionEvents, "QUESTION_DISPLAYED").path("questionId").asLong())
+        .as("an unauthenticated client still receives the participant question stream")
+        .isEqualTo(questionId);
+
+    // A credential in a scheme the handshake does not understand is ignored the same way.
+    WebSocketStompClient basicAuthClient = stompClient();
+    StompSession basicAuth = connectWithRawAuthHeader(basicAuthClient, "Basic dXNlcjpwYXNz");
+    BlockingQueue<JsonNode> basicAuthEvents = new LinkedBlockingQueue<>();
+    subscribe(basicAuth, "/topic/session." + sessionId + ".question", basicAuthEvents);
+    postJson("/api/sessions/" + sessionId + "/start-timer", owner, Map.of(), 200);
+    assertThat(waitForEvent(basicAuthEvents, "TIMER_START").path("questionId").asLong())
+        .isEqualTo(questionId);
+    basicAuth.disconnect();
+
+    // …but it is still anonymous, so organiser topics remain closed to it.
+    CountDownLatch rejected = new CountDownLatch(1);
+    WebSocketStompClient probeClient = stompClient();
+    StompSession probe = connect(probeClient, "not-a-real-jwt", rejected);
+    probe.subscribe(
+        "/topic/session." + sessionId + ".analytics", handler(new LinkedBlockingQueue<>()));
+    assertThat(rejected.await(10, TimeUnit.SECONDS))
+        .as("a degraded connection must not gain organiser access")
+        .isTrue();
+
+    degraded.disconnect();
+  }
+
+  /**
+   * Verifies that subscribing to the organiser topic of a session that does not exist is denied.
+   */
+  @Test
+  void organiserTopicsForUnknownSessionsAreRejected() throws Exception {
+    Auth owner = organiser();
+
+    WebSocketStompClient client = stompClient();
+    CountDownLatch rejected = new CountDownLatch(1);
+    StompSession session = connect(client, owner.token(), rejected);
+    session.subscribe("/topic/session.999999.analytics", handler(new LinkedBlockingQueue<>()));
+
+    assertThat(rejected.await(10, TimeUnit.SECONDS))
+        .as("a valid organiser may not subscribe to a session that does not exist")
+        .isTrue();
+  }
+
+  /**
    * Verifies that protected organiser topics reject subscriptions from non-owners and anonymous
    * clients.
    */
@@ -175,117 +362,5 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     assertThat(anonymousRejected.await(10, TimeUnit.SECONDS))
         .as("anonymous subscription to the control topic must be rejected")
         .isTrue();
-  }
-
-  private WebSocketStompClient stompClient() {
-    WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());
-    client.setMessageConverter(new JacksonJsonMessageConverter());
-    client.setTaskScheduler(
-        new ConcurrentTaskScheduler(
-            Executors.newSingleThreadScheduledExecutor(
-                task -> {
-                  Thread thread = new Thread(task, "stomp-test-receipts");
-                  thread.setDaemon(true);
-                  return thread;
-                })));
-    return client;
-  }
-
-  private StompSession connect(WebSocketStompClient client, String token) throws Exception {
-    StompHeaders headers = new StompHeaders();
-    if (token != null) {
-      headers.add("Authorization", "Bearer " + token);
-    }
-    StompSession session =
-        client
-            .connectAsync(
-                wsUrl(), new WebSocketHttpHeaders(), headers, new StompSessionHandlerAdapter() {})
-            .get(10, TimeUnit.SECONDS);
-    session.setAutoReceipt(true);
-    return session;
-  }
-
-  /**
-   * Connects expecting the session to be rejected later: any ERROR frame, handling exception, or
-   * transport close counts down the latch.
-   */
-  private StompSession connect(WebSocketStompClient client, String token, CountDownLatch rejected)
-      throws Exception {
-    StompHeaders headers = new StompHeaders();
-    if (token != null) {
-      headers.add("Authorization", "Bearer " + token);
-    }
-    return client
-        .connectAsync(
-            wsUrl(),
-            new WebSocketHttpHeaders(),
-            headers,
-            new StompSessionHandlerAdapter() {
-              @Override
-              public void handleFrame(StompHeaders frameHeaders, Object payload) {
-                rejected.countDown();
-              }
-
-              @Override
-              public void handleException(
-                  StompSession session,
-                  StompCommand command,
-                  StompHeaders frameHeaders,
-                  byte[] payload,
-                  Throwable exception) {
-                rejected.countDown();
-              }
-
-              @Override
-              public void handleTransportError(StompSession session, Throwable exception) {
-                rejected.countDown();
-              }
-            })
-        .get(10, TimeUnit.SECONDS);
-  }
-
-  private void subscribe(StompSession session, String destination, BlockingQueue<JsonNode> queue)
-      throws Exception {
-    CountDownLatch subscribed = new CountDownLatch(1);
-    CountDownLatch failed = new CountDownLatch(1);
-    StompSession.Subscription subscription = session.subscribe(destination, handler(queue));
-    subscription.addReceiptTask(subscribed::countDown);
-    subscription.addReceiptLostTask(failed::countDown);
-    if (!subscribed.await(10, TimeUnit.SECONDS)) {
-      if (failed.getCount() == 0) {
-        throw new AssertionError("Lost STOMP receipt for subscription to " + destination);
-      }
-      throw new AssertionError("Timed out waiting for subscription to " + destination);
-    }
-  }
-
-  private StompFrameHandler handler(BlockingQueue<JsonNode> queue) {
-    return new StompFrameHandler() {
-      @Override
-      public Type getPayloadType(StompHeaders headers) {
-        return Map.class;
-      }
-
-      @Override
-      public void handleFrame(StompHeaders headers, Object payload) {
-        queue.add(objectMapper.valueToTree(payload));
-      }
-    };
-  }
-
-  private JsonNode waitForEvent(BlockingQueue<JsonNode> queue, String event) throws Exception {
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-    JsonNode last = null;
-    while (System.nanoTime() < deadline) {
-      JsonNode next = queue.poll(250, TimeUnit.MILLISECONDS);
-      if (next == null) {
-        continue;
-      }
-      last = next;
-      if (event.equals(next.path("event").asText())) {
-        return next;
-      }
-    }
-    throw new AssertionError("Timed out waiting for " + event + ", last event was " + last);
   }
 }

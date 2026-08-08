@@ -10,9 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.hishaam.hermes.Application;
+import java.lang.reflect.Type;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,12 +28,22 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompFrameHandler;
+import org.springframework.messaging.simp.stomp.StompHeaders;
+import org.springframework.messaging.simp.stomp.StompSession;
+import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.web.socket.WebSocketHttpHeaders;
+import org.springframework.web.socket.client.standard.StandardWebSocketClient;
+import org.springframework.web.socket.messaging.WebSocketStompClient;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -41,6 +56,8 @@ import org.testcontainers.utility.DockerImageName;
 @ActiveProfiles("test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class BaseIntegrationTest {
+
+  // ─── Containers ────────────────────────────────────────────────────────────────
 
   private static final DockerImageName REDIS_IMAGE = DockerImageName.parse("redis:7-alpine");
   private static final DockerImageName RABBIT_IMAGE =
@@ -117,15 +134,36 @@ public abstract class BaseIntegrationTest {
 
   @LocalServerPort protected int port;
 
-  @BeforeEach
-  void cleanState() {
+  // ─── Per-test state ────────────────────────────────────────────────────────────
+
+  /**
+   * Drops every Redis key, simulating the session TTL lapsing or the cache being evicted mid-run.
+   * PostgreSQL is left intact, which is exactly the split the live-state fallbacks are built for.
+   */
+  protected void flushRedis() {
     try (RedisConnection connection = redisTemplate.getConnectionFactory().getConnection()) {
       connection.serverCommands().flushDb();
     }
+  }
+
+  @BeforeEach
+  void cleanState() {
+    flushRedis();
     jdbcTemplate.execute(
         "TRUNCATE TABLE participant_answers, participants, quiz_sessions, answer_options, "
             + "questions, passages, quizzes, events, users RESTART IDENTITY CASCADE");
   }
+
+  /**
+   * Counts rows in a table directly, for asserting on data the API deliberately exposes no read
+   * endpoint for — chiefly that cascading deletes leave nothing orphaned.
+   */
+  protected long rowCount(String table) {
+    Long count = jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Long.class);
+    return count == null ? 0L : count;
+  }
+
+  // ─── Fixtures ──────────────────────────────────────────────────────────────────
 
   protected Auth organiser() throws Exception {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -143,6 +181,8 @@ public abstract class BaseIntegrationTest {
             .path("data");
     return new Auth(login.path("token").asText(), user.path("id").asLong(), email);
   }
+
+  // ─── HTTP ──────────────────────────────────────────────────────────────────────
 
   protected JsonNode postJson(String url, Auth auth, Object body, int statusCode) throws Exception {
     return json(performWithBody(post(url), auth, body).andExpect(status().is(statusCode)));
@@ -263,9 +303,127 @@ public abstract class BaseIntegrationTest {
     };
   }
 
+  // ─── STOMP ─────────────────────────────────────────────────────────────────────
+
   protected String wsUrl() {
     return "ws://localhost:" + port + "/ws-hermes";
   }
+
+  protected WebSocketStompClient stompClient() {
+    WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());
+    client.setMessageConverter(new JacksonJsonMessageConverter());
+    client.setTaskScheduler(
+        new ConcurrentTaskScheduler(
+            Executors.newSingleThreadScheduledExecutor(
+                task -> {
+                  Thread thread = new Thread(task, "stomp-test-receipts");
+                  thread.setDaemon(true);
+                  return thread;
+                })));
+    return client;
+  }
+
+  /** Connects as the given organiser, or anonymously when {@code token} is null. */
+  protected StompSession connect(WebSocketStompClient client, String token) throws Exception {
+    StompHeaders headers = new StompHeaders();
+    if (token != null) {
+      headers.add("Authorization", "Bearer " + token);
+    }
+    StompSession session =
+        client
+            .connectAsync(
+                wsUrl(), new WebSocketHttpHeaders(), headers, new StompSessionHandlerAdapter() {})
+            .get(10, TimeUnit.SECONDS);
+    session.setAutoReceipt(true);
+    return session;
+  }
+
+  /**
+   * Connects expecting the session to be rejected later: any ERROR frame, handling exception, or
+   * transport close counts down the latch.
+   */
+  protected StompSession connect(WebSocketStompClient client, String token, CountDownLatch rejected)
+      throws Exception {
+    StompHeaders headers = new StompHeaders();
+    if (token != null) {
+      headers.add("Authorization", "Bearer " + token);
+    }
+    return client
+        .connectAsync(
+            wsUrl(),
+            new WebSocketHttpHeaders(),
+            headers,
+            new StompSessionHandlerAdapter() {
+              @Override
+              public void handleFrame(StompHeaders frameHeaders, Object payload) {
+                rejected.countDown();
+              }
+
+              @Override
+              public void handleException(
+                  StompSession session,
+                  StompCommand command,
+                  StompHeaders frameHeaders,
+                  byte[] payload,
+                  Throwable exception) {
+                rejected.countDown();
+              }
+
+              @Override
+              public void handleTransportError(StompSession session, Throwable exception) {
+                rejected.countDown();
+              }
+            })
+        .get(10, TimeUnit.SECONDS);
+  }
+
+  protected void subscribe(StompSession session, String destination, BlockingQueue<JsonNode> queue)
+      throws Exception {
+    CountDownLatch subscribed = new CountDownLatch(1);
+    CountDownLatch failed = new CountDownLatch(1);
+    StompSession.Subscription subscription = session.subscribe(destination, handler(queue));
+    subscription.addReceiptTask(subscribed::countDown);
+    subscription.addReceiptLostTask(failed::countDown);
+    if (!subscribed.await(10, TimeUnit.SECONDS)) {
+      if (failed.getCount() == 0) {
+        throw new AssertionError("Lost STOMP receipt for subscription to " + destination);
+      }
+      throw new AssertionError("Timed out waiting for subscription to " + destination);
+    }
+  }
+
+  protected StompFrameHandler handler(BlockingQueue<JsonNode> queue) {
+    return new StompFrameHandler() {
+      @Override
+      public Type getPayloadType(StompHeaders headers) {
+        return Map.class;
+      }
+
+      @Override
+      public void handleFrame(StompHeaders headers, Object payload) {
+        queue.add(objectMapper.valueToTree(payload));
+      }
+    };
+  }
+
+  /** Drains {@code queue} until a frame with the given {@code event} field arrives. */
+  protected JsonNode waitForEvent(BlockingQueue<JsonNode> queue, String event) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    JsonNode last = null;
+    while (System.nanoTime() < deadline) {
+      JsonNode next = queue.poll(250, TimeUnit.MILLISECONDS);
+      if (next == null) {
+        continue;
+      }
+      last = next;
+      if (event.equals(next.path("event").asText())) {
+        return next;
+      }
+    }
+    throw new AssertionError("Timed out waiting for " + event + ", last event was " + last);
+  }
+
+  // ─── Plumbing ──────────────────────────────────────────────────────────────────
 
   protected ResultActions perform(MockHttpServletRequestBuilder request, Auth auth)
       throws Exception {

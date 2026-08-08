@@ -1,12 +1,17 @@
 package dev.hishaam.hermes.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import dev.hishaam.hermes.exception.AppException;
+import dev.hishaam.hermes.service.session.SessionEngine;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Integration tests for lifecycle guardrails on sessions.
@@ -15,6 +20,9 @@ import org.junit.jupiter.api.Test;
  * joins, timer state checks, and automatic session ending when the final question is completed.
  */
 class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
+
+  /** Injected so tests can reach the engine the way a Quartz timeout job does — directly. */
+  @Autowired private SessionEngine engine;
 
   /**
    * Verifies that session creation and lifecycle transitions are rejected when the quiz is empty or
@@ -210,5 +218,214 @@ class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
     postJson("/api/sessions/" + sessionId + "/start", owner, Map.of(), 200);
     assertThat(getJson("/api/sessions/" + sessionId + "/status", owner, 200).path("data").asText())
         .isEqualTo("ACTIVE");
+  }
+
+  /**
+   * Verifies the engine's own entry guards, which a late Quartz job reaches directly rather than
+   * through the authorised host endpoints. A timeout that fires after the host already closed the
+   * question must not re-freeze or re-grade it, and one that fires before the session is running
+   * must do nothing at all.
+   */
+  @Test
+  void engineIgnoresTimerExpiryThatArrivesAfterTheQuestionHasAlreadyClosed() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Late Firing Event");
+    long quizId = createQuiz(organiser, eventId, "Late Firing Quiz");
+    JsonNode question = createSingleSelectQuestion(organiser, quizId, "Only question", 1, 30);
+    long questionId = question.path("id").asLong();
+
+    long sessionId =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201)
+            .path("data")
+            .path("id")
+            .asLong();
+
+    // Before the session starts, Redis still says LOBBY: both engine entry points must no-op.
+    assertThatCode(() -> engine.advanceSessionInternal(sessionId)).doesNotThrowAnyException();
+    assertThatCode(() -> engine.onTimerExpired(sessionId)).doesNotThrowAnyException();
+    assertThat(
+            getJson("/api/sessions/" + sessionId + "/status", organiser, 200).path("data").asText())
+        .isEqualTo("LOBBY");
+    assertThatThrownBy(() -> engine.startTimerInternal(sessionId))
+        .isInstanceOf(AppException.class)
+        .hasMessage("Session is not active");
+
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/start-timer", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/end-timer", organiser, Map.of(), 200);
+
+    JsonNode reviewing =
+        getJson("/api/sessions/" + sessionId + "/host-sync", organiser, 200).path("data");
+    assertThat(reviewing.path("questionLifecycle").asText()).isEqualTo("REVIEWING");
+
+    // The Quartz job for this question now fires late — the question is no longer TIMED.
+    engine.onTimerExpired(sessionId);
+
+    JsonNode afterLateFiring =
+        getJson("/api/sessions/" + sessionId + "/host-sync", organiser, 200).path("data");
+    assertThat(afterLateFiring.path("questionLifecycle").asText())
+        .as("a late timer expiry must leave the reviewed question untouched")
+        .isEqualTo("REVIEWING");
+    assertThat(afterLateFiring.path("currentQuestion").path("id").asLong()).isEqualTo(questionId);
+
+    // Starting the timer again on a reviewed question is still refused.
+    assertThatThrownBy(() -> engine.startTimerInternal(sessionId))
+        .isInstanceOf(AppException.class)
+        .hasMessage("Timer can only be started when question is in DISPLAYED state");
+  }
+
+  /**
+   * Verifies that a host who abandons the plan and ends a session that never left the lobby gets a
+   * clean ENDED session, with no question events broadcast to participants who never saw one.
+   */
+  @Test
+  void endingASessionThatNeverStartedClosesItWithoutBroadcastingQuestionEvents() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Never Started Event");
+    long quizId = createQuiz(organiser, eventId, "Never Started Quiz");
+    createSingleSelectQuestion(organiser, quizId, "Never asked", 1, 30);
+
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+    postJson(
+        "/api/sessions/join",
+        null,
+        Map.of("joinCode", session.path("joinCode").asText(), "displayName", "Waiting"),
+        200);
+
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+
+    assertThat(
+            getJson("/api/sessions/" + sessionId + "/status", organiser, 200).path("data").asText())
+        .isEqualTo("ENDED");
+
+    JsonNode results =
+        getJson("/api/sessions/" + sessionId + "/results", organiser, 200).path("data");
+    assertThat(results.path("questions")).hasSize(1);
+    assertThat(results.path("questions").get(0).path("totalAnswers").asLong()).isZero();
+    assertThat(results.path("leaderboard")).hasSize(1);
+    assertThat(results.path("leaderboard").get(0).path("score").asLong()).isZero();
+  }
+
+  /**
+   * Verifies that ending a session while an ENTIRE_PASSAGE block is still counting down freezes and
+   * grades the whole block, so answers submitted right before the host stopped still score.
+   */
+  @Test
+  void endingDuringATimedPassageFreezesAndGradesEverySubQuestion() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Ended Mid Passage Event");
+    long quizId = createQuiz(organiser, eventId, "Ended Mid Passage Quiz");
+
+    JsonNode passage =
+        postJson(
+                "/api/quizzes/" + quizId + "/passages",
+                organiser,
+                Map.of(
+                    "text",
+                    "Passage cut short by the host.",
+                    "orderIndex",
+                    1,
+                    "timerMode",
+                    "ENTIRE_PASSAGE",
+                    "timeLimitSeconds",
+                    120,
+                    "subQuestions",
+                    List.of(
+                        subQuestion("First sub", 0, "Right", 6, "Wrong", 0),
+                        subQuestion("Second sub", 1, "Right", 4, "Wrong", 0))),
+                201)
+            .path("data");
+    long firstSubId = passage.path("subQuestions").get(0).path("id").asLong();
+    long firstCorrect =
+        passage.path("subQuestions").get(0).path("options").get(0).path("id").asLong();
+    long secondSubId = passage.path("subQuestions").get(1).path("id").asLong();
+    long secondCorrect =
+        passage.path("subQuestions").get(1).path("options").get(0).path("id").asLong();
+
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+    String token =
+        postJson(
+                "/api/sessions/join",
+                null,
+                Map.of("joinCode", session.path("joinCode").asText(), "displayName", "Ada"),
+                200)
+            .path("data")
+            .path("rejoinToken")
+            .asText();
+
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/start-timer", organiser, Map.of(), 200);
+    answer(sessionId, token, firstSubId, firstCorrect);
+    answer(sessionId, token, secondSubId, secondCorrect);
+
+    // The host stops the session with 120s still on the clock.
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+
+    JsonNode results =
+        getJson("/api/sessions/" + sessionId + "/results", organiser, 200).path("data");
+    assertThat(results.path("leaderboard").get(0).path("score").asLong())
+        .as("both sub-questions of the interrupted passage must still be graded")
+        .isEqualTo(10);
+    assertThat(results.path("questions")).hasSize(2);
+    assertThat(results.path("questions").get(0).path("totalAnswers").asLong()).isEqualTo(1);
+    assertThat(results.path("questions").get(1).path("totalAnswers").asLong()).isEqualTo(1);
+  }
+
+  /**
+   * Verifies that host-sync on a finished session reports it as ENDED and stops advertising a live
+   * question or in-progress leaderboard.
+   */
+  @Test
+  void hostSyncOnAnEndedSessionReportsNoLiveQuestionOrLeaderboard() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Ended Sync Event");
+    long quizId = createQuiz(organiser, eventId, "Ended Sync Quiz");
+    createSingleSelectQuestion(organiser, quizId, "Question", 1, 30);
+
+    long sessionId =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201)
+            .path("data")
+            .path("id")
+            .asLong();
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+
+    JsonNode sync =
+        getJson("/api/sessions/" + sessionId + "/host-sync", organiser, 200).path("data");
+    assertThat(sync.path("status").asText()).isEqualTo("ENDED");
+    assertThat(sync.path("currentQuestion").isNull()).isTrue();
+    assertThat(sync.path("currentPassage").isNull()).isTrue();
+    assertThat(sync.path("leaderboard"))
+        .as("the live leaderboard is only served while the session is running")
+        .isEmpty();
+  }
+
+  private static Map<String, Object> subQuestion(
+      String text, int orderIndex, String right, int rightPoints, String wrong, int wrongPoints) {
+    return Map.of(
+        "text",
+        text,
+        "orderIndex",
+        orderIndex,
+        "questionType",
+        "SINGLE_SELECT",
+        "options",
+        options(right, 0, rightPoints, wrong, 1, wrongPoints));
+  }
+
+  private void answer(long sessionId, String token, long questionId, long optionId)
+      throws Exception {
+    postJson(
+        "/api/sessions/" + sessionId + "/answers",
+        null,
+        Map.of(
+            "rejoinToken", token,
+            "questionId", questionId,
+            "selectedOptionIds", List.of(optionId)),
+        200);
   }
 }
