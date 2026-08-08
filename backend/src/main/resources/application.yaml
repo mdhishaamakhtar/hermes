@@ -59,6 +59,10 @@ app:
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:3000}
   stomp:
+    # simple = in-process broker (no external service, single instance only)
+    # relay  = external STOMP broker via the broker-relay settings below
+    broker:
+      mode: ${STOMP_BROKER_MODE:simple}
     broker-relay:
       host: ${BROKER_RELAY_HOST:localhost}
       port: ${BROKER_RELAY_PORT:61613}

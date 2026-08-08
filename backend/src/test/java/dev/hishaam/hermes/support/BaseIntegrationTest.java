@@ -115,6 +115,8 @@ public abstract class BaseIntegrationTest {
     // shorten it so freshly scheduled question timers fire promptly in tests.
     registry.add("spring.quartz.properties.org.quartz.scheduler.idleWaitTime", () -> "1000");
     registry.add("app.cors.allowed-origin", () -> "http://localhost:3000");
+    // Pinned so the default (simple) does not silently stop exercising the relay path.
+    registry.add("app.stomp.broker.mode", () -> "relay");
     registry.add("app.stomp.broker-relay.host", RABBIT::getHost);
     registry.add("app.stomp.broker-relay.port", () -> RABBIT.getMappedPort(61613));
     registry.add("app.stomp.broker-relay.virtual-host", () -> "/");

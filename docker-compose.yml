@@ -63,6 +63,9 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ""
+      # Compose keeps RabbitMQ so the relay path stays exercised locally. The deployed
+      # single-instance stack runs the default in-process broker and needs none of this.
+      STOMP_BROKER_MODE: relay
       BROKER_RELAY_HOST: rabbitmq
       BROKER_RELAY_PORT: 61613
       BROKER_RELAY_VHOST: /

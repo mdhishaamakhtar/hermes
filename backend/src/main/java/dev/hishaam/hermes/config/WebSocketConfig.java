@@ -14,19 +14,34 @@ import org.springframework.messaging.tcp.reactor.ReactorNettyTcpClient;
 import org.springframework.web.socket.config.annotation.*;
 
 /**
- * Configures STOMP over WebSocket with a full broker relay to RabbitMQ. The Reactor Netty TCP
- * client is tuned with TCP keepalive to survive Railway's idle-connection proxy timeout (~60 s) and
- * a dynamic {@code remoteAddress} supplier so DNS is re-resolved on each reconnect attempt (works
- * around stale IPs after broker container restarts — SPR-13702).
+ * Configures STOMP over WebSocket, backed by either Spring's in-memory simple broker or a full
+ * relay to an external STOMP broker such as RabbitMQ.
+ *
+ * <p>The mode is set by {@code app.stomp.broker.mode} ({@code STOMP_BROKER_MODE}) and defaults to
+ * {@code simple}, which needs no broker service at all. A single-instance deployment behaves
+ * identically either way; the relay only becomes necessary to fan messages out across replicas,
+ * since the simple broker keeps subscriptions in the process that owns the WebSocket. Switching is
+ * a pure configuration change — set the mode to {@code relay} and supply the relay properties.
+ *
+ * <p>In relay mode the Reactor Netty TCP client is tuned with TCP keepalive to survive Railway's
+ * idle-connection proxy timeout (~60 s) and a dynamic {@code remoteAddress} supplier so DNS is
+ * re-resolved on each reconnect attempt (works around stale IPs after broker container restarts —
+ * SPR-13702).
  */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+  /** Value of {@code app.stomp.broker.mode} that selects the external relay. */
+  private static final String MODE_RELAY = "relay";
+
   private final StompChannelInterceptor stompChannelInterceptor;
 
   @Value("${app.cors.allowed-origin}")
   private String allowedOrigin;
+
+  @Value("${app.stomp.broker.mode:simple}")
+  private String brokerMode;
 
   @Value("${app.stomp.broker-relay.host}")
   private String brokerRelayHost;
@@ -61,6 +76,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void configureMessageBroker(MessageBrokerRegistry config) {
     config.setApplicationDestinationPrefixes("/app");
+
+    if (!MODE_RELAY.equalsIgnoreCase(brokerMode)) {
+      // In-process broker: same destinations and the same /user/** routing, no broker service.
+      config.enableSimpleBroker("/topic", "/queue");
+      return;
+    }
 
     // Custom TCP client: aggressive keepalive to survive Railway's idle-connection
     // proxy (~60s timeout), connect timeout to bound reconnect resource usage, and
