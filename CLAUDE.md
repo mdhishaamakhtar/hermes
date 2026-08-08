@@ -70,12 +70,20 @@ Frontend WebSocket is managed by `frontend/hooks/useStompClient.ts` with automat
 ### Key Backend Services
 | Service | Responsibility |
 |---|---|
-| `SessionService` | Session lifecycle (create/start/next/end) |
-| `SessionEngine` | Transactional question advance and session end; timers in `SessionTimerOrchestrator` |
-| `util/SessionRedisKeys` + `repository/redis/*RedisRepository` | Static key/TTL helpers and Redis repositories for session state, leaderboards, timers, stats, snapshots, join codes |
-| `AnswerService` | Answer recording and leaderboard updates |
-| `ParticipantService` | Join/rejoin logic and token management |
+| `session/SessionService` | Organizer-facing session API: authorizes every call, validates lifecycle preconditions, delegates transitions to `SessionEngine` |
+| `session/SessionEngine` | Transactional state machine: question display/advance, timer start and expiry, session end. No auth checks — callers authorize first and invoke cross-bean so `@Transactional` applies |
+| `session/SessionTimerScheduler` | Schedules and cancels the per-session Quartz job that fires `jobs/SessionTimeoutJob` on timer expiry |
+| `session/SessionSnapshotService` | Builds, serializes, and loads the quiz snapshot frozen at session creation |
+| `session/SessionEventPublisher` | All STOMP broadcasts; drops messages silently while the broker is offline |
+| `session/SessionResultsService` | Post-session results and per-participant results, computed purely from PostgreSQL |
+| `GradingService` + `ScoreCalculator` | Grading orchestration (persist, leaderboard, broadcast) and the stateless scoring math it calls |
+| `AnswerService` | Answer submission and lock-in during a live session |
+| `ParticipantService` | Anonymous join/rejoin logic and rejoin-token management |
 | `OwnershipService` | Ensures organizers can only manage their own resources |
+| `util/SessionRedisKeys` | Static Redis key builders and the shared session/rejoin TTLs |
+| `repository/redis/SessionStateRedisRepository` | Live state: status, current question/passage, lifecycle, participant count, timer, sequence, snapshot JSON, join-code reservations |
+| `repository/redis/SessionScoringRedisRepository` | Answer counts, lock-ins, leaderboard ZSet, cumulative answer time |
+| `repository/redis/ParticipantRejoinTokenRedisRepository` | Rejoin-token cache (pure cache; the Postgres fallback lives in `ParticipantService`) |
 
 ### Key Frontend Files
 | File | Purpose |
