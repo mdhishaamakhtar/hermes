@@ -198,8 +198,6 @@ public class SessionEngine {
     if (target != null) {
       freezeAnswers(sessionId, target);
       // The lifecycle flag lives in Redis too, so an eviction loses the signal to grade. Fall back
-      // to the durable record: anything submitted and never graded still needs scoring.
-      // The lifecycle flag lives in Redis too, so an eviction loses the signal to grade. Fall back
       // to the durable record: anything submitted and never graded still needs scoring. An
       // already-graded answer carries a gradedAt stamp, so this cannot double-grade.
       boolean shouldGrade =

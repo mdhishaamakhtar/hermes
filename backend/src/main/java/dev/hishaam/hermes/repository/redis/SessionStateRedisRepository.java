@@ -132,7 +132,10 @@ public class SessionStateRedisRepository {
   public void setCurrentQuestion(Long sessionId, Long questionId) {
     redis
         .opsForValue()
-        .set(SessionRedisKeys.currentQuestionKey(sessionId.toString()), questionId.toString());
+        .set(
+            SessionRedisKeys.currentQuestionKey(sessionId.toString()),
+            questionId.toString(),
+            SessionRedisKeys.SESSION_TTL);
   }
 
   /** Resets current_question to empty so the next advance finds the first question. */
