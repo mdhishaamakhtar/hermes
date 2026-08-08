@@ -3,6 +3,7 @@ package dev.hishaam.hermes.dto.session;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
+import dev.hishaam.hermes.exception.AppException;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -38,6 +39,37 @@ public record QuizSnapshot(
 
   public PassageSnapshot findPassage(Long passageId) {
     return passages.stream().filter(p -> p.id().equals(passageId)).findFirst().orElse(null);
+  }
+
+  /**
+   * Looks up a question that the caller already knows belongs to this snapshot — because the id
+   * came out of the snapshot, or out of live session state derived from it. Absence means the
+   * snapshot and the session state have diverged, which is corruption rather than a routine miss,
+   * so it fails loudly here instead of being null-checked into a silent skip at every call site.
+   */
+  public QuestionSnapshot requireQuestion(Long questionId) {
+    QuestionSnapshot question = findQuestion(questionId);
+    if (question == null) {
+      throw AppException.notFound("Question not found in session snapshot");
+    }
+    return question;
+  }
+
+  /** Passage equivalent of {@link #requireQuestion}, with the same contract. */
+  public PassageSnapshot requirePassage(Long passageId) {
+    PassageSnapshot passage = findPassage(passageId);
+    if (passage == null) {
+      throw AppException.notFound("Passage not found in session snapshot");
+    }
+    return passage;
+  }
+
+  /** Resolves every sub-question of a passage, in presentation order. */
+  public List<QuestionSnapshot> subQuestionsOf(PassageSnapshot passage) {
+    return passage.subQuestionIds().stream()
+        .map(this::requireQuestion)
+        .sorted(Comparator.comparingInt(QuestionSnapshot::orderIndex))
+        .toList();
   }
 
   /**

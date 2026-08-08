@@ -10,6 +10,7 @@ import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
+import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
@@ -22,11 +23,9 @@ import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -136,46 +135,36 @@ public class ParticipantService {
     Map<Long, RejoinResponse.QuestionStats> questionStatsById = new LinkedHashMap<>();
     if (SessionStatus.ACTIVE == status && ctx.currentQuestionId() != null) {
       if (ctx.currentPassageId() != null) {
-        QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(ctx.currentPassageId());
-        if (passage != null) {
-          List<RejoinResponse.QuestionInfo> subQuestions =
-              passage.subQuestionIds().stream()
-                  .map(snapshot::findQuestion)
-                  .filter(Objects::nonNull)
-                  .sorted(Comparator.comparingInt(QuizSnapshot.QuestionSnapshot::orderIndex))
-                  .map(
-                      qSnap -> {
-                        questionStatsById.put(
-                            qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
-                        return buildQuestionInfo(participantId, qSnap, snapshot);
-                      })
-                  .toList();
+        QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(ctx.currentPassageId());
+        List<RejoinResponse.QuestionInfo> subQuestions =
+            snapshot.subQuestionsOf(passage).stream()
+                .map(
+                    qSnap -> {
+                      questionStatsById.put(qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
+                      return buildQuestionInfo(participantId, qSnap, snapshot);
+                    })
+                .toList();
 
-          currentPassage =
-              new RejoinResponse.CurrentPassage(
-                  passage.id(),
-                  passage.text(),
-                  passage.timerMode().name(),
-                  snapshot.questionPosition(
-                      subQuestions.isEmpty()
-                          ? ctx.currentQuestionId()
-                          : subQuestions.getFirst().id()),
-                  snapshot.questions().size(),
-                  passage.timeLimitSeconds(),
-                  subQuestions.isEmpty() ? null : subQuestions.getFirst().effectiveDisplayMode(),
-                  subQuestions);
-        }
+        currentPassage =
+            new RejoinResponse.CurrentPassage(
+                passage.id(),
+                passage.text(),
+                passage.timerMode().name(),
+                snapshot.questionPosition(subQuestions.getFirst().id()),
+                snapshot.questions().size(),
+                passage.timeLimitSeconds(),
+                subQuestions.getFirst().effectiveDisplayMode(),
+                subQuestions);
       } else {
-        QuizSnapshot.QuestionSnapshot qSnap = snapshot.findQuestion(ctx.currentQuestionId());
-        if (qSnap != null) {
-          currentQuestion = buildCurrentQuestion(participantId, qSnap, snapshot);
-          questionStatsById.put(qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
-        }
+        QuizSnapshot.QuestionSnapshot qSnap = snapshot.requireQuestion(ctx.currentQuestionId());
+        currentQuestion = buildCurrentQuestion(participantId, qSnap, snapshot);
+        questionStatsById.put(qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
       }
     }
 
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        SessionStatus.ACTIVE == status && "REVIEWING".equals(ctx.questionLifecycle())
+        SessionStatus.ACTIVE == status
+                && ctx.questionLifecycle() == QuestionLifecycleState.REVIEWING
             ? scoringStore.buildLeaderboard(sessionId)
             : List.of();
 
@@ -289,7 +278,7 @@ public class ParticipantService {
             .filter(option -> option.pointValue() > 0)
             .map(QuizSnapshot.OptionSnapshot::id)
             .toList();
-    boolean reviewed = "REVIEWING".equals(ctx.questionLifecycle());
+    boolean reviewed = ctx.questionLifecycle() == QuestionLifecycleState.REVIEWING;
     boolean revealed =
         reviewed
             && (question.effectiveDisplayMode() == DisplayMode.BLIND
