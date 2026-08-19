@@ -109,13 +109,13 @@ export default function QuizEditorClient({
         description="Standalone questions and passage blocks, in order."
         meta={
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
-            <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
+            <span className="border border-border px-3 py-2 font-display uppercase tracking-[0.12em]">
               {canvasItems.length} blocks
             </span>
-            <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
+            <span className="border border-border px-3 py-2 font-display uppercase tracking-[0.12em]">
               {totalPrompts} prompts
             </span>
-            <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
+            <span className="border border-border px-3 py-2 font-display uppercase tracking-[0.12em]">
               Default {quiz.displayMode.toLowerCase()}
             </span>
           </div>

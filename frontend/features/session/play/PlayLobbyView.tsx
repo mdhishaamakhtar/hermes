@@ -36,7 +36,7 @@ export function PlayLobbyView({ session }: Props) {
         <motion.div {...rise} className="flex w-full flex-col items-center">
           <p className="label mb-6 text-accent">{sessionTitle}</p>
 
-          <h1 className="text-center text-4xl font-black tracking-tight text-foreground sm:text-5xl">
+          <h1 className="text-center text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
             Waiting for the host
           </h1>
 

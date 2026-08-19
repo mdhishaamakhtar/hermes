@@ -125,7 +125,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
                   value={quizTitle}
                   onChange={(e) => setQuizTitle(e.target.value)}
                   required
-                  className="input-field font-mono"
+                  className="input-field font-display"
                   placeholder="Quiz title"
                 />
               </div>
@@ -139,7 +139,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
                   inputMode="numeric"
                   name="orderIndex"
                   defaultValue={orderIndex}
-                  className="input-field font-mono"
+                  className="input-field font-display"
                 />
               </div>
             </div>
@@ -172,7 +172,7 @@ export default function EventClient({ eventId }: { eventId: string }) {
               transition={{ duration: duration.base }}
             >
               <div className="flex items-center gap-4">
-                <span className="font-mono text-xs text-muted tabular-nums w-5">
+                <span className="font-display text-xs text-muted tabular-nums w-5">
                   {index + 1}
                 </span>
                 <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">

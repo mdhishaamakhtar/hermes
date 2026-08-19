@@ -243,7 +243,7 @@ export default function PassageCard({
               <div>
                 <p className="label text-muted">Sub-questions</p>
               </div>
-              <span className="font-mono text-xs text-muted tabular-nums">
+              <span className="font-display text-xs text-muted tabular-nums">
                 {sortedSubQuestions.length} total
               </span>
             </div>
@@ -362,7 +362,7 @@ export default function PassageCard({
                     const val = event.target.value.replace(/[^0-9]/g, "");
                     setEditTimeLimitSeconds(val === "" ? 0 : parseInt(val, 10));
                   }}
-                  className="input-field font-mono tabular-nums"
+                  className="input-field font-display tabular-nums"
                 />
               </label>
             ) : (

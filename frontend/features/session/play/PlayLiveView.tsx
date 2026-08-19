@@ -126,7 +126,7 @@ export function PlayLiveView({ session }: Props) {
                 <div>
                   <p className="label mb-2">Timer</p>
                   <div
-                    className="font-black tabular-nums"
+                    className="font-extrabold tabular-nums"
                     style={{
                       fontSize: "clamp(2.2rem, 8vw, 4.5rem)",
                       lineHeight: 1,
@@ -452,7 +452,7 @@ export function PlayLiveView({ session }: Props) {
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <div
-                    className="font-black tabular-nums text-foreground"
+                    className="font-extrabold tabular-nums text-foreground"
                     style={{
                       fontSize: "clamp(2.25rem, 8vw, 3.75rem)",
                       lineHeight: 1,

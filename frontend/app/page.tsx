@@ -71,7 +71,7 @@ export default function LandingPage() {
           <Logo size="lg" showWordmark={false} />
         </div>
 
-        <h1 className="page-enter page-enter-delay-2 font-black tracking-widest text-[clamp(3.5rem,10vw,8rem)] uppercase leading-none text-foreground mb-4">
+        <h1 className="page-enter page-enter-delay-2 font-extrabold tracking-widest text-[clamp(3.5rem,10vw,8rem)] uppercase leading-none text-foreground mb-4">
           HERMES
         </h1>
 

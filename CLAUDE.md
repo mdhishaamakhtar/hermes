@@ -95,6 +95,7 @@ Frontend WebSocket is managed by `frontend/hooks/useStompClient.ts` with automat
 | `hooks/useStompClient.ts` | STOMP client lifecycle and subscription management |
 | `lib/session-constants.ts` | Shared session-related constants |
 | `lib/design-tokens.ts` | Design system colors and UI constants |
+| `lib/fonts.ts` | Monaspace face loading; defines the `--font-body` / `--font-display` variables |
 
 ### Environment Variables (Frontend)
 ```
@@ -133,6 +134,13 @@ Always use semantic tokens from `globals.css` / `lib/design-tokens.ts` — never
 - Background: `--color-background` (#0a0a0f), Surface: `--color-surface` (#1a1f2e)
 - Primary: `--color-primary` (#2563eb), Accent: `--color-accent` (#38bdf8)
 - Options A–D: blue / violet / amber / rose (defined as `--color-option-a` through `--color-option-d`)
+
+### Typography
+Hermes is monospace end to end — the Monaspace superfamily (`@fontsource/monaspace-*`), wired up in `frontend/lib/fonts.ts`. There is no sans-serif layer, so the Tailwind utilities are `font-body` and `font-display`, **not** `font-sans` / `font-mono`.
+- `--font-body` → Monaspace **Neon** (humanist): body copy, question text, form input.
+- `--font-display` → Monaspace **Krypton** (mechanical): uppercase labels, join codes, timers, scores, hero numbers.
+- Weight scale tops out at 800 — Monaspace ships no 900, so there is no `font-black` tier.
+- OG images cannot use these files directly; see `frontend/lib/social-image.tsx` and `frontend/scripts/build-og-fonts.py`.
 
 Full design context: `.impeccable.md` in project root.
 

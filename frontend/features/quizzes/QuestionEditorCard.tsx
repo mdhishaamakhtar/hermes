@@ -245,7 +245,7 @@ export default function QuestionEditorCard({
                       }
                       content={option.text}
                       aside={
-                        <span className={`font-mono ${tone}`}>
+                        <span className={`font-display ${tone}`}>
                           {option.pointValue > 0
                             ? `+${option.pointValue}`
                             : option.pointValue}
@@ -321,7 +321,7 @@ export default function QuestionEditorCard({
                     const val = event.target.value.replace(/[^0-9]/g, "");
                     setEditTime(val === "" ? 0 : parseInt(val, 10));
                   }}
-                  className="input-field font-mono tabular-nums"
+                  className="input-field font-display tabular-nums"
                 />
               </label>
             ) : null}
@@ -371,7 +371,7 @@ export default function QuestionEditorCard({
                         setOptionPoints(optionIndex, parsed);
                       }
                     }}
-                    className="input-field h-full min-h-16 py-2 px-2 text-center font-mono tabular-nums"
+                    className="input-field h-full min-h-16 py-2 px-2 text-center font-display tabular-nums"
                   />
                   <button
                     type="button"

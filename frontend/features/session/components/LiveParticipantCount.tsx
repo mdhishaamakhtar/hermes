@@ -25,8 +25,8 @@ export function LiveParticipantCount({
 
   const numberClass =
     size === "lg"
-      ? "text-4xl font-black tabular-nums leading-none tracking-tight text-accent sm:text-5xl"
-      : "text-2xl font-black tabular-nums leading-none text-accent sm:text-3xl";
+      ? "text-4xl font-extrabold tabular-nums leading-none tracking-tight text-accent sm:text-5xl"
+      : "text-2xl font-extrabold tabular-nums leading-none text-accent sm:text-3xl";
 
   const captionClass = "label max-w-[16rem] text-pretty";
 

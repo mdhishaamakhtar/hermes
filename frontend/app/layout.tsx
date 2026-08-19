@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { monaspaceKrypton, monaspaceNeon } from "@/lib/fonts";
 import { absoluteUrl, getSiteUrl, siteConfig } from "@/lib/site";
 import SWRProvider from "@/components/SWRProvider";
 import "./globals.css";
@@ -70,7 +69,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${monaspaceNeon.variable} ${monaspaceKrypton.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <SWRProvider>{children}</SWRProvider>
