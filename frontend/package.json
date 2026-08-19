@@ -10,9 +10,10 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@fontsource/monaspace-krypton": "^5.3.0",
+    "@fontsource/monaspace-neon": "^5.3.0",
     "@stomp/stompjs": "^7.3.0",
     "framer-motion": "^12.38.0",
-    "geist": "^1.7.0",
     "ky": "^1.14.3",
     "next": "16.2.11",
     "react": "19.2.4",

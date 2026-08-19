@@ -65,7 +65,7 @@ export default function LoginPage() {
                 type="email"
                 name="email"
                 required
-                className="input-field font-mono"
+                className="input-field font-display"
                 placeholder="organiser@example.com"
               />
             </div>
@@ -81,7 +81,7 @@ export default function LoginPage() {
                 type="password"
                 name="password"
                 required
-                className="input-field font-mono"
+                className="input-field font-display"
                 placeholder="••••••••"
               />
             </div>

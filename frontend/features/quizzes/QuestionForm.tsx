@@ -189,7 +189,7 @@ export default function QuestionForm({
               const val = event.target.value.replace(/[^0-9]/g, "");
               setQTime(val === "" ? 0 : parseInt(val, 10));
             }}
-            className="input-field font-mono tabular-nums"
+            className="input-field font-display tabular-nums"
           />
         </label>
       </div>
@@ -244,7 +244,7 @@ export default function QuestionForm({
                       setOptionPoints(index, parsed);
                     }
                   }}
-                  className="input-field h-full min-h-16 py-2 px-2 text-center font-mono tabular-nums"
+                  className="input-field h-full min-h-16 py-2 px-2 text-center font-display tabular-nums"
                 />
                 <button
                   type="button"

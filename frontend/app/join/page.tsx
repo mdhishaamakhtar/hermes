@@ -124,7 +124,7 @@ export default function JoinPage() {
                 }
                 maxLength={6}
                 placeholder="______"
-                className="w-full bg-transparent text-center text-foreground font-mono font-bold text-5xl tracking-[0.3em] border-b-2 border-border focus:border-primary focus:outline-none py-4 transition-colors"
+                className="w-full bg-transparent text-center text-foreground font-display font-bold text-5xl tracking-[0.3em] border-b-2 border-border focus:border-primary focus:outline-none py-4 transition-colors"
                 style={{ fontVariantNumeric: "tabular-nums" }}
                 autoComplete="off"
                 spellCheck={false}

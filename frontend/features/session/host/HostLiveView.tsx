@@ -145,7 +145,7 @@ export function HostLiveView({ session }: Props) {
                 <div>
                   <p className="label mb-2">Timer</p>
                   <div
-                    className="font-black tabular-nums"
+                    className="font-extrabold tabular-nums"
                     style={{
                       fontSize: "clamp(2rem, 7vw, 4rem)",
                       lineHeight: 1,
@@ -242,7 +242,7 @@ export function HostLiveView({ session }: Props) {
               <div className="mb-5 flex items-center gap-4 border border-primary/20 bg-background px-5 py-3">
                 <span className="label shrink-0">Join</span>
                 <span
-                  className="select-all font-black tracking-[0.3em] text-foreground"
+                  className="select-all font-extrabold tracking-[0.3em] text-foreground"
                   style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}
                 >
                   {joinCode || "------"}

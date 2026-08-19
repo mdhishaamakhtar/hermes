@@ -30,7 +30,7 @@ export default function Logo({ size = "md", showWordmark = true }: LogoProps) {
       </svg>
       {showWordmark && (
         <span
-          className={`${text} font-black tracking-widest uppercase text-foreground select-none`}
+          className={`${text} font-extrabold tracking-widest uppercase text-foreground select-none`}
         >
           HERMES
         </span>

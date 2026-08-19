@@ -88,7 +88,7 @@ export default function RegisterPage() {
                 name="displayName"
                 required
                 maxLength={100}
-                className="input-field font-mono"
+                className="input-field font-display"
                 placeholder="Your Name"
               />
             </div>
@@ -104,7 +104,7 @@ export default function RegisterPage() {
                 type="email"
                 name="email"
                 required
-                className="input-field font-mono"
+                className="input-field font-display"
                 placeholder="you@example.com"
               />
             </div>
@@ -121,7 +121,7 @@ export default function RegisterPage() {
                 name="password"
                 required
                 minLength={8}
-                className="input-field font-mono"
+                className="input-field font-display"
                 placeholder="Min. 8 characters"
               />
             </div>

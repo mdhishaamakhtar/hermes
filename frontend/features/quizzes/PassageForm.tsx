@@ -200,7 +200,7 @@ export default function PassageForm({
                 const val = event.target.value.replace(/[^0-9]/g, "");
                 setTimeLimitSeconds(val === "" ? 0 : parseInt(val, 10));
               }}
-              className="input-field font-mono tabular-nums"
+              className="input-field font-display tabular-nums"
             />
           </label>
         ) : (

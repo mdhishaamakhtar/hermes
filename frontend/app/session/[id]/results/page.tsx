@@ -109,7 +109,7 @@ export default function ResultsPage() {
             <div>
               <p className="label mb-2">{results.displayName}</p>
               <div
-                className="font-black tabular-nums text-foreground"
+                className="font-extrabold tabular-nums text-foreground"
                 style={{ fontSize: "clamp(3rem, 8vw, 5rem)", lineHeight: 1 }}
               >
                 {results.score.toLocaleString()}

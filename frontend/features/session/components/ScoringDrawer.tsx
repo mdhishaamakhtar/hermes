@@ -74,7 +74,7 @@ export function ScoringDrawer({
                         onChange={(event) =>
                           onChange(index, event.target.value)
                         }
-                        className="input-field font-mono tabular-nums"
+                        className="input-field font-display tabular-nums"
                       />
                     </label>
                   ))}

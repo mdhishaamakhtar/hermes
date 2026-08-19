@@ -117,8 +117,21 @@
   --color-danger-hover: var(--palette-red-600);
 
   /* Typography */
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), "Courier New", monospace;
+  /*
+   * Both faces are monospace — Hermes has no sans-serif layer. The names say
+   * what each one is *for*, not what genre it belongs to, because "sans" and
+   * "mono" would both be answering the same question here.
+   *
+   * body    Monaspace Neon    — humanist, read-heavy: copy, questions, input
+   * display Monaspace Krypton — mechanical, squared: labels, codes, timers,
+   *                             scores, hero numbers
+   *
+   * next/font/local defines the variables (see lib/fonts.ts) and appends its
+   * own metric-matched fallback, so the stacks below only need a final
+   * generic in case the variable itself is missing.
+   */
+  --font-body: var(--font-monaspace-neon), ui-monospace, monospace;
+  --font-display: var(--font-monaspace-krypton), ui-monospace, monospace;
 }
 
 /* ── 3. Motion tokens ────────────────────────────────────────────────────── */
@@ -218,12 +231,15 @@
  *   500 (medium)    — form labels, secondary labels, option text
  *   600 (semibold)  — eyebrow labels (label utility)
  *   700 (bold)      — page headings, question text
- *   900 (black)     — display numbers, logo, join codes
+ *   800 (extrabold) — display numbers, logo, join codes
+ *
+ * 800 is the top of the scale: Monaspace ships no 900, so there is no
+ * `font-black` tier to reach for.
  */
 body {
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
