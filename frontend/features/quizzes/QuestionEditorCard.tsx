@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { questionsApi } from "@/features/quizzes/quiz-api";
 import { apiErrorMessage } from "@/lib/api";
 import { duration, stagger } from "@/lib/motion";

@@ -1,4 +1,4 @@
-import ky, { HTTPError, type Options } from "ky";
+import ky, { isHTTPError } from "ky";
 import { clearStoredAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 
 const BASE_URL =
@@ -59,24 +59,19 @@ export function getAuthToken(): string | null {
   return getStoredAuthToken();
 }
 
-interface RequestOptions extends Options {
-  skipAuth?: boolean;
-}
-
 const kyInstance = ky.create({
-  prefixUrl: BASE_URL,
+  prefix: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  // SWR owns retries for reads; a second retry layer here would multiply them.
+  retry: 0,
   hooks: {
     beforeRequest: [
-      (request, options: RequestOptions) => {
-        if (!options.skipAuth) {
-          const token = getAuthToken();
-          if (token) {
-            request.headers.set("Authorization", `Bearer ${token}`);
-          }
-        }
+      ({ request, options }) => {
+        if (options.context.skipAuth) return;
+        const token = getAuthToken();
+        if (token) request.headers.set("Authorization", `Bearer ${token}`);
       },
     ],
   },
@@ -90,11 +85,6 @@ function handleUnauthorized() {
   if (!getStoredAuthToken()) return;
   clearStoredAuthToken();
   window.location.assign("/auth/login");
-}
-
-// ky's prefixUrl requires no leading slash
-function normalizePath(path: string): string {
-  return path.startsWith("/") ? path.slice(1) : path;
 }
 
 /**
@@ -112,7 +102,7 @@ async function request<T>(
   try {
     response = await send();
   } catch (error) {
-    if (!(error instanceof HTTPError)) {
+    if (!isHTTPError(error)) {
       throw new HermesError(
         error instanceof Error ? error.message : "An unknown error occurred",
         "NETWORK_ERROR",
@@ -122,13 +112,12 @@ async function request<T>(
     const status = error.response.status;
     if (status === 401 && !skipAuth) handleUnauthorized();
 
-    // Prefer the server's own error message when it sent an envelope.
-    let envelope: ApiEnvelope<never> | null = null;
-    try {
-      envelope = (await error.response.json()) as ApiEnvelope<never>;
-    } catch {
-      // Non-JSON error body (gateway HTML, empty response) — fall through.
-    }
+    // Prefer the server's own error message when it sent an envelope. ky has
+    // already consumed the body into `data`; non-JSON bodies arrive as text.
+    const envelope =
+      typeof error.data === "object" && error.data !== null
+        ? (error.data as ApiEnvelope<never>)
+        : null;
 
     if (envelope?.error) {
       throw new HermesError(
@@ -157,28 +146,26 @@ async function request<T>(
 
 export const api = {
   get: <T>(path: string, extraHeaders?: Record<string, string>) =>
-    request<T>(() =>
-      kyInstance.get(normalizePath(path), { headers: extraHeaders }),
-    ),
+    request<T>(() => kyInstance.get(path, { headers: extraHeaders })),
 
   post: <T>(path: string, body?: unknown, opts?: { skipAuth?: boolean }) =>
     request<T>(
       () =>
-        kyInstance.post(normalizePath(path), {
+        kyInstance.post(path, {
           json: body,
-          skipAuth: opts?.skipAuth,
-        } as RequestOptions),
+          context: { skipAuth: opts?.skipAuth ?? false },
+        }),
       { expectNoBody: !body, skipAuth: opts?.skipAuth },
     ),
 
   put: <T>(path: string, body?: unknown) =>
-    request<T>(() => kyInstance.put(normalizePath(path), { json: body })),
+    request<T>(() => kyInstance.put(path, { json: body })),
 
   patch: <T>(path: string, body?: unknown) =>
-    request<T>(() => kyInstance.patch(normalizePath(path), { json: body })),
+    request<T>(() => kyInstance.patch(path, { json: body })),
 
   delete: <T = void>(path: string) =>
-    request<T>(() => kyInstance.delete(normalizePath(path)), {
+    request<T>(() => kyInstance.delete(path), {
       expectNoBody: true,
     }),
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { OPTION_META } from "@/lib/design-tokens";
 import { spring } from "@/lib/motion";
 import OptionRow from "@/components/ui/OptionRow";

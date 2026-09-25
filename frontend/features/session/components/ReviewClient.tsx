@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import useSWR from "swr";
 import { ReviewSkeleton } from "@/components/PageSkeleton";
 import BackLink from "@/components/ui/BackLink";

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { CardBadge } from "@/features/session/components/CardBadge";
 import Logo from "@/components/Logo";
 import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";

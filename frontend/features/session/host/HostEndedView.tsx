@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { CardBadge } from "@/features/session/components/CardBadge";
 import { LiveParticipantCount } from "@/features/session/components/LiveParticipantCount";
 import { ScoringDrawer } from "@/features/session/components/ScoringDrawer";

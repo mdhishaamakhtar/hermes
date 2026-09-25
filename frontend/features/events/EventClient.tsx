@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { duration } from "@/lib/motion";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";

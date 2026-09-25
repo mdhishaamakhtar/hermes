@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { motion, type HTMLMotionProps } from "motion/react";
 import { Shimmer } from "@/components/ui/Shimmer";
 
 type Variant = "compact" | "default" | "review";

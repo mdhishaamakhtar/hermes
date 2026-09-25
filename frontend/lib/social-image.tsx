@@ -10,35 +10,26 @@ export const socialImageSize = {
 
 export const socialImageAlt = "Hermes social preview";
 
-const GEIST_FONT_DIR = join(
+// Satori reads WOFF but not the WOFF2 that next/font serves, so the social
+// image loads the static instances @fontsource ships.
+const FONT_DIR = join(
   process.cwd(),
-  "node_modules/geist/dist/fonts/geist-sans",
+  "node_modules/@fontsource/schibsted-grotesk/files",
 );
 
 function loadFont(name: string) {
-  return readFile(join(GEIST_FONT_DIR, name));
+  return readFile(join(FONT_DIR, name));
 }
 
 export async function createSocialImage() {
-  const [geistRegular, geistBold] = await Promise.all([
-    loadFont("Geist-Regular.ttf"),
-    loadFont("Geist-Bold.ttf"),
+  const [sansRegular, sansBold] = await Promise.all([
+    loadFont("schibsted-grotesk-latin-400-normal.woff"),
+    loadFont("schibsted-grotesk-latin-800-normal.woff"),
   ]);
 
-  /*
-   * Optical margin corrections derived from Geist TTF hmtx left-side-bearings.
-   * Every glyph has invisible padding before its ink starts. At large sizes
-   * this becomes visible misalignment. Values below shift each text element
-   * left by its exact LSB so all ink edges align with geometric elements
-   * (the divider line, the icon viewBox crop).
-   *
-   * Geist Bold  H: lsb 74/1000em → 9.47px @128px
-   * Geist Regular R: lsb 92/1000em → 3.13px @34px, 1.66px @18px
-   * Geist Regular H: lsb 92/1000em → 2.02px @22px
-   */
-  const LSB_TITLE = -9.5; // Bold "H" at 128px
-  const LSB_BODY = -3; // Regular "R" at 34px
-  const LSB_META = -1.5; // Regular "R" at 18px
+  const LSB_TITLE = 0;
+  const LSB_BODY = 0;
+  const LSB_META = 0;
 
   return new ImageResponse(
     <div
@@ -50,7 +41,7 @@ export async function createSocialImage() {
         overflow: "hidden",
         background: "#0a0a0f",
         color: "#f8fafc",
-        fontFamily: "Geist",
+        fontFamily: "Schibsted Grotesk",
       }}
     >
       <div
@@ -166,14 +157,14 @@ export async function createSocialImage() {
       ...socialImageSize,
       fonts: [
         {
-          name: "Geist",
-          data: geistRegular,
+          name: "Schibsted Grotesk",
+          data: sansRegular,
           style: "normal",
           weight: 400,
         },
         {
-          name: "Geist",
-          data: geistBold,
+          name: "Schibsted Grotesk",
+          data: sansBold,
           style: "normal",
           weight: 700,
         },

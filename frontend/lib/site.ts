@@ -6,7 +6,6 @@ export const siteConfig = {
   shortDescription:
     "Real-time quiz sessions. Live analytics. Anonymous participants.",
   url: "https://hermes.hishaam.dev",
-  ogImagePath: "/og-image.svg",
   ogImageAlt: "Hermes preview card",
   iconPath: "/icon.svg",
   creator: "Md Hishaam Akhtar",

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { duration } from "@/lib/motion";
 
 // Rendered in session headers. Silent when the WebSocket is live, visibly

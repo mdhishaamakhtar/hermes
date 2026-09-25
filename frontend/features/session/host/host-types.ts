@@ -147,8 +147,7 @@ export interface HostSessionState {
   questionStatsById: Record<number, QuestionStats>;
   leaderboard: LiveLeaderboardEntry[];
   finalLeaderboard:
-    | { rank: number; displayName: string; score: number }[]
-    | null;
+    { rank: number; displayName: string; score: number }[] | null;
   sessionResults: SessionResults | null;
   hydrated: boolean;
 }

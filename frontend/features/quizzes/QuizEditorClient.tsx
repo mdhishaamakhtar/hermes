@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "motion/react";
 import { QuizEditorSkeleton } from "@/components/PageSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import CustomSelect from "@/components/ui/CustomSelect";

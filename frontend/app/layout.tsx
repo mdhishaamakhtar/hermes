@@ -1,9 +1,20 @@
 import type { Metadata } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { Azeret_Mono, Schibsted_Grotesk } from "next/font/google";
 import { absoluteUrl, getSiteUrl, siteConfig } from "@/lib/site";
 import SWRProvider from "@/components/SWRProvider";
 import "./globals.css";
+
+const sans = Schibsted_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-schibsted",
+  display: "swap",
+});
+
+const mono = Azeret_Mono({
+  subsets: ["latin"],
+  variable: "--font-azeret",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
@@ -70,7 +81,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <SWRProvider>{children}</SWRProvider>

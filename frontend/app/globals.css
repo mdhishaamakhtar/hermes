@@ -117,8 +117,8 @@
   --color-danger-hover: var(--palette-red-600);
 
   /* Typography */
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), "Courier New", monospace;
+  --font-sans: var(--font-schibsted), system-ui, sans-serif;
+  --font-mono: var(--font-azeret), ui-monospace, monospace;
 }
 
 /* ── 3. Motion tokens ────────────────────────────────────────────────────── */

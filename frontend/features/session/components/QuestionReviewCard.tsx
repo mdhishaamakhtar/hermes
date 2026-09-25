@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import OptionRow from "@/components/ui/OptionRow";
 import { spring } from "@/lib/motion";
 import type { QuestionResult } from "@/lib/types";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import useSWR from "swr";

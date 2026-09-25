@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { LockInPendingOverlay } from "@/features/session/components/LockInPendingOverlay";
 import OptionRow from "@/components/ui/OptionRow";
 import { colorRgb } from "@/lib/design-tokens";

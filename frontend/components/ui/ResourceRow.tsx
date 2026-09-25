@@ -2,7 +2,7 @@
 
 import { type ReactNode } from "react";
 import Link from "next/link";
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { motion, type HTMLMotionProps } from "motion/react";
 import { LINE, Shimmer } from "@/components/ui/Shimmer";
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import Logo from "@/components/Logo";
 import LeaderboardRow from "@/components/ui/LeaderboardRow";
 import { CardBadge } from "@/features/session/components/CardBadge";

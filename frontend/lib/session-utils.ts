@@ -11,10 +11,7 @@ export function formatTime(seconds: number) {
 export const TIMER_NOT_STARTED_DISPLAY = "\u2014:\u2014";
 
 export type SessionCountdownLifecycle =
-  | "DISPLAYED"
-  | "TIMED"
-  | "FROZEN"
-  | "REVIEWING";
+  "DISPLAYED" | "TIMED" | "FROZEN" | "REVIEWING";
 
 /**
  * Formats the live countdown, or a neutral placeholder before TIMER_START.

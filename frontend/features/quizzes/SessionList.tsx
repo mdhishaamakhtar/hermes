@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { fade } from "@/lib/motion";
 import type { SessionItem } from "@/lib/types";

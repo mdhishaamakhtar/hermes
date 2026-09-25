@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { rise } from "@/lib/motion";
 import OptionRow from "@/components/ui/OptionRow";
 

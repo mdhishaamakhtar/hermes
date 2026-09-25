@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { duration } from "@/lib/motion";
 import useSWR from "swr";
 import { eventsApi } from "@/features/events/events-api";
