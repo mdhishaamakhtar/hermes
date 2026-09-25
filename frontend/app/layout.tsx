@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import type { Metadata, Viewport } from "next";
+import { Providers } from "@/components/Providers";
 import { absoluteUrl, getSiteUrl, siteConfig } from "@/lib/site";
-import SWRProvider from "@/components/SWRProvider";
+import { mono, sans } from "./fonts";
 import "./globals.css";
+
+const defaultTitle = `${siteConfig.name} | ${siteConfig.tagline}`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
-  applicationName: siteConfig.title,
+  applicationName: siteConfig.name,
   title: {
-    default: `${siteConfig.title} | Real-time Quiz Platform`,
-    template: `%s | ${siteConfig.title}`,
+    default: defaultTitle,
+    template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
   keywords: [...siteConfig.keywords],
@@ -18,9 +19,7 @@ export const metadata: Metadata = {
   creator: siteConfig.creator,
   publisher: siteConfig.creator,
   referrer: "origin-when-cross-origin",
-  alternates: {
-    canonical: "/",
-  },
+  alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
   robots: {
     index: true,
@@ -36,8 +35,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: siteConfig.url,
-    siteName: siteConfig.title,
-    title: `${siteConfig.title} | Real-time Quiz Platform`,
+    siteName: siteConfig.name,
+    title: defaultTitle,
     description: siteConfig.description,
     locale: "en_US",
     images: [
@@ -51,15 +50,15 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${siteConfig.title} | Real-time Quiz Platform`,
+    title: defaultTitle,
     description: siteConfig.description,
     images: [absoluteUrl("/twitter-image")],
   },
-  icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
-  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0f",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -68,12 +67,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <SWRProvider>{children}</SWRProvider>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+      <body className="flex min-h-dvh flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[var(--z-toast)] focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white"
+        >
+          Skip to content
+        </a>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

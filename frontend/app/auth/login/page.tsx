@@ -1,120 +1,15 @@
-"use client";
+import type { Metadata } from "next";
+import { LoginForm } from "@/features/auth/AuthForms";
 
-import { useActionState } from "react";
-import Link from "next/link";
-import { api, HermesError } from "@/lib/api";
-import { setStoredAuthToken } from "@/lib/auth-storage";
-import MinimalNav from "@/components/MinimalNav";
+export const metadata: Metadata = {
+  title: "Sign in",
+};
 
-interface LoginState {
-  error: string;
-}
-
-export default function LoginPage() {
-  const [state, formAction, isPending] = useActionState<LoginState, FormData>(
-    async (_prev, formData) => {
-      const email = formData.get("email") as string;
-      const password = formData.get("password") as string;
-      try {
-        const { token } = await api.post<{
-          token: string;
-          user: {
-            id: number;
-            email: string;
-            displayName: string;
-            createdAt: string;
-          };
-        }>("/api/auth/login", { email, password }, { skipAuth: true });
-        setStoredAuthToken(token);
-        // Full page load: resets the SWR cache and the Next.js router
-        // cache so nothing fetched pre-login leaks into the new session.
-        window.location.assign("/dashboard");
-        return { error: "" };
-      } catch (err) {
-        // The server refusing the credentials is worth quoting back; a request
-        // that never landed is not — the user needs to know it was the network.
-        if (err instanceof HermesError && err.isFromServer) {
-          return { error: err.message || "Invalid credentials" };
-        }
-        return { error: "Connection failed" };
-      }
-    },
-    { error: "" },
-  );
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <MinimalNav />
-
-      <div className="flex-1 flex items-center justify-center px-6 relative z-[var(--z-raised)]">
-        <div className="page-enter w-full max-w-sm">
-          <div className="mb-8">
-            <p className="label mb-2">Organiser Access</p>
-            <h1 className="text-2xl font-bold text-foreground leading-tight tracking-tight">
-              Sign In
-            </h1>
-          </div>
-
-          <form action={formAction} className="space-y-4">
-            <div>
-              <label htmlFor="login-email" className="field-label block mb-2">
-                Email
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                name="email"
-                required
-                className="input-field font-mono"
-                placeholder="organiser@example.com"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="login-password"
-                className="field-label block mb-2"
-              >
-                Password
-              </label>
-              <input
-                id="login-password"
-                type="password"
-                name="password"
-                required
-                className="input-field font-mono"
-                placeholder="••••••••"
-              />
-            </div>
-
-            {state.error && (
-              <p className="text-xs text-danger tracking-wide" role="alert">
-                {state.error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={isPending}
-              className="w-full bg-primary text-white py-4 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {isPending ? "Signing in..." : "Sign In"}
-            </button>
-          </form>
-
-          <div className="mt-8 border-t border-border pt-6">
-            <p className="text-sm text-muted">
-              No account?{" "}
-              <Link
-                href="/auth/register"
-                prefetch
-                className="text-accent hover:text-accent-hover transition-colors"
-              >
-                Create one
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  const { next } = await searchParams;
+  return <LoginForm next={typeof next === "string" ? next : null} />;
 }

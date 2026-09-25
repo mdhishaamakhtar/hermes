@@ -1,116 +1,112 @@
 import Link from "next/link";
-import type { Metadata } from "next";
-import Logo from "@/components/Logo";
+import { LogoMark } from "@/components/Logo";
+import { TopBar } from "@/components/TopBar";
+import { ButtonLink } from "@/components/ui/Button";
+import { CodeEntry } from "@/features/landing/CodeEntry";
+import { DemoRound } from "@/features/landing/DemoRound";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Real-time Quiz Platform",
-  description: siteConfig.description,
-  alternates: {
-    canonical: "/",
-  },
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      name: siteConfig.name,
+      url: siteConfig.url,
+      description: siteConfig.description,
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: siteConfig.name,
+      applicationCategory: "EducationalApplication",
+      operatingSystem: "Web",
+      url: siteConfig.url,
+      image: absoluteUrl("/opengraph-image"),
+      description: siteConfig.description,
+      creator: { "@type": "Person", name: siteConfig.creator },
+    },
+  ],
 };
 
 export default function LandingPage() {
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "WebSite",
-        name: siteConfig.title,
-        url: siteConfig.url,
-        description: siteConfig.description,
-      },
-      {
-        "@type": "SoftwareApplication",
-        name: siteConfig.title,
-        applicationCategory: "BusinessApplication",
-        operatingSystem: "Web",
-        url: siteConfig.url,
-        image: absoluteUrl("/opengraph-image"),
-        description: siteConfig.description,
-        creator: {
-          "@type": "Person",
-          name: siteConfig.creator,
-        },
-      },
-      {
-        "@type": "Organization",
-        name: siteConfig.title,
-        url: siteConfig.url,
-        logo: absoluteUrl(siteConfig.iconPath),
-      },
-    ],
-  };
-
   return (
-    <main className="relative min-h-screen bg-background overflow-hidden flex flex-col">
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
+      <TopBar width="stage">
+        <ButtonLink href="/join" variant="ghost" size="sm">
+          Join a session
+        </ButtonLink>
+        <ButtonLink href="/auth/login" size="sm">
+          Sign in
+        </ButtonLink>
+      </TopBar>
 
-      {/* Nav */}
-      <nav
-        aria-label="Site navigation"
-        className="page-enter relative z-[var(--z-raised)] px-8 py-6 flex items-center justify-between border-b border-border/60"
-      >
-        <Logo size="sm" showWordmark />
-        <Link
-          href="/auth/login"
-          prefetch
-          className="label hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          Sign In
-        </Link>
-      </nav>
+      <main id="main" className="flex-1">
+        <section className="mx-auto grid w-full max-w-7xl items-center gap-14 px-4 pt-14 pb-20 sm:px-6 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-14 xl:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] xl:gap-20 lg:pt-24 lg:pb-28">
+          <div className="animate-rise">
+            <h1 className="max-w-[15ch] text-[clamp(2.5rem,5.2vw,5.25rem)] leading-[0.98] font-extrabold tracking-[-0.03em] text-foreground">
+              Live quizzes, run like a broadcast.
+            </h1>
+            <p className="mt-6 max-w-[34rem] text-lg text-muted sm:text-xl sm:leading-relaxed">
+              Put a question on the big screen and watch the room answer in real
+              time. Players join from any phone with a six-character code. No
+              accounts, no app.
+            </p>
+            <div className="mt-10">
+              <ButtonLink
+                href="/auth/register"
+                variant="primary"
+                size="lg"
+                trailingIcon="arrow-right"
+              >
+                Host a quiz
+              </ButtonLink>
+            </div>
+            <div className="mt-12 max-w-md border-t border-border pt-8">
+              <CodeEntry />
+            </div>
+          </div>
 
-      {/* Hero — asymmetric, left-aligned */}
-      <div className="relative z-[var(--z-raised)] flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 max-w-5xl">
-        <div className="page-enter page-enter-delay-1 mb-8">
-          <Logo size="lg" showWordmark={false} />
-        </div>
+          <div className="animate-rise [animation-delay:120ms]">
+            <DemoRound />
+            <p className="mt-3 text-sm text-subtle">
+              A sample round, playing on repeat.
+            </p>
+          </div>
+        </section>
+      </main>
 
-        <h1 className="page-enter page-enter-delay-2 font-black tracking-widest text-[clamp(3.5rem,10vw,8rem)] uppercase leading-none text-foreground mb-4">
-          HERMES
-        </h1>
-
-        <p className="page-enter page-enter-delay-3 text-muted text-lg md:text-xl max-w-md mb-12 leading-relaxed">
-          Real-time quiz sessions. Live analytics. Anonymous participants.
-        </p>
-
-        <div className="line-reveal line-reveal-delay h-px w-24 bg-primary mb-12 origin-left" />
-
-        <div className="page-enter page-enter-delay-4 flex flex-col sm:flex-row gap-4">
-          <Link
-            href="/auth/login"
-            prefetch
-            className="group inline-flex items-center gap-3 bg-primary text-white px-8 py-4 text-sm tracking-widest uppercase font-medium hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Host a Quiz
-            <span
-              aria-hidden
-              className="group-hover:translate-x-1 transition-transform"
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-8 gap-y-4 px-4 py-6 text-sm text-subtle sm:px-6">
+          <span className="flex items-center gap-2.5">
+            <LogoMark size={16} />
+            Hermes
+          </span>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
+            <Link
+              href="/join"
+              className="transition-colors hover:text-foreground"
             >
-              →
-            </span>
-          </Link>
-          <Link
-            href="/join"
-            prefetch
-            className="inline-flex items-center gap-3 border border-border text-foreground px-8 py-4 text-sm tracking-widest uppercase font-medium hover:border-primary/50 hover:text-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Join a Session
-          </Link>
+              Join a session
+            </Link>
+            <Link
+              href="/auth/register"
+              className="transition-colors hover:text-foreground"
+            >
+              Create a host account
+            </Link>
+            <Link
+              href="/auth/login"
+              className="transition-colors hover:text-foreground"
+            >
+              Host sign in
+            </Link>
+          </nav>
         </div>
-      </div>
-
-      {/* Bottom rule */}
-      <div className="page-enter page-enter-delay-5 relative z-[var(--z-raised)] px-8 py-6 border-t border-border/40">
-        <p className="label opacity-40">
-          Real-time · WebSocket · Anonymous Participants
-        </p>
-      </div>
-    </main>
+      </footer>
+    </>
   );
 }

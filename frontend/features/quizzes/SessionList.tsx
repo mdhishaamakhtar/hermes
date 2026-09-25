@@ -1,93 +1,89 @@
-"use client";
+import { Badge } from "@/components/ui/Badge";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { countLabel, formatDate } from "@/lib/format";
+import type { SessionStatus, SessionSummary } from "@/lib/types";
 
-import { motion } from "framer-motion";
-import Link from "next/link";
-import { fade } from "@/lib/motion";
-import type { SessionItem } from "@/lib/types";
+const STATUS: Record<
+  SessionStatus,
+  { label: string; tone: "live" | "warning" | "neutral" }
+> = {
+  LOBBY: { label: "Lobby open", tone: "warning" },
+  ACTIVE: { label: "Live", tone: "live" },
+  ENDED: { label: "Ended", tone: "neutral" },
+};
 
-interface Props {
-  sessions: SessionItem[];
-  abandoning: boolean;
-  onAbandon: (id: number) => void;
-  onAbandonAll: () => void;
-}
-
-export default function SessionList({
+/** Every run of this quiz, newest first. */
+export function SessionList({
   sessions,
-  abandoning,
-  onAbandon,
-  onAbandonAll,
-}: Props) {
+  onDiscard,
+}: {
+  sessions: SessionSummary[];
+  onDiscard: (session: SessionSummary) => void;
+}) {
   if (sessions.length === 0) return null;
 
-  const hasNonEnded = sessions.some((s) => s.status !== "ENDED");
-
   return (
-    <>
-      <div className="h-px bg-border mb-6" />
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="label">Past Sessions</h2>
-        {hasNonEnded && (
-          <button
-            onClick={onAbandonAll}
-            disabled={abandoning}
-            className="text-sm tracking-widest uppercase text-warning hover:text-warning/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-          >
-            {abandoning ? "Abandoning..." : "Abandon All →"}
-          </button>
-        )}
-      </div>
-      <div className="list-stack">
-        {sessions.map((session) => (
-          <motion.div
-            key={session.id}
-            {...fade}
-            className="flex items-center justify-between px-6 py-4 bg-surface border border-border"
-          >
-            <div className="flex items-center gap-4">
-              <span
-                className={`text-xs tracking-widest uppercase px-2 py-0.5 ${
-                  session.status === "ENDED"
-                    ? "text-muted bg-border"
-                    : session.status === "LOBBY"
-                      ? "text-warning bg-warning/10"
-                      : "text-success bg-success/10"
-                }`}
+    <section aria-labelledby="sessions-heading" className="mt-16">
+      <h2
+        id="sessions-heading"
+        className="mb-4 text-xl font-semibold text-foreground"
+      >
+        Sessions
+      </h2>
+      <ul className="flex flex-col gap-2">
+        {sessions
+          .toSorted((a, b) => b.id - a.id)
+          .map((session) => {
+            const status = STATUS[session.status];
+            const running = session.status !== "ENDED";
+            return (
+              <li
+                key={session.id}
+                className="flex flex-wrap items-center gap-x-5 gap-y-3 border border-border bg-surface px-5 py-3.5"
               >
-                {session.status}
-              </span>
-              <span className="text-xs text-muted tabular-nums">
-                {session.participantCount} participants
-              </span>
-              {session.startedAt && (
-                <span className="text-xs text-muted/50">
-                  {new Date(session.startedAt).toLocaleDateString()}
+                <Badge tone={status.tone} dot={running}>
+                  {status.label}
+                </Badge>
+                <span className="text-sm text-muted">
+                  {formatDate(session.startedAt) ?? "Not started yet"}
                 </span>
-              )}
-            </div>
-
-            {session.status === "ENDED" && (
-              <Link
-                href={`/session/${session.id}/review`}
-                prefetch
-                className="label text-accent hover:text-accent-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Review →
-              </Link>
-            )}
-
-            {session.status !== "ENDED" && (
-              <button
-                onClick={() => onAbandon(session.id)}
-                disabled={abandoning}
-                className="label text-warning hover:text-warning/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-              >
-                {abandoning ? "Abandoning..." : "Abandon →"}
-              </button>
-            )}
-          </motion.div>
-        ))}
-      </div>
-    </>
+                <span className="text-sm text-subtle">
+                  {countLabel(session.participantCount, "player", "players")}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  {running ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDiscard(session)}
+                        className="hover:text-danger"
+                      >
+                        Discard
+                      </Button>
+                      <ButtonLink
+                        href={`/session/${session.id}/host`}
+                        variant="primary"
+                        size="sm"
+                        trailingIcon="arrow-right"
+                      >
+                        Open host view
+                      </ButtonLink>
+                    </>
+                  ) : (
+                    <ButtonLink
+                      href={`/session/${session.id}/review`}
+                      size="sm"
+                      trailingIcon="arrow-right"
+                    >
+                      Review
+                    </ButtonLink>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+      </ul>
+    </section>
   );
 }

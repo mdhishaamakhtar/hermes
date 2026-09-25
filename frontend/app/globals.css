@@ -2,536 +2,628 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HERMES DESIGN SYSTEM
-   ───────────────────────────────────────────────────────────────────────────
-   A dark-mode, real-time quiz platform. CRT-inspired, high-contrast,
-   purposeful. Every token is named for its meaning, not its value.
+   A flat near-black stage, hairline rules, one saturated signal at a time.
 
-   Sections:
-     1. Primitive palette  — raw hex values, only referenced by semantic tokens
-     2. Semantic tokens    — colour intent, exposed to Tailwind via @theme
-     3. Motion tokens      — durations, easings (in :root)
-     4. Layer tokens       — z-index semantic scale (in :root)
-     5. Border tokens      — border widths (in :root)
-     6. Base styles        — body defaults, font stack
-     7. Utility classes    — @utility definitions
-     8. Component patterns — live-dot, skeleton
-     9. Animations         — @keyframes
-    10. Accessibility      — reduced-motion overrides
+     1. Palette       raw values; only semantic tokens reference them
+     2. Theme         semantic tokens exposed to Tailwind (bg-*, text-*, …)
+     3. Motion        durations and easings, mirrored by lib/motion.ts
+     4. Layers        z-index scale
+     5. Base          document defaults, focus, selection
+     6. Components    label, input, buttons, option tiles, dialog, skeleton
+     7. Keyframes
+     8. Reduced motion
 
-   This file is the source of truth for colours, durations, easings, and
-   z-index. The one deliberate exception is answer-option colours, which live
-   in lib/design-tokens.ts because only TypeScript consumes them (see §5).
-
-   Nothing is defined here "for future flexibility". If it has no consumer,
-   it is deleted — an unused token is a value waiting to disagree with the
-   one that is actually used.
-
-   Theming:
-     Colour tokens are defined on [data-theme="dark"] (the current default).
-     To add a light theme, duplicate the block with [data-theme="light"] and
-     swap the surface/foreground/border values. The Tailwind @theme block
-     references these via var(), so all utilities automatically follow.
+   Every value here has a consumer. A token nothing reads is a value waiting
+   to disagree with the one that is actually used, so it gets deleted.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Primitive palette ─────────────────────────────────────────────────── */
-/*
- * Raw colour values. Never use these directly in components.
- * Components use semantic tokens. Primitives exist only to define them.
- */
+/* ── 1. Palette ───────────────────────────────────────────────────────────── */
 :root {
-  /* Neutrals */
-  --palette-neutral-950: #0a0a0f;
-  --palette-neutral-900: #0f1117;
-  --palette-neutral-800: #1a1f2e;
-  --palette-neutral-700: #252b3b;
-  --palette-neutral-600: #4b5563;
-  --palette-neutral-400: #94a3b8;
-  --palette-neutral-50: #f8fafc;
+  color-scheme: dark;
 
-  /* Blue (primary / interactive) */
+  --palette-ink-950: #0a0a0f;
+  --palette-ink-900: #0f1117;
+  --palette-ink-850: #151a26;
+  --palette-ink-800: #1a1f2e;
+  --palette-ink-700: #2a3144;
+  --palette-slate-600: #4b5563;
+  --palette-slate-500: #718096;
+  --palette-slate-400: #94a3b8;
+  --palette-slate-50: #f8fafc;
+
   --palette-blue-700: #1d4ed8;
   --palette-blue-600: #2563eb;
-  --palette-blue-400: #60a5fa;
-
-  /* Sky (accent / links) */
   --palette-sky-400: #38bdf8;
   --palette-sky-300: #7dd3fc;
-
-  /* Green (success / correct) */
   --palette-green-500: #22c55e;
-  --palette-green-400: #4ade80;
-
-  /* Amber (warning / editing) */
-  --palette-amber-600: #d97706;
-  --palette-amber-700: #b45309;
-
-  /* Red (danger / incorrect) */
-  --palette-red-600: #dc2626;
+  --palette-amber-500: #f59e0b;
   --palette-red-500: #ef4444;
-  --palette-red-400: #f87171;
+  --palette-red-600: #dc2626;
+  --palette-red-700: #b91c1c;
+
+  --palette-option-blue: #2563eb;
+  --palette-option-violet: #7c3aed;
+  --palette-option-amber: #d97706;
+  --palette-option-rose: #e11d48;
 }
 
-/* ── 2. Semantic tokens (Tailwind v4 @theme) ─────────────────────────────── */
+/* ── 2. Theme ─────────────────────────────────────────────────────────────── */
 /*
- * Semantic tokens map meaning to values. They are exposed to Tailwind, so
- * every token generates utility classes: bg-*, text-*, border-*, ring-*, etc.
+ * Text tiers, each measured against the stage (#0a0a0f):
+ *   foreground  19.3:1  primary reading text
+ *   muted        7.8:1  secondary text, labels
+ *   subtle       4.9:1  metadata, placeholders (the WCAG AA floor)
+ *   faint        2.6:1  disabled only, never information
  *
- * Naming:
- *   background   — page canvas
- *   surface      — cards, inputs, panels (one step lighter than background)
- *   border       — dividers, outlines
- *   foreground   — primary readable text
- *   muted        — secondary text, labels, captions
- *   muted-dark   — disabled / placeholder
- *   primary      — brand blue, primary actions
- *   accent       — sky blue, links, secondary actions
- *   success      — correct answers, confirmations
- *   warning      — edit mode, pending states
- *   danger       — errors, incorrect answers, destructive actions
+ * border is the hairline between surfaces; border-strong outlines controls
+ * (inputs, secondary buttons) so a field stays findable on any surface.
+ *
+ * Filled danger buttons use danger-solid: white on #ef4444 is 3.8:1 and
+ * fails for button text, white on #dc2626 passes at 4.8:1.
+ *
+ * The option colours mean "answer A/B/C/D" and nothing else. Never use them
+ * for chrome, navigation, or status.
  */
 @theme {
-  /* Surfaces */
-  --color-background: var(--palette-neutral-950);
-  --color-surface: var(--palette-neutral-900);
-  --color-border: var(--palette-neutral-800);
-  --color-overlay: var(--palette-neutral-700);
+  --color-background: var(--palette-ink-950);
+  --color-surface: var(--palette-ink-900);
+  --color-raised: var(--palette-ink-850);
+  --color-border: var(--palette-ink-800);
+  --color-border-strong: var(--palette-ink-700);
 
-  /* Text */
-  --color-foreground: var(--palette-neutral-50);
-  --color-muted: var(--palette-neutral-400);
-  --color-muted-dark: var(--palette-neutral-600);
+  --color-foreground: var(--palette-slate-50);
+  --color-muted: var(--palette-slate-400);
+  --color-subtle: var(--palette-slate-500);
+  --color-faint: var(--palette-slate-600);
 
-  /* Brand — primary */
   --color-primary: var(--palette-blue-600);
   --color-primary-hover: var(--palette-blue-700);
-
-  /* Brand — accent */
   --color-accent: var(--palette-sky-400);
   --color-accent-hover: var(--palette-sky-300);
 
-  /* Status */
   --color-success: var(--palette-green-500);
-  --color-warning: var(--palette-amber-600);
-  --color-warning-hover: var(--palette-amber-700);
+  --color-warning: var(--palette-amber-500);
   --color-danger: var(--palette-red-500);
-  --color-danger-hover: var(--palette-red-600);
+  --color-danger-solid: var(--palette-red-600);
+  --color-danger-solid-hover: var(--palette-red-700);
 
-  /* Typography */
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), "Courier New", monospace;
+  --color-option-a: var(--palette-option-blue);
+  --color-option-b: var(--palette-option-violet);
+  --color-option-c: var(--palette-option-amber);
+  --color-option-d: var(--palette-option-rose);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-rise: rise var(--duration-enter) var(--ease-out-expo) both;
+  --animate-fade: fade var(--duration-enter) var(--ease-out-expo) both;
 }
 
-/* ── 3. Motion tokens ────────────────────────────────────────────────────── */
-/*
- * Transition durations and easing functions.
- *
- * These are the canonical values. lib/motion.ts mirrors them for Framer
- * Motion, which needs numbers in JS and cannot read a CSS variable. If a
- * value changes here, change it there.
- *
- * Duration scale — five steps, each perceptibly different from its
- * neighbours. Roles are expressed by choosing from the scale, not by adding
- * aliases: a --duration-exit that equals --duration-base is two names for one
- * number, and they drift the moment someone tunes one of them.
- *
- *   instant  — immediate feedback, hover border changes
- *   fast     — micro-interactions, exits (leaving is quicker than arriving)
- *   base     — standard UI transitions (most common)
- *   enter    — elements arriving on screen
- *   slow     — page-level entrances, complex state changes
- *
- * Easing:
- *   ease-out — anything entering (fast start, gentle settle)
- *   ease-in-out — anything moving between two on-screen states
- *   standard — general-purpose CSS transitions
- */
-:root {
-  --duration-instant: 50ms;
-  --duration-fast: 100ms;
-  --duration-base: 150ms;
-  --duration-enter: 200ms;
-  --duration-slow: 250ms;
-
-  --ease-standard: ease;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out: fast settle */
-  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+/* Font variables are set on <html> by next/font, so resolve them in place. */
+@theme inline {
+  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-azeret), ui-monospace, monospace;
 }
 
-/* ── 4. Layer tokens (z-index) ───────────────────────────────────────────── */
+/* ── 3. Motion ────────────────────────────────────────────────────────────── */
 /*
- * Semantic z-index scale. Never use magic numbers.
- * Each layer has a defined purpose — consult before adding new ones.
+ *   instant  100ms  press and hover feedback
+ *   base     160ms  routine state changes
+ *   enter    240ms  surfaces arriving: dialogs, drawers, panels
+ *   stage    480ms  authored live moments: a question cutting in, a reveal
  *
- *   base      — default document flow
- *   raised    — tooltips, dropdowns within a component
- *   dropdown  — floating menus, autocomplete lists
- *   sticky    — sticky headers and sidebars
- *   overlay   — backdrop shades behind modals
- *   modal     — dialogs, drawers
- *   toast     — notification toasts (above modals)
- *   tooltip   — tooltips that must appear above everything
+ * Exits run at `base`: leaving is quicker than arriving.
  */
 :root {
-  --z-base: 0;
+  --duration-instant: 100ms;
+  --duration-base: 160ms;
+  --duration-enter: 240ms;
+  --duration-stage: 480ms;
+}
+
+/* ── 4. Layers ────────────────────────────────────────────────────────────── */
+:root {
   --z-raised: 10;
   --z-dropdown: 100;
   --z-sticky: 200;
-  --z-overlay: 300;
-  --z-modal: 400;
+  --z-dock: 250;
   --z-toast: 500;
-  --z-tooltip: 600;
 }
 
-/* ── 5. Border tokens ────────────────────────────────────────────────────── */
-/*
- * Hermes uses sharp corners as a design principle (quiz/terminal aesthetic),
- * so there are deliberately no radius tokens — a radius scale existed here
- * previously and was referenced by nothing, including other CSS.
- */
-:root {
-  --border-width-thin: 1px;
-  --border-width-emphasis: 2px;
-}
-
-/*
- * Answer option colours (A–D) are NOT defined here. Their only consumer is
- * TypeScript, which needs rgb triplets to build dynamic rgba() values for
- * Framer Motion — something a CSS variable cannot hand to JS. They live at a
- * single definition site in lib/design-tokens.ts (OPTION_META).
- */
-
-/* ── 6. Base styles ──────────────────────────────────────────────────────── */
-/*
- * Type scale (1.25 modular ratio, rem-based for zoom-safety):
- *
- *   xs     0.75rem   12px  → eyebrow labels, badges, metadata  [label utility]
- *   sm     0.875rem  14px  → secondary body, helper text
- *   base   1rem      16px  → primary body, form inputs          [input-field utility]
- *   lg     1.125rem  18px  → stat values, leaderboard scores
- *   xl     1.25rem   20px  → — (not currently used as a primary text size)
- *   2xl    1.5rem    24px  → page titles, question text during play
- *   3xl    1.875rem  30px  → logo, final leaderboard heading
- *   display clamp()        → hero numbers, join codes (fluid)
- *
- * Weight roles:
- *   400 (regular)   — body text when present
- *   500 (medium)    — form labels, secondary labels, option text
- *   600 (semibold)  — eyebrow labels (label utility)
- *   700 (bold)      — page headings, question text
- *   900 (black)     — display numbers, logo, join codes
- */
-body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* ── 7. Utility classes ──────────────────────────────────────────────────── */
-
-/*
- * label
- * Eyebrow / section label — uppercase, tracked, muted.
- * Use for: section headings, status badges, metadata captions.
- * Do NOT use for: form field labels (use field-label), body text.
- */
-@utility label {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-/*
- * page-enter
- * The CSS twin of `rise` in lib/motion.ts — same 8px travel, same duration,
- * same easing. Not a competing system: pick between them by what the
- * component is, not by taste.
- *
- *   page-enter — server components (the landing page, auth shells). Costs no
- *                JS and paints before React hydrates.
- *   rise       — client components already using Framer, and anything that
- *                needs AnimatePresence to animate on the way out.
- *
- * If one changes, change the other.
- */
-@utility page-enter {
-  animation: slide-up var(--duration-enter) var(--ease-out) both;
-}
-
-@utility line-reveal {
-  animation: line-reveal var(--duration-slow) var(--ease-out) both;
-}
-
-.page-enter-delay-1 {
-  animation-delay: 50ms;
-}
-
-.page-enter-delay-2 {
-  animation-delay: 100ms;
-}
-
-.page-enter-delay-3 {
-  animation-delay: 150ms;
-}
-
-.page-enter-delay-4 {
-  animation-delay: 200ms;
-}
-
-.page-enter-delay-5,
-.line-reveal-delay {
-  animation-delay: 250ms;
-}
-
-/*
- * field-label
- * Form input label — readable, not uppercase, slightly muted.
- * Use for: <label> elements above form inputs.
- */
-@utility field-label {
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--color-muted);
-}
-
-/*
- * input-field
- * Standard text input — 16px prevents iOS Safari auto-zoom on focus.
- * Includes focus ring via box-shadow (not outline) for cross-browser consistency.
- */
-@utility input-field {
-  width: 100%;
-  background-color: var(--color-surface);
-  border: var(--border-width-thin) solid var(--color-border);
-  color: var(--color-foreground);
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  outline: none;
-  transition:
-    border-color var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard);
-
-  &::placeholder {
-    color: color-mix(in srgb, var(--color-muted) 30%, transparent);
+/* ── 5. Base ──────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    background-color: var(--color-background);
+    scrollbar-gutter: stable;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  &:focus {
-    border-color: var(--color-primary);
-    box-shadow: inset 0 0 0 1px var(--color-primary);
+  /* A modal dialog owns the screen; the page behind it stops scrolling. */
+  html:has(dialog[open]) {
+    overflow: hidden;
   }
 
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  body {
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Tailwind v4 resets buttons to the default cursor. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+    color: var(--color-foreground);
   }
 }
 
+/* ── 6. Components ────────────────────────────────────────────────────────── */
 /*
- * btn-primary
- * Primary call-to-action button. Hermes style: rectangular, uppercase, tracked.
- * Use for: the single most important action on a surface.
+ * Plain classes in the components layer, so any Tailwind utility on the same
+ * element overrides them without !important.
  */
-@utility btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-primary);
-  color: #fff;
-  padding: 1rem 2rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition: background-color var(--duration-base) var(--ease-standard);
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background-color: var(--color-primary-hover);
+@layer components {
+  /* Uppercase tracked label: section names, status, metadata. Never a
+     kicker above a heading; the heading carries its own weight. */
+  .label {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-muted);
   }
 
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  /* ── Inputs ─────────────────────────────────────────────────────────── */
+  /* 16px text keeps iOS Safari from zooming on focus. The field is a darker
+     well with a strong outline, so it reads as a field on any surface. */
+  .input {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.875rem;
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-foreground);
+    font-size: 1rem;
+    line-height: 1.5;
+    transition:
+      border-color var(--duration-base) ease,
+      box-shadow var(--duration-base) ease;
+
+    &::placeholder {
+      color: var(--color-subtle);
+    }
+
+    &:hover:not(:disabled, :focus) {
+      border-color: color-mix(
+        in srgb,
+        var(--color-border-strong) 50%,
+        var(--color-muted)
+      );
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: inset 0 0 0 1px var(--color-primary);
+    }
+
+    &[aria-invalid="true"] {
+      border-color: var(--color-danger);
+    }
+
+    &[aria-invalid="true"]:focus {
+      box-shadow: inset 0 0 0 1px var(--color-danger);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 2px var(--color-primary);
-  }
-}
-
-/*
- * btn-lock-in-pending
- * Lock-in in flight: keep full opacity + wait cursor. Motion overlay is
- * rendered by LockInPendingOverlay (Framer), not CSS.
- */
-@utility btn-lock-in-pending {
-  position: relative;
-  overflow: hidden;
-  cursor: wait;
-
-  &:disabled {
-    opacity: 1;
-    cursor: wait;
+  textarea.input {
+    resize: vertical;
+    field-sizing: content;
+    min-height: 5.5rem;
   }
 
-  &.btn-primary:disabled {
-    background-color: color-mix(
-      in srgb,
-      var(--color-primary) 68%,
-      var(--color-background)
-    );
+  /* ── Buttons ────────────────────────────────────────────────────────── */
+  .btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0 1.25rem;
+    border: 1px solid transparent;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    user-select: none;
+    transition:
+      background-color var(--duration-instant) ease,
+      border-color var(--duration-instant) ease,
+      color var(--duration-instant) ease,
+      transform var(--duration-instant) ease;
+
+    &:active:not(:disabled, [aria-busy="true"]) {
+      transform: translateY(1px);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* A request in flight is not a disabled button: keep full strength and
+       sweep a light across it until the answer lands. */
+    &[aria-busy="true"] {
+      opacity: 1;
+      cursor: progress;
+      overflow: hidden;
+    }
+
+    &[aria-busy="true"]::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 -60%;
+      width: 60%;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in srgb, currentColor 22%, transparent),
+        transparent
+      );
+      animation: sweep 1.35s linear infinite;
+    }
   }
 
-  &:not(.btn-primary):disabled {
+  .btn-trail {
+    transition: translate var(--duration-base) var(--ease-out-expo);
+  }
+
+  .btn:hover:not(:disabled, [aria-busy="true"]) .btn-trail {
+    translate: 3px 0;
+  }
+
+  .btn-sm {
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .btn-lg {
+    min-height: 3.25rem;
+    padding: 0 1.75rem;
+    font-size: 0.875rem;
+  }
+
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background-color: var(--color-primary-hover);
+    }
+  }
+
+  .btn-secondary {
+    border-color: var(--color-border-strong);
+    color: var(--color-foreground);
+
+    &:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+      background-color: var(--color-raised);
+    }
+  }
+
+  .btn-danger {
+    background-color: var(--color-danger-solid);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background-color: var(--color-danger-solid-hover);
+    }
+  }
+
+  .btn-ghost {
+    padding-inline: 0.75rem;
+    color: var(--color-muted);
+
+    &:hover:not(:disabled) {
+      color: var(--color-foreground);
+      background-color: var(--color-raised);
+    }
+  }
+
+  /* Square icon-only button. Always paired with an aria-label. */
+  .btn-icon {
+    min-height: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+  }
+
+  /* ── Answer options ─────────────────────────────────────────────────── */
+  /* One tile for every context: editor, host stage, player, results.
+     `--option` carries the A/B/C/D identity; `data-state` carries meaning. */
+  .option-tile {
+    --tone: var(--option, var(--color-border-strong));
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.875rem;
+    padding: 0.875rem 1rem;
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border);
+    text-align: left;
+    transition:
+      background-color var(--duration-base) ease,
+      border-color var(--duration-base) ease,
+      opacity var(--duration-base) ease;
+
+    &[data-state="selected"] {
+      border-color: var(--tone);
+      background-color: color-mix(
+        in srgb,
+        var(--tone) 14%,
+        var(--color-background)
+      );
+    }
+
+    &[data-state="correct"] {
+      --tone: var(--color-success);
+      border-color: var(--tone);
+      background-color: color-mix(
+        in srgb,
+        var(--tone) 12%,
+        var(--color-background)
+      );
+    }
+
+    &[data-state="missed"] {
+      --tone: var(--color-success);
+      border-color: color-mix(in srgb, var(--tone) 55%, transparent);
+      border-style: dashed;
+    }
+
+    &[data-state="wrong"] {
+      --tone: var(--color-danger);
+      border-color: color-mix(in srgb, var(--tone) 65%, transparent);
+      background-color: color-mix(
+        in srgb,
+        var(--tone) 9%,
+        var(--color-background)
+      );
+    }
+
+    &[data-state="dimmed"] {
+      opacity: 0.5;
+    }
+  }
+
+  button.option-tile:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--tone) 70%, transparent);
+  }
+
+  .option-letter {
+    display: inline-grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid color-mix(in srgb, var(--tone) 60%, transparent);
+    color: var(--tone);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition:
+      background-color var(--duration-base) ease,
+      color var(--duration-base) ease;
+
+    [data-state="selected"] > &,
+    [data-state="correct"] > & {
+      background-color: var(--tone);
+      border-color: var(--tone);
+      color: #fff;
+    }
+  }
+
+  /* ── Dialogs ────────────────────────────────────────────────────────── */
+  /* Native <dialog>: focus trap, Escape, and inert background for free.
+     @starting-style animates the open; allow-discrete keeps the close. */
+  .dialog {
+    margin: auto;
+    width: min(28rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    background-color: var(--color-surface);
+    color: var(--color-foreground);
+    border: 1px solid var(--color-border-strong);
+    box-shadow:
+      0 24px 48px -12px rgb(0 0 0 / 0.6),
+      0 8px 16px -8px rgb(0 0 0 / 0.5);
+    opacity: 0;
+    translate: 0 8px;
+    transition:
+      opacity var(--duration-base) ease,
+      translate var(--duration-base) ease,
+      overlay var(--duration-base) allow-discrete,
+      display var(--duration-base) allow-discrete;
+
+    &[open] {
+      opacity: 1;
+      translate: 0 0;
+      transition-duration: var(--duration-enter);
+      transition-timing-function: var(--ease-out-expo);
+    }
+
+    &::backdrop {
+      background-color: rgb(10 10 15 / 0);
+      transition:
+        background-color var(--duration-base) ease,
+        overlay var(--duration-base) allow-discrete,
+        display var(--duration-base) allow-discrete;
+    }
+
+    &[open]::backdrop {
+      background-color: rgb(10 10 15 / 0.82);
+    }
+  }
+
+  @starting-style {
+    .dialog[open] {
+      opacity: 0;
+      translate: 0 8px;
+    }
+
+    .dialog[open]::backdrop {
+      background-color: rgb(10 10 15 / 0);
+    }
+  }
+
+  /* The drawer variant docks to the right edge and slides in from it. */
+  .dialog.drawer {
+    margin: 0 0 0 auto;
+    width: min(34rem, 100vw);
+    height: 100dvh;
+    max-height: none;
+    border-width: 0 0 0 1px;
+    translate: 24px 0;
+
+    &[open] {
+      translate: 0 0;
+    }
+  }
+
+  @starting-style {
+    .dialog.drawer[open] {
+      translate: 24px 0;
+    }
+  }
+
+  /* ── Skeleton ───────────────────────────────────────────────────────── */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
     background-color: var(--color-surface);
   }
-}
 
-/*
- * btn-ghost
- * Secondary/ghost button — bordered, transparent background.
- * Use for: secondary actions, destructive confirms, cancel flows.
- */
-@utility btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: transparent;
-  border: var(--border-width-thin) solid var(--color-border);
-  color: var(--color-muted);
-  padding: 1rem 2rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition:
-    border-color var(--duration-base) var(--ease-standard),
-    color var(--duration-base) var(--ease-standard);
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
-    color: var(--color-accent);
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    translate: -100% 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-accent) 10%, var(--color-border)),
+      transparent
+    );
+    animation: shimmer 1.8s linear infinite;
   }
 
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  /* The text caret drawn inside the join-code cells. */
+  .caret {
+    display: block;
+    width: 2px;
+    height: 0.9em;
+    background-color: var(--color-accent);
+    animation: blink 1.06s steps(1) infinite;
   }
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 2px var(--color-primary);
+  /* Pulsing status dot for live and reconnecting signals. */
+  .live-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: currentColor;
+    animation: pulse-dot 1.6s ease-in-out infinite;
   }
 }
 
-/*
- * list-stack
- * Shared vertical rhythm for resource lists.
- * Use for: events, quizzes, sessions, and matching loading states.
- */
-@utility list-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+/* ── 7. Keyframes ─────────────────────────────────────────────────────────── */
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
 }
 
-/* ── 8. Component patterns ───────────────────────────────────────────────── */
-
-/*
- * .live-dot
- * Pulsing status indicator. Pair with a coloured background.
- *
- * Usage: <span className="live-dot w-2 h-2 rounded-full bg-success" />
- */
-.live-dot {
-  animation: pulse-dot 1.5s ease-in-out infinite;
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
 }
 
-/*
- * .skeleton
- * Shimmer loading placeholder. Apply alongside a bg-* class for the base
- * colour — the ::after sweeps a translucent accent gradient across it.
- *
- * Usage: <div className="h-4 w-36 bg-surface skeleton" />
- *        <div className="h-3 w-20 bg-border skeleton" />  ← more prominent
- */
-.skeleton {
-  position: relative;
-  overflow: hidden;
+@keyframes sweep {
+  to {
+    translate: 270% 0;
+  }
 }
 
-.skeleton::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--color-accent) 16%, var(--color-border)) 50%,
-    transparent 100%
-  );
-  animation: skeleton-shimmer 2s linear infinite;
+@keyframes shimmer {
+  to {
+    translate: 100% 0;
+  }
 }
 
-/* ── 9. Animations ───────────────────────────────────────────────────────── */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
 
 @keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
   50% {
-    opacity: 0.5;
-    transform: scale(1.3);
+    opacity: 0.35;
+    scale: 0.8;
   }
 }
 
-@keyframes slide-up {
+/* Countdown fill: drains from the fraction left to empty, on the compositor,
+   so the bar stays smooth however busy the main thread gets mid-question. */
+@keyframes drain {
   from {
-    opacity: 0;
-    transform: translateY(8px);
+    transform: scaleX(var(--drain-from, 1));
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes line-reveal {
-  from {
-    opacity: 0;
     transform: scaleX(0);
   }
-  to {
-    opacity: 1;
-    transform: scaleX(1);
-  }
 }
 
-@keyframes skeleton-shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* ── 10. Accessibility ───────────────────────────────────────────────────── */
-/*
- * Respect prefers-reduced-motion for CSS animations and transitions.
- */
+/* ── 8. Reduced motion ────────────────────────────────────────────────────── */
+/* Framer animations follow MotionConfig reducedMotion="user" in Providers. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

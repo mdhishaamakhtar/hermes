@@ -1,277 +1,372 @@
 "use client";
 
-import { AnimatePresence } from "framer-motion";
-import { QuizEditorSkeleton } from "@/components/PageSkeleton";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import CustomSelect from "@/components/ui/CustomSelect";
-import BackLink from "@/components/ui/BackLink";
-import EmptyState from "@/components/ui/EmptyState";
-import PageHeader from "@/components/ui/PageHeader";
-import PassageCard from "@/features/quizzes/PassageCard";
-import PassageForm from "@/features/quizzes/PassageForm";
-import QuestionEditorCard from "@/features/quizzes/QuestionEditorCard";
-import QuestionForm from "@/features/quizzes/QuestionForm";
-import SessionList from "@/features/quizzes/SessionList";
-import { useQuizEditor } from "@/features/quizzes/useQuizEditor";
-import { DISPLAY_MODE_OPTIONS } from "@/features/quizzes/editor-model";
-import type { DisplayMode, Passage, Question } from "@/lib/types";
+import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import { LoadError } from "@/components/LoadError";
+import { Page, PageHeader, PageHeaderSkeleton } from "@/components/Page";
+import { Alert } from "@/components/ui/Alert";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
+import { describeError } from "@/lib/api";
+import { countLabel } from "@/lib/format";
+import { fade } from "@/lib/motion";
+import type { DisplayMode, SessionSummary } from "@/lib/types";
+import {
+  DISPLAY_MODES,
+  newQuestionDraft,
+  questionCount,
+  quizBlocks,
+} from "./editor-model";
+import { QuestionEditor } from "./QuestionEditor";
+import {
+  PassageBlock,
+  PassageComposer,
+  QuestionBlock,
+  type BlockActions,
+  type DeleteTarget,
+} from "./QuizBlocks";
+import { SessionList } from "./SessionList";
+import { useQuizEditor } from "./useQuizEditor";
 
-type CanvasItem =
-  | { kind: "question"; orderIndex: number; question: Question }
-  | { kind: "passage"; orderIndex: number; passage: Passage };
+type Composer = "question" | "passage" | null;
 
-function sortCanvasItems(items: CanvasItem[]): CanvasItem[] {
-  return items.toSorted((a, b) => {
-    if (a.orderIndex !== b.orderIndex) {
-      return a.orderIndex - b.orderIndex;
-    }
-
-    if (a.kind === b.kind) return 0;
-    return a.kind === "question" ? -1 : 1;
-  });
-}
-
-export default function QuizEditorClient({
+export function QuizEditorClient({
   eventId,
   quizId,
 }: {
   eventId: string;
   quizId: string;
 }) {
-  const {
-    quiz,
-    quizLoading,
-    sessions,
-    composerMode,
-    setComposerMode,
-    launching,
-    launchError,
-    abandoning,
-    confirmMessage,
-    confirmLabel,
-    confirmVariant,
-    confirmAction,
-    clearConfirm,
-    quizDisplayModeDraft,
-    setQuizDisplayModeDraft,
-    savingQuizSettings,
-    settingsError,
-    closeComposer,
-    handleQuestionAdded,
-    handlePassageAdded,
-    handleQuestionSaved,
-    handlePassageSaved,
-    handleSubQuestionAdded,
-    requestDeleteQuestion,
-    requestDeletePassage,
-    handleSaveQuizSettings,
-    handleLaunch,
-    handleAbandon,
-    handleAbandonAll,
-    nextOrderIndexForQuiz,
-    sortPassages,
-    sortQuestions,
-  } = useQuizEditor({ eventId, quizId });
+  const router = useRouter();
+  const editor = useQuizEditor(eventId, quizId);
+  const { quiz, event, runningSession } = editor;
+  const displayId = useId();
 
-  if (quizLoading || !quiz) return <QuizEditorSkeleton />;
+  const [composer, setComposer] = useState<Composer>(null);
+  const [launching, setLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  // Targets are kept apart from the open flags so a dialog's copy does not
+  // blank out while it animates closed.
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [discardTarget, setDiscardTarget] = useState<SessionSummary | null>(
+    null,
+  );
+  const [discardOpen, setDiscardOpen] = useState(false);
 
-  const standaloneQuestions = sortQuestions(
-    quiz.questions.filter((question) => question.passageId == null),
-  );
-  const passages = sortPassages(quiz.passages);
-  const canvasItems = sortCanvasItems([
-    ...standaloneQuestions.map((question) => ({
-      kind: "question" as const,
-      orderIndex: question.orderIndex,
-      question,
-    })),
-    ...passages.map((passage) => ({
-      kind: "passage" as const,
-      orderIndex: passage.orderIndex,
-      passage,
-    })),
-  ]);
-  const totalPrompts =
-    standaloneQuestions.length +
-    passages.reduce((count, passage) => count + passage.subQuestions.length, 0);
-  const nextOrderIndex = nextOrderIndexForQuiz(quiz);
-  const hasBlockingSession = sessions.some(
-    (session) => session.status === "LOBBY" || session.status === "ACTIVE",
-  );
+  if (!quiz) {
+    return editor.error ? (
+      <Page>
+        <LoadError
+          error={editor.error}
+          resource="quiz"
+          back={{ href: `/events/${eventId}`, label: "Back to the event" }}
+          onRetry={editor.retry}
+        />
+      </Page>
+    ) : (
+      <QuizEditorSkeleton />
+    );
+  }
+
+  const blocks = quizBlocks(quiz);
+  const total = questionCount(quiz);
+  const locked = Boolean(runningSession);
+
+  // Running-order number of each block's first question.
+  const starts: number[] = [];
+  let next = 1;
+  for (const block of blocks) {
+    starts.push(next);
+    next +=
+      block.kind === "question"
+        ? 1
+        : Math.max(1, block.passage.subQuestions.length);
+  }
+
+  const actions: BlockActions = {
+    quizDisplayMode: quiz.displayMode,
+    locked,
+    saveQuestion: editor.saveQuestion,
+    savePassage: editor.savePassage,
+    addSubQuestion: editor.addSubQuestion,
+    requestDelete: (target) => {
+      setDeleteTarget(target);
+      setDeleteOpen(true);
+    },
+  };
+
+  const launch = async () => {
+    setLaunching(true);
+    setLaunchError(null);
+    try {
+      router.push(`/session/${await editor.launch()}/host`);
+    } catch (err) {
+      setLaunchError(describeError(err, "Couldn't open a lobby."));
+      setLaunching(false);
+    }
+  };
+
+  const changeDisplayMode = async (mode: DisplayMode) => {
+    try {
+      await editor.setDisplayMode(mode);
+    } catch (err) {
+      toast.error(describeError(err, "Couldn't change the answer display."));
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
-      <BackLink href={`/events/${eventId}`} label="Event" />
-
+    <Page>
       <PageHeader
-        label="Quiz Editor"
+        crumbs={[
+          { href: "/dashboard", label: "Events" },
+          { href: `/events/${eventId}`, label: event?.title ?? "Event" },
+        ]}
         title={quiz.title}
-        description="Standalone questions and passage blocks, in order."
         meta={
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
-            <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
-              {canvasItems.length} blocks
-            </span>
-            <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
-              {totalPrompts} prompts
-            </span>
-            <span className="border border-border px-3 py-2 font-mono uppercase tracking-[0.12em]">
-              Default {quiz.displayMode.toLowerCase()}
-            </span>
-          </div>
+          <>
+            <span>{countLabel(total, "question", "questions")}</span>
+            {quiz.passages.length > 0 && (
+              <span>
+                {countLabel(quiz.passages.length, "passage", "passages")}
+              </span>
+            )}
+          </>
         }
-        action={
-          <div className="flex flex-col items-end gap-2">
-            <button
-              onClick={handleLaunch}
-              disabled={launching || totalPrompts === 0}
-              className="bg-primary px-6 py-3 text-sm tracking-widest text-white uppercase transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {launching ? "Launching..." : "↑ Launch Session"}
-            </button>
-            {launchError ? (
-              <p className="text-xs text-danger">{launchError}</p>
-            ) : null}
-          </div>
+        actions={
+          <Button
+            variant="primary"
+            size="lg"
+            icon="play"
+            onClick={launch}
+            pending={launching}
+            disabled={total === 0 || locked}
+            title={total === 0 ? "Add a question first" : undefined}
+          >
+            {launching ? "Opening lobby…" : "Start a session"}
+          </Button>
         }
       />
 
-      <section className="mb-8 border border-border bg-surface">
-        <div className="flex flex-wrap items-center gap-5 px-5 py-5 md:px-6 md:py-5">
-          <p className="label text-accent">Display Mode</p>
-          <div className="flex items-center gap-3">
-            <div className="w-44">
-              <CustomSelect
-                value={quizDisplayModeDraft ?? quiz.displayMode}
-                onChange={(v) => setQuizDisplayModeDraft(v as DisplayMode)}
-                disabled={hasBlockingSession}
-                options={DISPLAY_MODE_OPTIONS}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleSaveQuizSettings}
-              disabled={
-                hasBlockingSession ||
-                savingQuizSettings ||
-                (quizDisplayModeDraft ?? quiz.displayMode) === quiz.displayMode
-              }
-              className="btn-primary px-5 py-3 disabled:cursor-not-allowed disabled:opacity-40"
+      {launchError && <Alert className="mb-8">{launchError}</Alert>}
+
+      {runningSession && (
+        <Alert
+          tone="info"
+          className="mb-8"
+          action={
+            <ButtonLink
+              href={`/session/${runningSession.id}/host`}
+              variant="primary"
+              size="sm"
+              trailingIcon="arrow-right"
             >
-              {savingQuizSettings ? "Saving…" : "Save"}
-            </button>
-          </div>
-          {settingsError ? (
-            <p className="text-sm text-danger">{settingsError}</p>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="mb-6 border border-border bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-4 md:px-6">
-          <p className="label text-foreground/75">Canvas</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                setComposerMode((current) =>
-                  current === "question" ? null : "question",
-                )
-              }
-              disabled={hasBlockingSession}
-              className="label border border-border px-3 py-2 text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {composerMode === "question"
-                ? "Close Question Composer"
-                : "+ Standalone Question"}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setComposerMode((current) =>
-                  current === "passage" ? null : "passage",
-                )
-              }
-              disabled={hasBlockingSession}
-              className="label border border-border px-3 py-2 text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {composerMode === "passage"
-                ? "Close Passage Composer"
-                : "+ Passage Block"}
-            </button>
-          </div>
-        </div>
-
-        <AnimatePresence initial={false}>
-          {composerMode === "question" ? (
-            <QuestionForm
-              quizId={quizId}
-              nextOrderIndex={nextOrderIndex}
-              quizDisplayMode={quiz.displayMode}
-              onAdded={handleQuestionAdded}
-              onCancel={closeComposer}
-            />
-          ) : null}
-
-          {composerMode === "passage" ? (
-            <PassageForm
-              quizId={quizId}
-              nextOrderIndex={nextOrderIndex}
-              onAdded={handlePassageAdded}
-              onCancel={closeComposer}
-            />
-          ) : null}
-        </AnimatePresence>
-      </section>
-
-      {canvasItems.length === 0 ? (
-        <EmptyState message="No prompts yet. Add a standalone question or a passage block above." />
-      ) : (
-        <div className="mb-12 space-y-4">
-          {canvasItems.map((item, index) =>
-            item.kind === "question" ? (
-              <QuestionEditorCard
-                key={`question-${item.question.id}`}
-                question={item.question}
-                index={index}
-                disabled={hasBlockingSession}
-                onDelete={requestDeleteQuestion}
-                onSaved={handleQuestionSaved}
-                onEditOpen={closeComposer}
-              />
-            ) : (
-              <PassageCard
-                key={`passage-${item.passage.id}`}
-                passage={item.passage}
-                disabled={hasBlockingSession}
-                onDelete={requestDeletePassage}
-                onSaved={handlePassageSaved}
-                onSubQuestionAdded={handleSubQuestionAdded}
-                onSubQuestionSaved={handleQuestionSaved}
-                onSubQuestionDeleted={requestDeleteQuestion}
-                onEditOpen={closeComposer}
-              />
-            ),
-          )}
-        </div>
+              Open host view
+            </ButtonLink>
+          }
+        >
+          A session of this quiz is{" "}
+          {runningSession.status === "LOBBY"
+            ? "waiting in the lobby"
+            : "live right now"}
+          . Editing is locked until it ends.
+        </Alert>
       )}
 
+      <section
+        aria-label="Quiz settings"
+        className="mb-12 border border-border bg-surface p-5 sm:p-6"
+      >
+        <Field id={displayId} label="Answer display during questions">
+          <div className="max-w-md">
+            <SegmentedControl<DisplayMode>
+              id={displayId}
+              value={quiz.displayMode}
+              options={DISPLAY_MODES}
+              onChange={changeDisplayMode}
+              disabled={locked}
+            />
+          </div>
+        </Field>
+      </section>
+
+      <section aria-labelledby="questions-heading">
+        <h2
+          id="questions-heading"
+          className="mb-4 text-xl font-semibold text-foreground"
+        >
+          Questions
+        </h2>
+
+        {blocks.length === 0 && !composer ? (
+          <EmptyState
+            title="No questions yet"
+            description="Add a question, or a reading passage with questions about it."
+            action={
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button
+                  variant="primary"
+                  icon="plus"
+                  disabled={locked}
+                  onClick={() => setComposer("question")}
+                >
+                  Add a question
+                </Button>
+                <Button
+                  icon="plus"
+                  disabled={locked}
+                  onClick={() => setComposer("passage")}
+                >
+                  Add a passage
+                </Button>
+              </div>
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {blocks.map((block, index) =>
+              block.kind === "question" ? (
+                <QuestionBlock
+                  key={`question-${block.question.id}`}
+                  question={block.question}
+                  number={starts[index]}
+                  actions={actions}
+                />
+              ) : (
+                <PassageBlock
+                  key={`passage-${block.passage.id}`}
+                  passage={block.passage}
+                  firstNumber={starts[index]}
+                  actions={actions}
+                />
+              ),
+            )}
+
+            <AnimatePresence mode="wait" initial={false}>
+              {composer === "question" ? (
+                <QuestionEditor
+                  key="new-question"
+                  heading={`New question ${next}`}
+                  initial={newQuestionDraft()}
+                  ownTimer
+                  quizDisplayMode={quiz.displayMode}
+                  submitLabel="Add question"
+                  onCancel={() => setComposer(null)}
+                  onSubmit={async (draft) => {
+                    await editor.addQuestion(draft);
+                    setComposer(null);
+                  }}
+                />
+              ) : composer === "passage" ? (
+                <PassageComposer
+                  key="new-passage"
+                  quizDisplayMode={quiz.displayMode}
+                  onCancel={() => setComposer(null)}
+                  onCreate={async (draft, questions) => {
+                    await editor.addPassage(draft, questions);
+                    setComposer(null);
+                  }}
+                />
+              ) : (
+                !locked && (
+                  <motion.div
+                    key="add"
+                    {...fade}
+                    className="flex flex-wrap items-center justify-center gap-3 border border-dashed border-border-strong px-4 py-5"
+                  >
+                    <Button
+                      variant="ghost"
+                      icon="plus"
+                      onClick={() => setComposer("question")}
+                    >
+                      Add question
+                    </Button>
+                    <span aria-hidden className="h-5 w-px bg-border-strong" />
+                    <Button
+                      variant="ghost"
+                      icon="plus"
+                      onClick={() => setComposer("passage")}
+                    >
+                      Add passage
+                    </Button>
+                  </motion.div>
+                )
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+      </section>
+
       <SessionList
-        sessions={sessions}
-        abandoning={abandoning}
-        onAbandon={handleAbandon}
-        onAbandonAll={handleAbandonAll}
+        sessions={editor.sessions}
+        onDiscard={(session) => {
+          setDiscardTarget(session);
+          setDiscardOpen(true);
+        }}
       />
 
       <ConfirmDialog
-        message={confirmMessage}
-        confirmLabel={confirmLabel}
-        variant={confirmVariant}
-        onConfirm={() => {
-          void confirmAction?.();
-        }}
-        onCancel={clearConfirm}
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title={
+          deleteTarget?.kind === "passage"
+            ? "Delete this passage?"
+            : `Delete question ${deleteTarget?.number ?? ""}?`
+        }
+        description={
+          deleteTarget?.kind === "passage"
+            ? `Its ${countLabel(deleteTarget.questionCount, "question goes", "questions go")} with it. This can't be undone.`
+            : "This can't be undone."
+        }
+        confirmLabel="Delete"
+        onConfirm={() =>
+          deleteTarget?.kind === "passage"
+            ? editor.deletePassage(deleteTarget.id)
+            : deleteTarget && editor.deleteQuestion(deleteTarget.id)
+        }
       />
-    </div>
+
+      <ConfirmDialog
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Discard this session?"
+        description="Everyone in it is disconnected, and its players and answers are deleted. The quiz becomes editable again."
+        confirmLabel="Discard session"
+        onConfirm={() =>
+          discardTarget && editor.discardSession(discardTarget.id)
+        }
+      />
+    </Page>
+  );
+}
+
+export function QuizEditorSkeleton() {
+  return (
+    <Page>
+      <LoadingRegion label="Loading quiz">
+        <PageHeaderSkeleton crumbs action titleWidth="w-72" />
+        <Skeleton className="mb-12 h-32 w-full" />
+        <Skeleton className="mb-4 h-7 w-28" />
+        <div className="flex flex-col gap-3">
+          {[0, 1].map((block) => (
+            <div key={block} className="border border-border bg-surface p-6">
+              <Skeleton className="h-5 w-40 bg-border" />
+              <Skeleton className="mt-3 h-7 w-3/4 bg-border" />
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {[0, 1, 2, 3].map((option) => (
+                  <Skeleton key={option} className="h-12 bg-background" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </LoadingRegion>
+    </Page>
   );
 }

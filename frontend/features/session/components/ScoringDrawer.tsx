@@ -1,112 +1,157 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { rise } from "@/lib/motion";
-import OptionRow from "@/components/ui/OptionRow";
+import { useId, useState, type CSSProperties, type FormEvent } from "react";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { describeError } from "@/lib/api";
+import { optionColor, optionLetter } from "@/lib/options";
 
-export interface CorrectionDraftOption {
-  optionId: number;
+export interface ScoringTarget {
+  questionId: number;
+  number: number;
   text: string;
-  orderIndex: number;
-  pointValue: number | string;
+  options: Array<{ id: number; text: string; pointValue: number }>;
 }
 
+/**
+ * Re-score a graded question. Saving recalculates every player's total on
+ * the server; the leaderboard updates the moment it lands.
+ */
 export function ScoringDrawer({
   open,
-  questionTitle,
-  draftOptions,
-  saving,
-  error,
+  target,
   onClose,
-  onChange,
   onSave,
 }: {
   open: boolean;
-  questionTitle: string;
-  draftOptions: CorrectionDraftOption[];
-  saving: boolean;
-  error?: string;
+  /** Kept after closing so the drawer does not blank while it slides out. */
+  target: ScoringTarget | null;
   onClose: () => void;
-  onChange: (index: number, value: string) => void;
-  onSave: () => void;
+  onSave: (
+    questionId: number,
+    points: Array<{ optionId: number; pointValue: number }>,
+  ) => Promise<void>;
 }) {
   return (
-    <AnimatePresence>
-      {open ? (
-        <motion.div {...rise} className="fixed inset-0 z-[var(--z-overlay)]">
-          <button
-            type="button"
-            aria-label="Close scoring editor"
-            onClick={onClose}
-            className="absolute inset-0 bg-black/55"
-          />
-          <aside className="absolute right-0 top-0 h-full w-full max-w-xl border-l border-border bg-background shadow-2xl">
-            <div className="flex h-full flex-col">
-              <div className="border-b border-border px-6 py-5">
-                <p className="label mb-2">Edit scoring</p>
-                <h3 className="text-xl font-bold leading-snug text-foreground">
-                  {questionTitle}
-                </h3>
-                <p className="mt-3 text-sm text-muted">
-                  Positive point values count as correct. Zero or negative
-                  values are treated as incorrect for display and scoring.
-                </p>
-              </div>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      variant="drawer"
+      title={target ? `Scoring for question ${target.number}` : "Scoring"}
+      description={target?.text}
+    >
+      {target && (
+        <ScoringForm
+          key={target.questionId}
+          target={target}
+          onCancel={onClose}
+          onSave={async (points) => {
+            await onSave(target.questionId, points);
+            onClose();
+          }}
+        />
+      )}
+    </Dialog>
+  );
+}
 
-              <div className="flex-1 overflow-y-auto px-6 py-5">
-                <div className="space-y-4">
-                  {draftOptions.map((option, index) => (
-                    <label key={option.optionId} className="block">
-                      <div className="mb-2">
-                        <OptionRow
-                          content={option.text}
-                          contentClassName="text-sm font-medium text-foreground"
-                          aside={
-                            <span className="text-muted">
-                              Option {index + 1}
-                            </span>
-                          }
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        value={option.pointValue}
-                        onChange={(event) =>
-                          onChange(index, event.target.value)
-                        }
-                        className="input-field font-mono tabular-nums"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
+function ScoringForm({
+  target,
+  onSave,
+  onCancel,
+}: {
+  target: ScoringTarget;
+  onSave: (
+    points: Array<{ optionId: number; pointValue: number }>,
+  ) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const formId = useId();
+  const [points, setPoints] = useState(() =>
+    target.options.map((option) => String(option.pointValue)),
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-              <div className="border-t border-border px-6 py-5">
-                {error ? (
-                  <p className="mb-4 text-sm text-danger">{error}</p>
-                ) : null}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="border border-border px-5 py-3 text-xs tracking-widest uppercase text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onSave}
-                    disabled={saving}
-                    className="btn-primary"
-                  >
-                    {saving ? "Saving..." : "Save & Recalculate"}
-                  </button>
-                </div>
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (points.some((value) => !/^-?\d+$/.test(value))) {
+      setError("Every option needs a whole number of points.");
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      await onSave(
+        target.options.map((option, index) => ({
+          optionId: option.id,
+          pointValue: Number.parseInt(points[index], 10),
+        })),
+      );
+    } catch (err) {
+      setError(describeError(err, "Couldn't update the scoring."));
+      setPending(false);
+    }
+  };
+
+  return (
+    <form id={formId} onSubmit={submit} className="flex h-full flex-col gap-5">
+      <p className="text-sm text-muted">
+        Options with positive points count as correct. Everyone&apos;s score is
+        recalculated when you save.
+      </p>
+      <ol className="flex flex-col gap-2">
+        {target.options.map((option, index) => {
+          const value = Number.parseInt(points[index], 10);
+          return (
+            <li
+              key={option.id}
+              className="option-tile"
+              data-state={value > 0 ? "correct" : undefined}
+              style={{ "--option": optionColor(index) } as CSSProperties}
+            >
+              <span className="option-letter">{optionLetter(index)}</span>
+              <label
+                htmlFor={`${formId}-${option.id}`}
+                className="min-w-0 text-sm break-words text-foreground"
+              >
+                {option.text}
+              </label>
+              <div className="relative w-24">
+                <input
+                  id={`${formId}-${option.id}`}
+                  value={points[index]}
+                  inputMode="numeric"
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    if (!/^-?\d*$/.test(raw)) return;
+                    setPoints((current) =>
+                      current.map((entry, i) => (i === index ? raw : entry)),
+                    );
+                  }}
+                  className="input pr-10 text-right font-mono tabular-nums"
+                />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-subtle"
+                >
+                  pts
+                </span>
               </div>
-            </div>
-          </aside>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+            </li>
+          );
+        })}
+      </ol>
+      {error && <Alert>{error}</Alert>}
+      <div className="mt-auto flex flex-wrap justify-end gap-3 border-t border-border pt-5">
+        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" pending={pending}>
+          {pending ? "Recalculating…" : "Save and recalculate"}
+        </Button>
+      </div>
+    </form>
   );
 }

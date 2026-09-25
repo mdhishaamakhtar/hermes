@@ -1,244 +1,373 @@
+/**
+ * The quiz editor's data model: drafts, validation, payloads, and the pure
+ * updates that keep the cached quiz in step with the server.
+ *
+ * Drafts hold numbers as the strings being typed, so "-" and "" are valid
+ * mid-edit states. They become numbers once, in the payload builders.
+ */
 import type {
   DisplayMode,
+  Passage,
   PassageTimerMode,
   Question,
-  QuestionOptionInput,
   QuestionType,
+  Quiz,
 } from "@/lib/types";
+import type { Segment } from "@/components/ui/SegmentedControl";
 
-export interface QuestionDraftOption extends Omit<
-  QuestionOptionInput,
-  "pointValue"
-> {
-  pointValue: number | string;
+export interface OptionDraft {
+  text: string;
+  points: string;
 }
 
 export interface QuestionDraft {
   text: string;
-  orderIndex: number | string;
-  timeLimitSeconds: number | string;
   questionType: QuestionType;
+  timeLimitSeconds: string;
   displayModeOverride: DisplayMode | null;
-  options: QuestionDraftOption[];
+  options: OptionDraft[];
 }
 
-export const DISPLAY_MODE_OPTIONS: Array<{
-  value: DisplayMode;
-  label: string;
-  description: string;
-}> = [
+export interface PassageDraft {
+  text: string;
+  timerMode: PassageTimerMode;
+  timeLimitSeconds: string;
+}
+
+export const MIN_OPTIONS = 2;
+export const MIN_TIMER_SECONDS = 5;
+const DEFAULT_TIMER = "30";
+const DEFAULT_PASSAGE_TIMER = "120";
+const CORRECT_POINTS = "10";
+
+/* ── Choices, with the words the editor shows for them ────────────────────── */
+
+export const QUESTION_TYPES: Segment<QuestionType>[] = [
   {
-    value: "BLIND",
-    label: "Blind",
-    description: "Hide answer analytics until the host reveals them.",
+    value: "SINGLE_SELECT",
+    label: "One answer",
+    description: "Players pick one option. Exactly one option scores.",
   },
+  {
+    value: "MULTI_SELECT",
+    label: "Several answers",
+    description: "Players pick every option they think is right.",
+  },
+];
+
+export const DISPLAY_MODES: Segment<DisplayMode>[] = [
   {
     value: "LIVE",
     label: "Live",
-    description: "Show live answer distribution while the audience responds.",
+    description: "The answer spread fills in on screen as players respond.",
+  },
+  {
+    value: "BLIND",
+    label: "Blind",
+    description: "Responses stay hidden until time is up, then are revealed.",
   },
   {
     value: "CODE_DISPLAY",
     label: "Code",
-    description: "Keep the join code on stage with the question prompt only.",
+    description:
+      "The join code stays on screen beside the question for latecomers. Responses stay hidden until time is up.",
   },
 ];
 
-export const QUESTION_TYPE_OPTIONS: Array<{
-  value: QuestionType;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: "SINGLE_SELECT",
-    label: "Single-select",
-    description: "Exactly one positive-scoring option.",
-  },
-  {
-    value: "MULTI_SELECT",
-    label: "Multi-select",
-    description: "Multiple positive options allowed.",
-  },
-];
-
-export const PASSAGE_TIMER_MODE_OPTIONS: Array<{
-  value: PassageTimerMode;
-  label: string;
-  description: string;
-}> = [
+export const TIMER_MODES: Segment<PassageTimerMode>[] = [
   {
     value: "PER_SUB_QUESTION",
-    label: "Timer per question",
-    description: "Each sub-question gets its own countdown.",
+    label: "One at a time",
+    description: "Each question gets its own timer, with the passage pinned.",
   },
   {
     value: "ENTIRE_PASSAGE",
-    label: "One timer for all",
-    description: "The full passage block runs under one shared timer.",
+    label: "All together",
+    description: "Every question shows at once, under one shared timer.",
   },
 ];
 
-export function createOptionInput(
-  text = "",
-  pointValue: number | string = 0,
-  orderIndex?: number,
-): QuestionDraftOption {
-  return { text, pointValue, orderIndex };
+export function displayModeLabel(mode: DisplayMode): string {
+  return DISPLAY_MODES.find((option) => option.value === mode)?.label ?? mode;
 }
 
-export function createDefaultOptions(
+export function questionTypeLabel(type: QuestionType): string {
+  return type === "MULTI_SELECT" ? "Several answers" : "One answer";
+}
+
+/* ── Drafts ───────────────────────────────────────────────────────────────── */
+
+export function newQuestionDraft(): QuestionDraft {
+  return {
+    text: "",
+    questionType: "SINGLE_SELECT",
+    timeLimitSeconds: DEFAULT_TIMER,
+    displayModeOverride: null,
+    options: [
+      { text: "", points: CORRECT_POINTS },
+      { text: "", points: "0" },
+      { text: "", points: "0" },
+      { text: "", points: "0" },
+    ],
+  };
+}
+
+export function draftFromQuestion(question: Question): QuestionDraft {
+  return {
+    text: question.text,
+    questionType: question.questionType,
+    timeLimitSeconds: String(
+      question.timeLimitSeconds > 0 ? question.timeLimitSeconds : DEFAULT_TIMER,
+    ),
+    displayModeOverride: question.displayModeOverride,
+    options: question.options
+      .toSorted((a, b) => a.orderIndex - b.orderIndex)
+      .map((option) => ({
+        text: option.text,
+        points: String(option.pointValue),
+      })),
+  };
+}
+
+export function newPassageDraft(): PassageDraft {
+  return {
+    text: "",
+    timerMode: "PER_SUB_QUESTION",
+    timeLimitSeconds: DEFAULT_PASSAGE_TIMER,
+  };
+}
+
+export function draftFromPassage(passage: Passage): PassageDraft {
+  return {
+    text: passage.text,
+    timerMode: passage.timerMode,
+    timeLimitSeconds: String(passage.timeLimitSeconds ?? DEFAULT_PASSAGE_TIMER),
+  };
+}
+
+function toInt(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+export function isCorrect(option: OptionDraft): boolean {
+  return toInt(option.points) > 0;
+}
+
+/**
+ * Flip an option between correct and not. A single-answer question keeps
+ * exactly one correct option, so marking one clears the others.
+ */
+export function toggleCorrect(
+  draft: QuestionDraft,
+  index: number,
+): QuestionDraft {
+  const markCorrect = !isCorrect(draft.options[index]);
+  return {
+    ...draft,
+    options: draft.options.map((option, i) => {
+      if (i === index) {
+        return { ...option, points: markCorrect ? CORRECT_POINTS : "0" };
+      }
+      if (markCorrect && draft.questionType === "SINGLE_SELECT") {
+        return isCorrect(option) ? { ...option, points: "0" } : option;
+      }
+      return option;
+    }),
+  };
+}
+
+/**
+ * Switching to one answer keeps the first correct option and zeroes the rest,
+ * so the draft stays valid without the author redoing it.
+ */
+export function withQuestionType(
+  draft: QuestionDraft,
   questionType: QuestionType,
-): QuestionDraftOption[] {
-  if (questionType === "MULTI_SELECT") {
-    return [
-      createOptionInput("", 10, 0),
-      createOptionInput("", 0, 1),
-      createOptionInput("", 10, 2),
-      createOptionInput("", -5, 3),
-    ];
-  }
-
-  return [
-    createOptionInput("", 10, 0),
-    createOptionInput("", 0, 1),
-    createOptionInput("", 0, 2),
-    createOptionInput("", 0, 3),
-  ];
+): QuestionDraft {
+  if (questionType === "MULTI_SELECT") return { ...draft, questionType };
+  const firstCorrect = Math.max(0, draft.options.findIndex(isCorrect));
+  return {
+    ...draft,
+    questionType,
+    options: draft.options.map((option, i) => {
+      if (i === firstCorrect) {
+        return isCorrect(option)
+          ? option
+          : { ...option, points: CORRECT_POINTS };
+      }
+      return toInt(option.points) > 0 ? { ...option, points: "0" } : option;
+    }),
+  };
 }
 
-export function isPositiveOption(pointValue: number | string): boolean {
-  const parsed =
-    typeof pointValue === "string" ? parseInt(pointValue, 10) : pointValue;
-  return !isNaN(parsed) && parsed > 0;
-}
+/* ── Validation ───────────────────────────────────────────────────────────── */
 
-export function isNegativeOption(pointValue: number | string): boolean {
-  const parsed =
-    typeof pointValue === "string" ? parseInt(pointValue, 10) : pointValue;
-  return !isNaN(parsed) && parsed < 0;
-}
-
-export function normalizeOptionsForQuestionType(
-  questionType: QuestionType,
-  options: QuestionDraftOption[],
-): QuestionDraftOption[] {
-  if (!options.length) {
-    return createDefaultOptions(questionType);
-  }
-
-  if (questionType === "MULTI_SELECT") {
-    return options.map((option, index) => ({ ...option, orderIndex: index }));
-  }
-
-  // For SINGLE_SELECT, identify which option should be the lone positive one
-  const firstPositiveIndex = options.findIndex((opt) =>
-    isPositiveOption(opt.pointValue),
-  );
-  const targetIndex = firstPositiveIndex === -1 ? 0 : firstPositiveIndex;
-
-  return options.map((option, index) => {
-    const rawVal =
-      typeof option.pointValue === "string"
-        ? parseInt(option.pointValue, 10)
-        : option.pointValue;
-    const pVal = isNaN(rawVal) ? 0 : rawVal;
-
-    if (index === targetIndex) {
-      return {
-        ...option,
-        pointValue: pVal > 0 ? option.pointValue : 10,
-        orderIndex: index,
-      };
-    }
-
-    return {
-      ...option,
-      pointValue: Math.min(pVal, 0),
-      orderIndex: index,
-    };
-  });
-}
-
-export function validateQuestionDraft(
-  draft: Pick<
-    QuestionDraft,
-    "text" | "timeLimitSeconds" | "questionType" | "options"
-  >,
-  {
-    requirePositiveTimer = true,
-    minimumOptionCount = 2,
-  }: {
-    requirePositiveTimer?: boolean;
-    minimumOptionCount?: number;
-  } = {},
+/** The first thing stopping this draft from saving, in the editor's words. */
+export function validateQuestion(
+  draft: QuestionDraft,
+  { ownTimer }: { ownTimer: boolean },
 ): string | null {
-  if (!draft.text.trim()) return "Question text is required.";
-
-  const timeVal =
-    typeof draft.timeLimitSeconds === "string"
-      ? parseInt(draft.timeLimitSeconds, 10)
-      : draft.timeLimitSeconds;
-
-  if (requirePositiveTimer && (isNaN(timeVal) || timeVal < 5)) {
-    return "Question time must be at least 5 seconds.";
+  if (!draft.text.trim()) return "Write the question first.";
+  if (ownTimer && toInt(draft.timeLimitSeconds) < MIN_TIMER_SECONDS) {
+    return `Give players at least ${MIN_TIMER_SECONDS} seconds.`;
   }
-  if (draft.options.length < minimumOptionCount) {
-    return `Questions need at least ${minimumOptionCount} options.`;
+  if (draft.options.length < MIN_OPTIONS) {
+    return `A question needs at least ${MIN_OPTIONS} options.`;
   }
   if (draft.options.some((option) => !option.text.trim())) {
-    return "Fill in every option label.";
+    return "Fill in every option, or remove the empty ones.";
   }
-
-  const positiveCount = draft.options.filter((option) =>
-    isPositiveOption(option.pointValue),
-  ).length;
-
-  if (draft.questionType === "SINGLE_SELECT" && positiveCount !== 1) {
-    return "Single-select questions need exactly one positive-scoring option.";
+  const correct = draft.options.filter(isCorrect).length;
+  if (draft.questionType === "SINGLE_SELECT" && correct !== 1) {
+    return "Mark exactly one option correct.";
   }
-  if (draft.questionType === "MULTI_SELECT" && positiveCount < 1) {
-    return "Multi-select questions need at least one positive-scoring option.";
-  }
-
+  if (correct < 1) return "Mark at least one option correct.";
   return null;
 }
 
-export function questionTypeLabel(questionType: QuestionType): string {
-  return (
-    QUESTION_TYPE_OPTIONS.find((option) => option.value === questionType)
-      ?.label ?? questionType
-  );
+export function validatePassage(draft: PassageDraft): string | null {
+  if (!draft.text.trim()) return "Write the passage first.";
+  if (
+    draft.timerMode === "ENTIRE_PASSAGE" &&
+    toInt(draft.timeLimitSeconds) < MIN_TIMER_SECONDS
+  ) {
+    return `Give players at least ${MIN_TIMER_SECONDS} seconds.`;
+  }
+  return null;
 }
 
-export function displayModeLabel(mode: DisplayMode): string {
-  return (
-    DISPLAY_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? mode
-  );
+/* ── Payloads ─────────────────────────────────────────────────────────────── */
+
+export interface QuestionPayload {
+  text: string;
+  orderIndex: number;
+  timeLimitSeconds?: number;
+  questionType: QuestionType;
+  displayModeOverride: DisplayMode | null;
+  options: Array<{ text: string; pointValue: number; orderIndex: number }>;
 }
 
-export function passageTimerModeLabel(mode: PassageTimerMode): string {
-  return (
-    PASSAGE_TIMER_MODE_OPTIONS.find((option) => option.value === mode)?.label ??
-    mode
-  );
-}
-
-export function effectiveQuestionTimer(question: Question): string {
-  return question.timeLimitSeconds > 0
-    ? `${question.timeLimitSeconds}s`
-    : "Shared timer";
-}
-
-export function createQuestionDraft(
+export function questionPayload(
+  draft: QuestionDraft,
   orderIndex: number,
-  questionType: QuestionType = "SINGLE_SELECT",
-): QuestionDraft {
+  { ownTimer }: { ownTimer: boolean },
+): QuestionPayload {
   return {
-    text: "",
+    text: draft.text.trim(),
     orderIndex,
-    timeLimitSeconds: 30,
-    questionType,
-    displayModeOverride: null,
-    options: createDefaultOptions(questionType),
+    timeLimitSeconds: ownTimer ? toInt(draft.timeLimitSeconds) : undefined,
+    questionType: draft.questionType,
+    displayModeOverride: draft.displayModeOverride,
+    options: draft.options.map((option, index) => ({
+      text: option.text.trim(),
+      pointValue: toInt(option.points),
+      orderIndex: index,
+    })),
+  };
+}
+
+export function passagePayload(draft: PassageDraft, orderIndex: number) {
+  return {
+    text: draft.text.trim(),
+    orderIndex,
+    timerMode: draft.timerMode,
+    timeLimitSeconds:
+      draft.timerMode === "ENTIRE_PASSAGE"
+        ? toInt(draft.timeLimitSeconds)
+        : null,
+  };
+}
+
+/* ── The cached quiz, updated in place after each save ───────────────────── */
+
+const byOrder = <T extends { orderIndex: number }>(items: T[]) =>
+  items.toSorted((a, b) => a.orderIndex - b.orderIndex);
+
+export type QuizBlock =
+  | { kind: "question"; question: Question }
+  | { kind: "passage"; passage: Passage };
+
+/** Standalone questions and passages, interleaved in running order. */
+export function quizBlocks(quiz: Quiz): QuizBlock[] {
+  const blocks: Array<QuizBlock & { orderIndex: number }> = [
+    ...quiz.questions
+      .filter((question) => question.passageId == null)
+      .map((question) => ({
+        kind: "question" as const,
+        question,
+        orderIndex: question.orderIndex,
+      })),
+    ...quiz.passages.map((passage) => ({
+      kind: "passage" as const,
+      passage,
+      orderIndex: passage.orderIndex,
+    })),
+  ];
+  return blocks.toSorted(
+    (a, b) =>
+      a.orderIndex - b.orderIndex ||
+      (a.kind === b.kind ? 0 : a.kind === "question" ? -1 : 1),
+  );
+}
+
+export function questionCount(quiz: Quiz): number {
+  return (
+    quiz.questions.filter((question) => question.passageId == null).length +
+    quiz.passages.reduce((sum, passage) => sum + passage.subQuestions.length, 0)
+  );
+}
+
+export function nextOrderIndex(quiz: Quiz): number {
+  return (
+    Math.max(
+      0,
+      ...quiz.questions.map((question) => question.orderIndex),
+      ...quiz.passages.map((passage) => passage.orderIndex),
+    ) + 1
+  );
+}
+
+export function withQuestion(quiz: Quiz, question: Question): Quiz {
+  if (question.passageId == null) {
+    const others = quiz.questions.filter((q) => q.id !== question.id);
+    return { ...quiz, questions: byOrder([...others, question]) };
+  }
+  return {
+    ...quiz,
+    passages: quiz.passages.map((passage) =>
+      passage.id === question.passageId
+        ? {
+            ...passage,
+            subQuestions: byOrder([
+              ...passage.subQuestions.filter((q) => q.id !== question.id),
+              question,
+            ]),
+          }
+        : passage,
+    ),
+  };
+}
+
+export function withoutQuestion(quiz: Quiz, questionId: number): Quiz {
+  return {
+    ...quiz,
+    questions: quiz.questions.filter((q) => q.id !== questionId),
+    passages: quiz.passages.map((passage) => ({
+      ...passage,
+      subQuestions: passage.subQuestions.filter((q) => q.id !== questionId),
+    })),
+  };
+}
+
+export function withPassage(quiz: Quiz, passage: Passage): Quiz {
+  const others = quiz.passages.filter((p) => p.id !== passage.id);
+  return { ...quiz, passages: byOrder([...others, passage]) };
+}
+
+export function withoutPassage(quiz: Quiz, passageId: number): Quiz {
+  return {
+    ...quiz,
+    passages: quiz.passages.filter((passage) => passage.id !== passageId),
   };
 }

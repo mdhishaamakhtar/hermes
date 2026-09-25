@@ -1,38 +1,45 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Client,
   ReconnectionTimeMode,
-  StompSubscription,
+  type StompSubscription,
 } from "@stomp/stompjs";
 
-interface UseStompOptions {
+interface StompOptions {
   headers?: Record<string, string>;
   onConnect?: () => void;
-  onDisconnect?: () => void;
 }
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws-hermes";
 
-// Start aggressive; exponential back-off widens the interval on repeat failures.
+// Start aggressive; exponential back-off widens the gap on repeat failures.
 const INITIAL_RECONNECT_DELAY_MS = 500;
 const MAX_RECONNECT_DELAY_MS = 5000;
-// STOMP-level keep-alive. Detects half-open sockets (cellular → Wi-Fi handoffs,
-// iOS backgrounding) that would otherwise sit silent until the next publish.
+// STOMP heartbeats catch half-open sockets (Wi-Fi to cellular handoffs, iOS
+// backgrounding) that would otherwise sit silent until the next publish.
 const HEARTBEAT_MS = 10_000;
 
-export function useStompClient(options: UseStompOptions = {}) {
+function parse(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return body;
+  }
+}
+
+/**
+ * One STOMP connection for the life of a session screen. Subscriptions are
+ * remembered and replayed on every reconnect, and publishes made while the
+ * socket is down are queued and flushed once it is back.
+ */
+export function useStompClient(options: StompOptions = {}) {
   const clientRef = useRef<Client | null>(null);
-  const connectedRef = useRef(false);
-  const subscriptionsRef = useRef<Map<string, StompSubscription>>(new Map());
-  const desiredSubscriptionsRef = useRef<Map<string, (body: unknown) => void>>(
-    new Map(),
-  );
-  const publishQueueRef = useRef<Array<{ destination: string; body: unknown }>>(
-    [],
-  );
+  const activeRef = useRef(new Map<string, StompSubscription>());
+  const wantedRef = useRef(new Map<string, (body: unknown) => void>());
+  const queueRef = useRef<Array<{ destination: string; body: unknown }>>([]);
   const optionsRef = useRef(options);
   const [connected, setConnected] = useState(false);
 
@@ -41,10 +48,11 @@ export function useStompClient(options: UseStompOptions = {}) {
   });
 
   useEffect(() => {
+    const active = activeRef.current;
     const client = new Client({
       brokerURL: WS_URL,
       beforeConnect: async () => {
-        client.connectHeaders = optionsRef.current.headers || {};
+        client.connectHeaders = optionsRef.current.headers ?? {};
       },
       reconnectDelay: INITIAL_RECONNECT_DELAY_MS,
       maxReconnectDelay: MAX_RECONNECT_DELAY_MS,
@@ -52,153 +60,95 @@ export function useStompClient(options: UseStompOptions = {}) {
       heartbeatIncoming: HEARTBEAT_MS,
       heartbeatOutgoing: HEARTBEAT_MS,
       onConnect: () => {
-        connectedRef.current = true;
         setConnected(true);
-        if (process.env.NODE_ENV === "development")
-          console.info("[stomp] connected");
-        subscriptionsRef.current.clear();
-        desiredSubscriptionsRef.current.forEach((callback, destination) => {
-          if (!subscriptionsRef.current.has(destination)) {
-            const subscription = client.subscribe(destination, (msg) => {
-              try {
-                callback(JSON.parse(msg.body));
-              } catch {
-                callback(msg.body);
-              }
-            });
-            subscriptionsRef.current.set(destination, subscription);
-          }
-        });
-        publishQueueRef.current.forEach(({ destination, body }) => {
-          client.publish({
+        active.clear();
+        wantedRef.current.forEach((callback, destination) => {
+          active.set(
             destination,
-            body: JSON.stringify(body),
-          });
+            client.subscribe(destination, (message) =>
+              callback(parse(message.body)),
+            ),
+          );
         });
-        publishQueueRef.current = [];
+        queueRef.current.forEach(({ destination, body }) =>
+          client.publish({ destination, body: JSON.stringify(body) }),
+        );
+        queueRef.current = [];
         optionsRef.current.onConnect?.();
       },
       onDisconnect: () => {
-        connectedRef.current = false;
         setConnected(false);
-        if (process.env.NODE_ENV === "development")
-          console.info("[stomp] disconnected");
-        subscriptionsRef.current.clear();
-        optionsRef.current.onDisconnect?.();
+        active.clear();
       },
       onWebSocketClose: () => {
-        connectedRef.current = false;
         setConnected(false);
-        if (process.env.NODE_ENV === "development")
-          console.info("[stomp] websocket-closed");
-        subscriptionsRef.current.clear();
+        active.clear();
       },
       onStompError: (frame) => {
-        console.error("STOMP error:", frame);
+        console.error("STOMP error", frame.headers.message, frame.body);
       },
     });
 
     client.activate();
     clientRef.current = client;
 
-    // Force an immediate reconnect when we return to the foreground or the
-    // network comes back. stompjs otherwise sits in its reconnectDelay timeout.
-    // iOS Safari aggressively closes backgrounded WebSockets, so without this
-    // every app-switch eats a full back-off before the client even tries.
-    const forceReconnect = () => {
-      const c = clientRef.current;
-      if (!c) return;
-      if (c.connected) return;
-      if (process.env.NODE_ENV === "development")
-        console.info("[stomp] force-reconnect");
-      // Reset to initial delay so a long prior back-off doesn't carry over.
-      c.reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
-      // deactivate() cancels the pending reconnect timer; activate() re-queues
-      // a connection attempt immediately. Safe to call concurrently per stompjs.
-      void c.deactivate().then(() => c.activate());
+    // Reconnect at once when the page returns to the foreground or the
+    // network comes back, instead of waiting out the back-off. iOS Safari
+    // closes backgrounded sockets, so every app switch would otherwise stall.
+    const reconnectNow = () => {
+      if (client.connected) return;
+      client.reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
+      void client.deactivate().then(() => client.activate());
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reconnectNow();
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        forceReconnect();
-      }
-    };
-    const handlePageShow = () => {
-      // Covers iOS BFCache restores where visibilitychange may not fire.
-      forceReconnect();
-    };
-    const handleOnline = () => {
-      forceReconnect();
-    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", reconnectNow);
+    window.addEventListener("online", reconnectNow);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("online", handleOnline);
-
-    const subs = subscriptionsRef.current;
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("online", handleOnline);
-      subs.forEach((sub) => sub.unsubscribe());
-      subs.clear();
-      client.deactivate();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", reconnectNow);
+      window.removeEventListener("online", reconnectNow);
+      active.forEach((subscription) => subscription.unsubscribe());
+      active.clear();
+      void client.deactivate();
     };
   }, []);
 
   const subscribe = useCallback(
     (destination: string, callback: (body: unknown) => void) => {
-      desiredSubscriptionsRef.current.set(destination, callback);
+      wantedRef.current.set(destination, callback);
       const client = clientRef.current;
-      if (!client?.connected || subscriptionsRef.current.has(destination)) {
-        return;
-      }
-      const subscription = client.subscribe(destination, (msg) => {
-        try {
-          callback(JSON.parse(msg.body));
-        } catch {
-          callback(msg.body);
-        }
-      });
-      subscriptionsRef.current.set(destination, subscription);
+      if (!client?.connected || activeRef.current.has(destination)) return;
+      activeRef.current.set(
+        destination,
+        client.subscribe(destination, (message) =>
+          callback(parse(message.body)),
+        ),
+      );
     },
     [],
   );
 
+  const unsubscribe = useCallback((destination: string) => {
+    wantedRef.current.delete(destination);
+    activeRef.current.get(destination)?.unsubscribe();
+    activeRef.current.delete(destination);
+  }, []);
+
+  /** True when sent now; false when queued for the next connection. */
   const publish = useCallback((destination: string, body: unknown) => {
     const client = clientRef.current;
-    if (process.env.NODE_ENV === "development")
-      console.info("[stomp] publish", {
-        destination,
-        connected: Boolean(client?.connected),
-        active: Boolean(client?.active),
-      });
     if (client?.connected) {
-      client.publish({
-        destination,
-        body: JSON.stringify(body),
-      });
+      client.publish({ destination, body: JSON.stringify(body) });
       return true;
     }
-    publishQueueRef.current.push({ destination, body });
+    queueRef.current.push({ destination, body });
     return false;
   }, []);
 
-  const unsubscribe = useCallback((destination: string) => {
-    desiredSubscriptionsRef.current.delete(destination);
-    const subscription = subscriptionsRef.current.get(destination);
-    if (subscription) {
-      subscription.unsubscribe();
-      subscriptionsRef.current.delete(destination);
-    }
-  }, []);
-
-  return {
-    subscribe,
-    publish,
-    unsubscribe,
-    clientRef,
-    connectedRef,
-    connected,
-  };
+  return { subscribe, unsubscribe, publish, connected };
 }

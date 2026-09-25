@@ -1,13 +1,25 @@
-interface EmptyStateProps {
-  message: string;
-  hint?: string;
-}
+import type { ReactNode } from "react";
 
-export default function EmptyState({ message, hint }: EmptyStateProps) {
+/**
+ * An empty list teaches the next step: what belongs here, and the one action
+ * that puts it there. The dashed frame reads as a slot waiting to be filled.
+ */
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
-    <div className="text-center py-16">
-      <p className="text-muted text-sm tracking-wide mb-2">{message}</p>
-      {hint && <p className="text-muted/50 text-xs">{hint}</p>}
+    <div className="flex flex-col items-center border border-dashed border-border-strong px-6 py-14 text-center">
+      <p className="text-base font-semibold text-foreground">{title}</p>
+      {description && (
+        <p className="mt-2 max-w-sm text-sm text-muted">{description}</p>
+      )}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   );
 }
