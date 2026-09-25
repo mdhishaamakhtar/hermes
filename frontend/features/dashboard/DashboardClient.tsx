@@ -1,182 +1,225 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { duration } from "@/lib/motion";
+import { AnimatePresence, motion } from "motion/react";
 import useSWR from "swr";
+import { LoadError } from "@/components/LoadError";
+import { Page, PageHeader, PageHeaderSkeleton } from "@/components/Page";
+import { ResourceRow, ResourceRowSkeleton } from "@/components/ResourceRow";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TextAreaField, TextField } from "@/components/ui/Field";
+import { LoadingRegion } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
 import { eventsApi } from "@/features/events/events-api";
-import { EventListSkeleton } from "@/components/PageSkeleton";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import EmptyState from "@/components/ui/EmptyState";
-import PageHeader from "@/components/ui/PageHeader";
-import ResourceRow from "@/components/ui/ResourceRow";
+import { describeError } from "@/lib/api";
+import { countLabel, formatDate } from "@/lib/format";
+import { rise } from "@/lib/motion";
 import type { EventSummary } from "@/lib/types";
 
-export default function DashboardClient() {
-  const {
-    data: events,
-    mutate,
-    isLoading,
-    error,
-  } = useSWR<EventSummary[]>("/api/events");
-  // Fade rows in only when this mount actually showed the skeleton.
-  // Cached data must paint instantly — re-fading known content on every
-  // navigation reads as a flicker.
-  const [animateEntrance] = useState(() => events === undefined);
-  const [showForm, setShowForm] = useState(false);
-  const [confirmId, setConfirmId] = useState<number | null>(null);
+export function DashboardClient() {
+  const { data: events, error, mutate } = useSWR<EventSummary[]>("/api/events");
+  const [composing, setComposing] = useState(false);
+  // Kept separately from `confirmOpen` so the dialog's title does not blank
+  // out while it animates closed.
+  const [target, setTarget] = useState<EventSummary | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleCreate = async (_prev: null, formData: FormData) => {
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    try {
-      const created = await eventsApi.create({ title, description });
-      mutate([created, ...(events ?? [])], { revalidate: false });
-      setShowForm(false);
-    } catch {
-      // Leave the form open with its values intact so the user can retry.
-    }
-    return null;
-  };
-
-  const [, createAction, creating] = useActionState(handleCreate, null);
-
-  const handleDeleteConfirmed = async () => {
-    if (confirmId === null) return;
-    const id = confirmId;
-    setConfirmId(null);
-    try {
-      await eventsApi.delete(id);
-      mutate(
-        (events ?? []).filter((event) => event.id !== id),
-        { revalidate: false },
-      );
-    } catch {
-      // The row stays; the list still reflects the server.
-    }
-  };
-
-  if (isLoading) return <EventListSkeleton />;
-
-  if (error) {
-    return (
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        <p className="text-sm text-danger">{error.message}</p>
-      </div>
+  if (!events) {
+    return error ? (
+      <Page>
+        <LoadError
+          error={error}
+          resource="event list"
+          back={{ href: "/", label: "Back to Hermes" }}
+          onRetry={() => void mutate()}
+        />
+      </Page>
+    ) : (
+      <DashboardSkeleton />
     );
   }
 
+  const deleteTarget = async () => {
+    if (!target) return;
+    await eventsApi.delete(target.id);
+    await mutate(
+      events.filter((event) => event.id !== target.id),
+      { revalidate: false },
+    );
+    toast.success(`Deleted "${target.title}"`);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <Page>
       <PageHeader
-        label="Organiser"
         title="Events"
-        action={
-          <button
-            onClick={() => setShowForm((value) => !value)}
-            className="bg-primary text-white px-6 py-2.5 text-sm tracking-widest uppercase hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            {showForm ? "Cancel" : "+ New Event"}
-          </button>
+        actions={
+          !composing &&
+          events.length > 0 && (
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => setComposing(true)}
+            >
+              New event
+            </Button>
+          )
         }
       />
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.form
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: duration.base }}
-            action={createAction}
-            className="mb-8 border border-border bg-surface p-6 space-y-4"
-          >
-            <div>
-              <label htmlFor="event-title" className="field-label block mb-2">
-                Title
-              </label>
-              <input
-                id="event-title"
-                name="title"
-                required
-                className="input-field"
-                placeholder="Event title"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="event-description"
-                className="field-label block mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                id="event-description"
-                name="description"
-                rows={2}
-                className="input-field resize-none"
-                placeholder="Optional description"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={creating}
-              className="bg-primary text-white px-6 py-2.5 text-xs tracking-widest uppercase hover:bg-primary-hover disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {creating ? "Creating..." : "Create Event"}
-            </button>
-          </motion.form>
+      <AnimatePresence initial={false}>
+        {composing && (
+          <NewEventForm
+            key="new-event"
+            onCancel={() => setComposing(false)}
+            onCreated={(created) => {
+              void mutate([created, ...events], { revalidate: false });
+              setComposing(false);
+            }}
+          />
         )}
       </AnimatePresence>
 
-      <div className="h-px bg-border mb-8" />
-
-      {(events ?? []).length === 0 ? (
-        <EmptyState
-          message="No events yet"
-          hint="Create your first event to get started"
-        />
+      {events.length === 0 ? (
+        !composing && (
+          <EmptyState
+            title="No events yet"
+            description="An event holds the quizzes you run together: a class, a meetup, a trivia night."
+            action={
+              <Button
+                variant="primary"
+                icon="plus"
+                onClick={() => setComposing(true)}
+              >
+                Create your first event
+              </Button>
+            }
+          />
+        )
       ) : (
-        <motion.div className="list-stack">
-          <AnimatePresence>
-            {(events ?? []).map((event) => (
+        <ul className="flex flex-col gap-2">
+          <AnimatePresence initial={false}>
+            {events.map((event) => (
               <ResourceRow
                 key={event.id}
                 href={`/events/${event.id}`}
-                ariaLabel={`Open event: ${event.title}`}
-                onDelete={() => setConfirmId(event.id)}
-                deleteAriaLabel={`Delete event: ${event.title}`}
-                initial={animateEntrance ? { opacity: 0 } : false}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: duration.base }}
-                layout
-              >
-                <h2 className="text-foreground font-medium group-hover:text-accent transition-colors">
-                  {event.title}
-                </h2>
-                <p className="text-xs text-muted mt-1">
-                  {event.quizzes.length} quiz
-                  {event.quizzes.length !== 1 ? "zes" : ""} ·{" "}
-                  {new Date(event.createdAt).toLocaleDateString()}
-                </p>
-              </ResourceRow>
+                title={event.title}
+                subtitle={[
+                  countLabel(event.quizzes.length, "quiz", "quizzes"),
+                  formatDate(event.createdAt),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                deleteLabel={`Delete event: ${event.title}`}
+                onDelete={() => {
+                  setTarget(event);
+                  setConfirmOpen(true);
+                }}
+              />
             ))}
           </AnimatePresence>
-        </motion.div>
+        </ul>
       )}
 
       <ConfirmDialog
-        message={
-          confirmId !== null
-            ? `Delete "${(events ?? []).find((e) => e.id === confirmId)?.title}"? All quizzes, questions, and session history will be permanently removed.`
-            : null
-        }
-        confirmLabel="Delete"
-        variant="danger"
-        onConfirm={handleDeleteConfirmed}
-        onCancel={() => setConfirmId(null)}
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={`Delete "${target?.title ?? ""}"?`}
+        description="Its quizzes, questions, and every session's results will be permanently removed. This can't be undone."
+        confirmLabel="Delete event"
+        onConfirm={deleteTarget}
       />
-    </div>
+    </Page>
+  );
+}
+
+function NewEventForm({
+  onCreated,
+  onCancel,
+}: {
+  onCreated: (event: EventSummary) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [error, submit, pending] = useActionState<string | null>(async () => {
+    const trimmed = title.trim();
+    if (!trimmed) return "Give the event a title.";
+    try {
+      onCreated(
+        await eventsApi.create({
+          title: trimmed,
+          description: description.trim(),
+        }),
+      );
+      return null;
+    } catch (err) {
+      return describeError(err, "Couldn't create the event.");
+    }
+  }, null);
+
+  return (
+    <motion.form
+      {...rise}
+      action={submit}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onCancel();
+      }}
+      className="mb-8 border border-border bg-surface p-5 sm:p-6"
+      aria-labelledby="new-event-heading"
+    >
+      <h2
+        id="new-event-heading"
+        className="mb-5 text-lg font-semibold text-foreground"
+      >
+        New event
+      </h2>
+      <div className="flex flex-col gap-5">
+        <TextField
+          label="Title"
+          name="title"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          maxLength={255}
+          placeholder="Friday trivia night"
+          error={error}
+          autoFocus
+        />
+        <TextAreaField
+          label="Description"
+          hint="Optional. Only you see it."
+          name="description"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          rows={2}
+        />
+      </div>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Button type="submit" variant="primary" pending={pending}>
+          {pending ? "Creating…" : "Create event"}
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </motion.form>
+  );
+}
+
+export function DashboardSkeleton() {
+  return (
+    <Page>
+      <LoadingRegion label="Loading your events">
+        <PageHeaderSkeleton titleWidth="w-32" action />
+        <ul className="flex flex-col gap-2">
+          {[0, 1, 2].map((row) => (
+            <ResourceRowSkeleton key={row} />
+          ))}
+        </ul>
+      </LoadingRegion>
+    </Page>
   );
 }

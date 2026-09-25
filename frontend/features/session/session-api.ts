@@ -1,49 +1,72 @@
 import { api } from "@/lib/api";
-import type { HostSessionSync, MyResults, SessionResults } from "@/lib/types";
+import type { SessionStatus } from "@/lib/types";
+import type {
+  HostSessionSync,
+  JoinResponse,
+  LobbySnapshot,
+  MyResults,
+  RejoinResponse,
+  SessionResults,
+} from "./session-types";
 
-/** Matches GET `/api/sessions/{id}/status` and `SessionLobbySnapshot.status`. */
-export type SessionLifecycleStatus = "LOBBY" | "ACTIVE" | "ENDED";
+type Id = number | string;
 
-export interface SessionLobbySnapshot {
-  status: SessionLifecycleStatus;
-  participantCount: number;
-  joinCode: string;
-}
-
+/** Organiser calls authenticate with the JWT; player calls with a rejoin token. */
 export const sessionsApi = {
   create: (quizId: number) =>
     api.post<{ id: number; joinCode: string }>("/api/sessions", { quizId }),
-  start: (id: number | string) => api.post<void>(`/api/sessions/${id}/start`),
-  startTimer: (id: number | string) =>
-    api.post<void>(`/api/sessions/${id}/start-timer`),
-  endTimer: (id: number | string) =>
-    api.post<void>(`/api/sessions/${id}/end-timer`),
-  next: (id: number | string) => api.post<void>(`/api/sessions/${id}/next`),
-  end: (id: number | string) => api.post<void>(`/api/sessions/${id}/end`),
-  abandon: (id: number | string) => api.delete(`/api/sessions/${id}`),
-  hostSync: (id: number | string) =>
+  start: (id: Id) => api.post<void>(`/api/sessions/${id}/start`),
+  startTimer: (id: Id) => api.post<void>(`/api/sessions/${id}/start-timer`),
+  endTimer: (id: Id) => api.post<void>(`/api/sessions/${id}/end-timer`),
+  next: (id: Id) => api.post<void>(`/api/sessions/${id}/next`),
+  end: (id: Id) => api.post<void>(`/api/sessions/${id}/end`),
+  abandon: (id: Id) => api.delete(`/api/sessions/${id}`),
+  hostSync: (id: Id) =>
     api.get<HostSessionSync>(`/api/sessions/${id}/host-sync`),
-  /** Organizer-facing results snapshot (JWT). Same resource as review / SWR `/api/sessions/{id}/results`. */
-  results: (id: number | string) =>
-    api.get<SessionResults>(`/api/sessions/${id}/results`),
-  lobby: (id: number | string) =>
-    api.get<SessionLobbySnapshot>(`/api/sessions/${id}/lobby`),
-  sessionStatus: (id: number | string) =>
-    api.get<SessionLifecycleStatus>(`/api/sessions/${id}/status`),
+  lobby: (id: Id) => api.get<LobbySnapshot>(`/api/sessions/${id}/lobby`),
+  status: (id: Id) => api.get<SessionStatus>(`/api/sessions/${id}/status`),
+  results: (id: Id) => api.get<SessionResults>(`/api/sessions/${id}/results`),
   correctScoring: (
-    id: number | string,
+    id: Id,
     questionId: number,
     options: Array<{ optionId: number; pointValue: number }>,
   ) =>
     api.patch<void>(`/api/sessions/${id}/questions/${questionId}/scoring`, {
       options,
     }),
-  /**
-   * Participant-facing results. Authenticated by rejoin token rather than JWT,
-   * so it takes a header the shared SWR fetcher cannot supply.
-   */
-  myResults: (sessionId: string, rejoinToken: string) =>
+
+  join: (joinCode: string, displayName: string) =>
+    api.post<JoinResponse>(
+      "/api/sessions/join",
+      { joinCode, displayName },
+      { skipAuth: true },
+    ),
+  rejoin: (sessionId: Id, rejoinToken: string) =>
+    api.post<RejoinResponse>(
+      "/api/sessions/rejoin",
+      { sessionId: Number(sessionId), rejoinToken },
+      { skipAuth: true },
+    ),
+  /** HTTP fallback for when the realtime answer path does not confirm. */
+  submitAnswer: (
+    sessionId: Id,
+    body: {
+      rejoinToken: string;
+      questionId: number;
+      selectedOptionIds: number[];
+    },
+  ) =>
+    api.post<void>(`/api/sessions/${sessionId}/answers`, body, {
+      skipAuth: true,
+    }),
+  /** HTTP fallback for a lock-in the realtime path did not confirm. */
+  lockIn: (sessionId: Id, body: { rejoinToken: string; questionId: number }) =>
+    api.post<void>(`/api/sessions/${sessionId}/lock-in`, body, {
+      skipAuth: true,
+    }),
+  myResults: (sessionId: Id, rejoinToken: string) =>
     api.get<MyResults>(`/api/sessions/${sessionId}/my-results`, {
-      "X-Rejoin-Token": rejoinToken,
+      skipAuth: true,
+      headers: { "X-Rejoin-Token": rejoinToken },
     }),
 };

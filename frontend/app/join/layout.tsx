@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Join a Session",
+  title: "Join a session",
   description:
-    "Join a live Hermes quiz session with a six-character code and rejoin active sessions instantly.",
+    "Join a live Hermes quiz with the six-character code on the host's screen. No account needed.",
 };
 
 export default function JoinLayout({

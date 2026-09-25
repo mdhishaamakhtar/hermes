@@ -1,21 +1,19 @@
 export const siteConfig = {
   name: "Hermes",
-  title: "Hermes",
+  tagline: "Live quizzes, run like a broadcast",
   description:
-    "Real-time quiz sessions with live analytics, organiser controls, and seamless participant joins.",
-  shortDescription:
-    "Real-time quiz sessions. Live analytics. Anonymous participants.",
+    "Run live quiz sessions. Put a question on screen and watch answers arrive in real time. Players join from any phone with a six-character code, no account needed.",
   url: "https://hermes.hishaam.dev",
-  ogImageAlt: "Hermes preview card",
+  ogImageAlt: "Hermes: live quizzes, run like a broadcast",
   iconPath: "/icon.svg",
   creator: "Md Hishaam Akhtar",
   keywords: [
+    "live quiz",
     "real-time quiz platform",
-    "live quiz app",
-    "polling platform",
-    "quiz host dashboard",
-    "websocket quiz app",
-    "anonymous participant quiz",
+    "classroom quiz",
+    "trivia night",
+    "audience polling",
+    "join code quiz",
     "Hermes",
   ],
 } as const;

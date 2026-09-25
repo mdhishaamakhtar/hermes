@@ -1,200 +1,230 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { duration } from "@/lib/motion";
-import { useRouter } from "next/navigation";
+import { useActionState, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import useSWR from "swr";
+import { LoadError } from "@/components/LoadError";
+import { Page, PageHeader, PageHeaderSkeleton } from "@/components/Page";
+import { ResourceRow, ResourceRowSkeleton } from "@/components/ResourceRow";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TextField } from "@/components/ui/Field";
+import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
 import { eventsApi } from "@/features/events/events-api";
-import { EventDetailSkeleton } from "@/components/PageSkeleton";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import BackLink from "@/components/ui/BackLink";
-import EmptyState from "@/components/ui/EmptyState";
-import PageHeader from "@/components/ui/PageHeader";
-import ResourceRow from "@/components/ui/ResourceRow";
-import type { EventSummary } from "@/lib/types";
+import { describeError } from "@/lib/api";
+import { rise } from "@/lib/motion";
+import { byOrderIndex } from "@/lib/options";
+import type { EventSummary, QuizSummary } from "@/lib/types";
 
-export default function EventClient({ eventId }: { eventId: string }) {
-  const router = useRouter();
+const CRUMBS = [{ href: "/dashboard", label: "Events" }];
+
+export function EventClient({ eventId }: { eventId: string }) {
   const {
     data: event,
-    mutate,
-    isLoading,
     error,
+    mutate,
   } = useSWR<EventSummary>(`/api/events/${eventId}`);
-  // Fade rows in only when this mount actually showed the skeleton.
-  // Cached data must paint instantly — re-fading known content on every
-  // navigation reads as a flicker.
-  const [animateEntrance] = useState(() => event === undefined);
-  const [showForm, setShowForm] = useState(false);
-  const [quizTitle, setQuizTitle] = useState("");
-  const [confirmQuizId, setConfirmQuizId] = useState<number | null>(null);
+  const [composing, setComposing] = useState(false);
+  const [target, setTarget] = useState<QuizSummary | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  useEffect(() => {
-    if (error) router.push("/dashboard");
-  }, [error, router]);
+  if (!event) {
+    return error ? (
+      <Page>
+        <LoadError
+          error={error}
+          resource="event"
+          back={{ href: "/dashboard", label: "All events" }}
+          onRetry={() => void mutate()}
+        />
+      </Page>
+    ) : (
+      <EventSkeleton />
+    );
+  }
 
-  const orderIndex = (event?.quizzes.length ?? 0) + 1;
+  const quizzes = byOrderIndex(event.quizzes);
+  const nextOrderIndex =
+    quizzes.reduce((max, quiz) => Math.max(max, quiz.orderIndex), 0) + 1;
 
-  const handleCreateQuiz = async (_prev: null, formData: FormData) => {
-    const title = formData.get("quizTitle") as string;
-    const orderStr = formData.get("orderIndex") as string;
-    const order = parseInt(orderStr, 10);
-
-    if (!title.trim()) return null;
-    if (isNaN(order) || order < 0) return null;
-
-    try {
-      const created = await eventsApi.createQuiz(eventId, {
-        title,
-        orderIndex: order,
-      });
-      if (event) {
-        const updated = [...event.quizzes, created].toSorted(
-          (a, b) => a.orderIndex - b.orderIndex,
-        );
-        mutate({ ...event, quizzes: updated }, { revalidate: false });
-        setQuizTitle("");
-        setShowForm(false);
-      }
-    } catch {
-      // Leave the form open with its values intact so the user can retry.
-    }
-
-    return null;
+  const deleteTarget = async () => {
+    if (!target) return;
+    await eventsApi.deleteQuiz(target.id);
+    await mutate(
+      {
+        ...event,
+        quizzes: event.quizzes.filter((quiz) => quiz.id !== target.id),
+      },
+      { revalidate: false },
+    );
+    toast.success(`Deleted "${target.title}"`);
   };
 
-  const [, createQuizAction, creating] = useActionState(handleCreateQuiz, null);
-
-  const handleDeleteQuizConfirmed = async () => {
-    if (confirmQuizId === null || !event) return;
-    const id = confirmQuizId;
-    setConfirmQuizId(null);
-    try {
-      await eventsApi.deleteQuiz(id);
-      mutate(
-        { ...event, quizzes: event.quizzes.filter((q) => q.id !== id) },
-        { revalidate: false },
-      );
-    } catch {
-      // The quiz stays; the list still reflects the server.
-    }
-  };
-
-  if (isLoading || !event) return <EventDetailSkeleton />;
-
-  const quizzes = event.quizzes.toSorted((a, b) => a.orderIndex - b.orderIndex);
+  const newQuizButton = (label: string) => (
+    <Button variant="primary" icon="plus" onClick={() => setComposing(true)}>
+      {label}
+    </Button>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
-      <BackLink href="/dashboard" label="Dashboard" />
-
+    <Page>
       <PageHeader
-        label="Event"
+        crumbs={CRUMBS}
         title={event.title}
         description={event.description || undefined}
       />
 
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="label">Quizzes</h2>
-        <button
-          onClick={() => setShowForm((value) => !value)}
-          className="bg-primary text-white px-4 py-2 text-sm tracking-widest uppercase hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          {showForm ? "Cancel" : "+ Add Quiz"}
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {showForm && (
-          <motion.form
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            action={createQuizAction}
-            className="mb-6 border border-border bg-surface p-5 space-y-4"
+      <section aria-labelledby="quizzes-heading">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2
+            id="quizzes-heading"
+            className="text-xl font-semibold text-foreground"
           >
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label htmlFor="quiz-title" className="field-label block mb-2">
-                  Title
-                </label>
-                <input
-                  id="quiz-title"
-                  name="quizTitle"
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  required
-                  className="input-field font-mono"
-                  placeholder="Quiz title"
-                />
-              </div>
-              <div className="w-24">
-                <label htmlFor="quiz-order" className="field-label block mb-2">
-                  Order
-                </label>
-                <input
-                  id="quiz-order"
-                  type="text"
-                  inputMode="numeric"
-                  name="orderIndex"
-                  defaultValue={orderIndex}
-                  className="input-field font-mono"
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={creating}
-              className="bg-primary text-white px-5 py-2 text-sm tracking-widest uppercase hover:bg-primary-hover disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {creating ? "Creating..." : "Create"}
-            </button>
-          </motion.form>
-        )}
-      </AnimatePresence>
-
-      <div className="h-px bg-border mb-4" />
-
-      {quizzes.length === 0 ? (
-        <EmptyState message="No quizzes yet. Add one above." />
-      ) : (
-        <div className="list-stack">
-          {quizzes.map((quiz, index) => (
-            <ResourceRow
-              key={quiz.id}
-              href={`/events/${eventId}/quizzes/${quiz.id}`}
-              ariaLabel={`Open quiz: ${quiz.title}`}
-              onDelete={() => setConfirmQuizId(quiz.id)}
-              deleteAriaLabel={`Delete quiz: ${quiz.title}`}
-              initial={animateEntrance ? { opacity: 0 } : false}
-              animate={{ opacity: 1 }}
-              transition={{ duration: duration.base }}
-            >
-              <div className="flex items-center gap-4">
-                <span className="font-mono text-xs text-muted tabular-nums w-5">
-                  {index + 1}
-                </span>
-                <span className="text-foreground font-medium group-hover:text-accent transition-colors text-base">
-                  {quiz.title}
-                </span>
-              </div>
-            </ResourceRow>
-          ))}
+            Quizzes
+          </h2>
+          {!composing && quizzes.length > 0 && newQuizButton("New quiz")}
         </div>
-      )}
+
+        <AnimatePresence initial={false}>
+          {composing && (
+            <NewQuizForm
+              key="new-quiz"
+              eventId={eventId}
+              orderIndex={nextOrderIndex}
+              onCancel={() => setComposing(false)}
+              onCreated={(created) => {
+                void mutate(
+                  { ...event, quizzes: [...event.quizzes, created] },
+                  { revalidate: false },
+                );
+                setComposing(false);
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {quizzes.length === 0 ? (
+          !composing && (
+            <EmptyState
+              title="No quizzes in this event yet"
+              description="A quiz is a set of questions you host live. Add one to start writing questions."
+              action={newQuizButton("Add a quiz")}
+            />
+          )
+        ) : (
+          <ul className="flex flex-col gap-2">
+            <AnimatePresence initial={false}>
+              {quizzes.map((quiz, index) => (
+                <ResourceRow
+                  key={quiz.id}
+                  href={`/events/${eventId}/quizzes/${quiz.id}`}
+                  title={quiz.title}
+                  leading={
+                    <span className="block w-6 font-mono text-sm text-subtle tabular-nums">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                  }
+                  deleteLabel={`Delete quiz: ${quiz.title}`}
+                  onDelete={() => {
+                    setTarget(quiz);
+                    setConfirmOpen(true);
+                  }}
+                />
+              ))}
+            </AnimatePresence>
+          </ul>
+        )}
+      </section>
 
       <ConfirmDialog
-        message={
-          confirmQuizId !== null
-            ? `Delete "${quizzes.find((q) => q.id === confirmQuizId)?.title}"? All questions and session history for this quiz will be permanently removed.`
-            : null
-        }
-        confirmLabel="Delete"
-        variant="danger"
-        onConfirm={handleDeleteQuizConfirmed}
-        onCancel={() => setConfirmQuizId(null)}
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={`Delete "${target?.title ?? ""}"?`}
+        description="Its questions and every session's results will be permanently removed. This can't be undone."
+        confirmLabel="Delete quiz"
+        onConfirm={deleteTarget}
       />
-    </div>
+    </Page>
+  );
+}
+
+function NewQuizForm({
+  eventId,
+  orderIndex,
+  onCreated,
+  onCancel,
+}: {
+  eventId: string;
+  orderIndex: number;
+  onCreated: (quiz: QuizSummary) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState("");
+
+  const [error, submit, pending] = useActionState<string | null>(async () => {
+    const trimmed = title.trim();
+    if (!trimmed) return "Give the quiz a title.";
+    try {
+      onCreated(
+        await eventsApi.createQuiz(eventId, { title: trimmed, orderIndex }),
+      );
+      return null;
+    } catch (err) {
+      return describeError(err, "Couldn't create the quiz.");
+    }
+  }, null);
+
+  return (
+    <motion.form
+      {...rise}
+      action={submit}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onCancel();
+      }}
+      className="mb-6 border border-border bg-surface p-5 sm:p-6"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <TextField
+          label="Quiz title"
+          name="title"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          maxLength={255}
+          placeholder="Round one: general knowledge"
+          error={error}
+          fieldClassName="flex-1"
+          autoFocus
+        />
+        <div className="flex gap-3 sm:pt-7">
+          <Button type="submit" variant="primary" pending={pending}>
+            {pending ? "Adding…" : "Add quiz"}
+          </Button>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </motion.form>
+  );
+}
+
+export function EventSkeleton() {
+  return (
+    <Page>
+      <LoadingRegion label="Loading event">
+        <PageHeaderSkeleton crumbs description titleWidth="w-64" />
+        <div className="mb-4 flex items-center justify-between">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-11 w-32" />
+        </div>
+        <ul className="flex flex-col gap-2">
+          {[0, 1, 2].map((row) => (
+            <ResourceRowSkeleton key={row} subtitle={false} leading />
+          ))}
+        </ul>
+      </LoadingRegion>
+    </Page>
   );
 }
