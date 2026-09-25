@@ -24,40 +24,40 @@ colors:
   option-d-rose: "#e11d48"
 typography:
   display:
-    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontFamily: "Azeret Mono, ui-monospace, monospace"
     fontSize: "clamp(2.5rem, 8vw, 5rem)"
-    fontWeight: 900
+    fontWeight: 600
     lineHeight: 1
     fontFeature: "tabular-nums"
   headline:
-    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontFamily: "Schibsted Grotesk, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.5rem"
     fontWeight: 700
     lineHeight: 1.3
   title:
-    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontFamily: "Schibsted Grotesk, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.125rem"
     fontWeight: 700
     lineHeight: 1.4
   body:
-    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontFamily: "Schibsted Grotesk, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.6
   label:
-    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontFamily: "Schibsted Grotesk, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 600
     lineHeight: 1rem
     letterSpacing: "0.1em"
   field-label:
-    fontFamily: "Geist Sans, system-ui, sans-serif"
+    fontFamily: "Schibsted Grotesk, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.8125rem"
     fontWeight: 500
     lineHeight: 1.25rem
     letterSpacing: "0.01em"
   mono:
-    fontFamily: "Geist Mono, Courier New, monospace"
+    fontFamily: "Azeret Mono, ui-monospace, monospace"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.4
@@ -129,7 +129,7 @@ The implementation is a dark, sharp-edged system built from semantic CSS tokens 
 **Key Characteristics:**
 - Flat near-black canvas and charcoal surfaces with a compact neutral range.
 - Sharp rectangular controls and 1px borders as the default geometry.
-- Geist Sans for interface text and live numerals; Geist Mono for typed identifiers and scoring fields.
+- Schibsted Grotesk for interface text; Azeret Mono for live data, typed identifiers, and scoring fields.
 - Broadcast blue for action, sky blue for liveness, and a protected A/B/C/D option palette.
 - Motion is state communication: fade for content appearing in place, rise for surfaces that genuinely arrive, spring for response bars.
 
@@ -172,14 +172,14 @@ The palette is cool, high-contrast, and intentionally restrained: neutrals carry
 
 ## Typography
 
-**Display Font:** Geist Sans (with `system-ui, sans-serif`)
-**Body Font:** Geist Sans (with `system-ui, sans-serif`)
-**Label/Mono Font:** Geist Sans for labels; Geist Mono (with `Courier New, monospace`) for typed content only.
+**Display Font:** Azeret Mono (with `ui-monospace, monospace`)
+**Body Font:** Schibsted Grotesk (with `ui-sans-serif, system-ui, sans-serif`)
+**Label/Mono Font:** Schibsted Grotesk for labels; Azeret Mono for data, codes, and typed content.
 
-**Character:** Geist Sans keeps the product broadcast-modern and highly legible. Geist Mono is a functional typewriter register for input, codes, and scoring values, never a decorative display face.
+**Character:** Schibsted Grotesk is the clean, confident broadcast voice for readable UI. Azeret Mono makes values and input feel precise and technical; its slashed zero keeps `0` and `O` distinct in projected join codes.
 
 ### Hierarchy
-- **Display** (900, `clamp(2.5rem, 8vw, 5rem)`, line-height 1): Hero numbers, join codes, timers, and final scores. Use `tabular-nums` whenever the value changes.
+- **Display** (600, `clamp(2.5rem, 8vw, 5rem)`, line-height 1): Hero numbers, join codes, timers, and final scores. Use Azeret Mono and `tabular-nums` whenever the value changes.
 - **Headline** (700, 1.5rem, line-height 1.3): Question prompts and major result headings, generally constrained to a readable measure.
 - **Title** (700, 1.125rem, line-height 1.4): Page titles, stat values, and secondary headings.
 - **Body** (400, 1rem, line-height 1.6): Explanations, descriptions, and default form text. Keep inputs at 16px to avoid mobile browser zoom.
@@ -189,7 +189,7 @@ The palette is cool, high-contrast, and intentionally restrained: neutrals carry
 ### Named Rules
 **The Tabular Digit Rule.** Timers, scores, ranks, counts, and response totals use `tabular-nums` so live updates do not move the surrounding layout.
 
-**The Mono Stays in the Field Rule.** Geist Mono belongs in inputs, identifiers, codes, and scoring fields. It does not belong in headings, display numerals, or general labels.
+**The Data Register Rule.** Azeret Mono belongs to join codes, clocks, scores, ranks, response totals, identifiers, and typed content. It makes live data precise and codes unambiguous; general headings, labels, and prose stay in Schibsted Grotesk.
 
 ## Layout
 
@@ -238,7 +238,7 @@ The component language is pixel-precise, rectangular, and broadcast-confident. S
 ### Inputs / Fields
 - **Style:** Full-width surface background, 1px border, `0.75rem 1rem` padding, 16px body text, and no radius.
 - **Focus:** Border changes to primary with an inset primary stroke. Disabled fields reduce opacity and block interaction.
-- **Typed content:** Apply Geist Mono to join codes, identifiers, and scoring inputs; keep normal prose in Geist Sans.
+- **Typed content:** Apply Azeret Mono to join codes, identifiers, and scoring inputs; keep normal prose in Schibsted Grotesk.
 
 ### Navigation
 - **Style:** Sticky full-width bar with a bottom rule, translucent background, backdrop blur, and a centered max-width content row. Logo and wordmark sit left; account actions or session state sit right.
@@ -269,7 +269,7 @@ The component language is pixel-precise, rectangular, and broadcast-confident. S
 - **Do** reserve A/B/C/D colors for answer options.
 - **Do** use hairline rule borders as the default structural device.
 - **Do** apply `tabular-nums` to values that update live.
-- **Do** use Geist Mono only for typed identifiers, form content, and scoring inputs.
+- **Do** use Azeret Mono for typed identifiers and live data such as codes, timers, scores, ranks, and response totals.
 - **Do** keep loading twins geometrically coupled to their rendered components.
 - **Do** use motion to explain arrival, change, locking, or reveal, and honor reduced-motion preferences.
 
@@ -277,6 +277,6 @@ The component language is pixel-precise, rectangular, and broadcast-confident. S
 - **Don't** introduce light surfaces, rounded SaaS cards, confetti, CRT scanlines, fake noise, or gradient text.
 - **Don't** reuse the answer palette for navigation, chrome, or unrelated status.
 - **Don't** use shadows as the default card treatment; reserve them for localized overlay separation like the dropdown and scoring drawer.
-- **Don't** use Geist Mono for display numerals or headings.
+- **Don't** use Azeret Mono for general headings, labels, or body copy; keep the interface voice in Schibsted Grotesk.
 - **Don't** animate decoration that does not communicate a state change.
 - **Don't** hand-copy skeleton geometry when the source component can expose its layout shell.

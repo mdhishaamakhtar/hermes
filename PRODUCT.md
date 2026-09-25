@@ -27,8 +27,8 @@ Hermes is the god of speed. The interface should feel like something is always h
 
 ### Typography
 
-- **Geist Sans** for all UI text — including scores, timers, leaderboard numbers, and all display numerals. Use `tabular-nums` (`font-variant-numeric: tabular-nums`) wherever digits update live to prevent layout shift.
-- **Geist Mono** only for input fields and typed user content (email, password, quiz form fields, join code entry). Do not use mono for display numbers — Geist Mono wasn't designed as a display face and looks off at large sizes.
+- **Schibsted Grotesk** carries the interface voice: headings, labels, controls, and body copy. Its clear, compact shapes keep the broadcast stage easy to scan under time pressure.
+- **Azeret Mono** carries data: join codes, clocks, scores, point values, rank and response totals, plus anything a person types. Its slashed zero keeps `0` and `O` distinct in projected join codes. Use `tabular-nums` (`font-variant-numeric: tabular-nums`) wherever digits update live to prevent layout shift.
 - Uppercase + tracked text for section labels, status chips, and CTAs (already established).
 - Large, bold weights for question text and scores — players read under time pressure.
 
