@@ -5,7 +5,7 @@ import { LoadError } from "@/components/LoadError";
 import { Page, PageHeader, PageHeaderSkeleton } from "@/components/Page";
 import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
-import { countLabel, formatDate } from "@/lib/format";
+import { countLabel, formatDateTime } from "@/lib/format";
 import { sessionsApi } from "../session-api";
 import type { SessionResults } from "../session-types";
 import { LeaderboardSkeleton } from "../components/Leaderboard";
@@ -34,7 +34,7 @@ export function ReviewClient({ sessionId }: { sessionId: string }) {
     );
   }
 
-  const date = formatDate(results.startedAt);
+  const date = formatDateTime(results.startedAt);
 
   return (
     <Page>

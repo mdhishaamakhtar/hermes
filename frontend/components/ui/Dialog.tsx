@@ -39,7 +39,13 @@ export function Dialog({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // React's autoFocus runs at mount, while the dialog is still closed,
+      // so showModal() would fall back to the first control (the close
+      // button). Content marks its intended first stop with data-autofocus.
+      dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -161,7 +167,12 @@ export function ConfirmDialog({
               {error}
             </p>
           )}
-          <Button variant="ghost" onClick={close} disabled={pending} autoFocus>
+          <Button
+            variant="ghost"
+            onClick={close}
+            disabled={pending}
+            data-autofocus
+          >
             Cancel
           </Button>
           <Button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { SessionLoading } from "@/features/session/components/SessionLoading";
 import {
@@ -38,6 +38,11 @@ function PlaySessionScreen({
   rejoinToken: string;
 }) {
   const session = usePlaySession(sessionId, rejoinToken);
+
+  // The lobby and the stage are separate screens: open each at the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [session.status]);
 
   if (session.missing) return <PlayUnavailable reason="missing" />;
   if (session.loadError) {

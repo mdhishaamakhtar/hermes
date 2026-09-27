@@ -11,6 +11,13 @@ import type {
 
 type Id = number | string;
 
+/*
+ * Results are refused with 409 until the session's ENDED status is committed,
+ * and SESSION_END can arrive a moment before that commit. Clients fetch
+ * results the instant it lands, so there a 409 means "not yet".
+ */
+const NOT_ENDED_YET = [409];
+
 /** Organiser calls authenticate with the JWT; player calls with a rejoin token. */
 export const sessionsApi = {
   create: (quizId: number) =>
@@ -25,7 +32,10 @@ export const sessionsApi = {
     api.get<HostSessionSync>(`/api/sessions/${id}/host-sync`),
   lobby: (id: Id) => api.get<LobbySnapshot>(`/api/sessions/${id}/lobby`),
   status: (id: Id) => api.get<SessionStatus>(`/api/sessions/${id}/status`),
-  results: (id: Id) => api.get<SessionResults>(`/api/sessions/${id}/results`),
+  results: (id: Id) =>
+    api.get<SessionResults>(`/api/sessions/${id}/results`, {
+      retryOn: NOT_ENDED_YET,
+    }),
   correctScoring: (
     id: Id,
     questionId: number,
@@ -68,5 +78,6 @@ export const sessionsApi = {
     api.get<MyResults>(`/api/sessions/${sessionId}/my-results`, {
       skipAuth: true,
       headers: { "X-Rejoin-Token": rejoinToken },
+      retryOn: NOT_ENDED_YET,
     }),
 };

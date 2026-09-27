@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { TopBar } from "@/components/TopBar";
 import { ButtonLink } from "@/components/ui/Button";
 
+// No title here: a string title in a layout would stop the root "%s | Hermes"
+// template from reaching the pages below, which name themselves.
 export const metadata: Metadata = {
-  title: "Host sign in",
   description:
     "Sign in or create a host account to build quizzes and run live Hermes sessions.",
 };

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Live session",
+  // A template, not a string, so child titles keep the " | Hermes" suffix.
+  title: { default: "Live session", template: "%s | Hermes" },
   robots: { index: false, follow: false },
 };
 

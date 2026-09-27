@@ -123,6 +123,9 @@ function ScoringForm({
                   id={`${formId}-${option.id}`}
                   value={points[index]}
                   inputMode="numeric"
+                  data-autofocus={index === 0 || undefined}
+                  // Typing replaces the old value instead of joining it.
+                  onFocus={(event) => event.currentTarget.select()}
                   onChange={(event) => {
                     const raw = event.target.value;
                     if (!/^-?\d*$/.test(raw)) return;
