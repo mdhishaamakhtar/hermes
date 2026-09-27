@@ -12,9 +12,9 @@ import type {
 type Id = number | string;
 
 /*
- * Results are refused with 409 until the session's ENDED status is committed,
- * and SESSION_END can arrive a moment before that commit. Clients fetch
- * results the instant it lands, so there a 409 means "not yet".
+ * Results are refused with 409 until the session's ENDED status is committed.
+ * The server sends SESSION_END only after that commit, so the reads clients
+ * make the instant it lands should succeed; retrying a 409 is a safety net.
  */
 const NOT_ENDED_YET = [409];
 
