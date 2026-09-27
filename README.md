@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD033 -->
 
 <p align="center">
-  <img src="./frontend/public/og-image.svg" alt="Hermes Preview">
+  <img src="./.github/assets/hermes-preview.png" alt="Hermes: live quizzes, run like a broadcast">
 </p>
 
 ## Hermes
@@ -25,7 +25,7 @@ Create events, build quizzes, host live sessions, let players join with a code, 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Bun](https://img.shields.io/badge/Bun-1.x-FBF0DF?style=for-the-badge&logo=bun&logoColor=black)](https://bun.sh/)
-[![Framer Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?style=for-the-badge&logo=framer&logoColor=white)](https://www.framer.com/motion/)
+[![Motion](https://img.shields.io/badge/Motion-13-0055FF?style=for-the-badge&logo=framer&logoColor=white)](https://motion.dev/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-25-007396?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)](https://spring.io/projects/spring-security)

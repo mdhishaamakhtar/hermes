@@ -34,15 +34,15 @@ Hermes is the god of speed. The interface should feel like something is always h
 
 ### Motion
 
-- Framer Motion is in the stack — use it intentionally.
+- Motion (`motion/react`) is in the stack — use it intentionally. Its shared vocabulary lives in `lib/motion.ts`.
 - Transitions communicate state: new question arriving, answer locked in, results revealing, timer counting down.
-- Enter animations: fade + slide-up (already defined as `enterAnimation`).
+- Enter animations: `fade` for content appearing in place, `rise` for surfaces that arrive, `stageCut` for a new question on the live stage.
 - Never animate for decoration alone. Every motion should tell the user something changed.
 - Respect `prefers-reduced-motion` (already implemented in globals.css).
 
 ### Color System
 
-All semantic tokens are defined in `globals.css` (`@theme`) and mirrored in `lib/design-tokens.ts`:
+All semantic tokens, option colours included, are defined in `globals.css` (`@theme`):
 
 | Token | Value | Use |
 |---|---|---|
