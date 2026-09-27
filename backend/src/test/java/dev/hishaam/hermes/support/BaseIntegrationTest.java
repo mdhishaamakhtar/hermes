@@ -12,7 +12,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.hishaam.hermes.Application;
 import java.lang.reflect.Type;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -20,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -29,15 +32,24 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.messaging.converter.JacksonJsonMessageConverter;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessageType;
+import org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.messaging.simp.user.SimpSubscription;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
+import org.springframework.messaging.simp.user.UserDestinationResolver;
+import org.springframework.messaging.simp.user.UserDestinationResult;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -54,6 +66,10 @@ import org.testcontainers.utility.DockerImageName;
     classes = Application.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+// Pinned so the default (simple) does not silently stop exercising the relay path. Pinned here, not
+// in @DynamicPropertySource: dynamic properties outrank every @TestPropertySource, so a subclass
+// could never switch modes, while its own @TestPropertySource does override this one.
+@TestPropertySource(properties = "app.stomp.broker.mode=relay")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class BaseIntegrationTest {
 
@@ -115,8 +131,6 @@ public abstract class BaseIntegrationTest {
     // shorten it so freshly scheduled question timers fire promptly in tests.
     registry.add("spring.quartz.properties.org.quartz.scheduler.idleWaitTime", () -> "1000");
     registry.add("app.cors.allowed-origin", () -> "http://localhost:3000");
-    // Pinned so the default (simple) does not silently stop exercising the relay path.
-    registry.add("app.stomp.broker.mode", () -> "relay");
     registry.add("app.stomp.broker-relay.host", RABBIT::getHost);
     registry.add("app.stomp.broker-relay.port", () -> RABBIT.getMappedPort(61613));
     registry.add("app.stomp.broker-relay.virtual-host", () -> "/");
@@ -133,6 +147,13 @@ public abstract class BaseIntegrationTest {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private StringRedisTemplate redisTemplate;
+
+  /** Present only when the class runs on Spring's in-process broker rather than the relay. */
+  @Autowired private ObjectProvider<SimpleBrokerMessageHandler> simpleBroker;
+
+  @Autowired private SimpUserRegistry userRegistry;
+
+  @Autowired private UserDestinationResolver userDestinationResolver;
 
   @LocalServerPort protected int port;
 
@@ -379,8 +400,17 @@ public abstract class BaseIntegrationTest {
         .get(10, TimeUnit.SECONDS);
   }
 
+  /**
+   * Subscribes and returns only once the broker has registered the subscription, so a test never
+   * triggers an event before anyone is listening for it.
+   */
   protected void subscribe(StompSession session, String destination, BlockingQueue<JsonNode> queue)
       throws Exception {
+    SimpleBrokerMessageHandler inProcessBroker = simpleBroker.getIfAvailable();
+    if (inProcessBroker != null) {
+      subscribeInProcess(inProcessBroker, session, destination, queue);
+      return;
+    }
     CountDownLatch subscribed = new CountDownLatch(1);
     CountDownLatch failed = new CountDownLatch(1);
     StompSession.Subscription subscription = session.subscribe(destination, handler(queue));
@@ -392,6 +422,69 @@ public abstract class BaseIntegrationTest {
       }
       throw new AssertionError("Timed out waiting for subscription to " + destination);
     }
+  }
+
+  /**
+   * Spring's in-process broker never answers a SUBSCRIBE with a RECEIPT, and registers it on the
+   * executor-backed inbound channel, so {@code subscribe} returning proves nothing. Instead this
+   * polls the broker's own registry until the subscription is in it. The id is unique so that no
+   * other session's subscription can satisfy the lookup.
+   */
+  private void subscribeInProcess(
+      SimpleBrokerMessageHandler broker,
+      StompSession session,
+      String destination,
+      BlockingQueue<JsonNode> queue)
+      throws InterruptedException {
+    String subscriptionId = UUID.randomUUID().toString();
+    StompHeaders headers = new StompHeaders();
+    headers.setDestination(destination);
+    headers.setId(subscriptionId);
+    session.subscribe(headers, handler(queue));
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (!isRegistered(broker, destination, subscriptionId)) {
+      if (System.nanoTime() > deadline) {
+        throw new AssertionError("Timed out waiting for subscription to " + destination);
+      }
+      Thread.sleep(20);
+    }
+  }
+
+  private boolean isRegistered(
+      SimpleBrokerMessageHandler broker, String destination, String subscriptionId) {
+    // The user registry records a SUBSCRIBE as soon as it is dispatched, before the broker has
+    // handled it, so it is consulted only to learn which server-side session to look up.
+    for (SimpSubscription dispatched :
+        userRegistry.findSubscriptions(candidate -> subscriptionId.equals(candidate.getId()))) {
+      String sessionId = dispatched.getSession().getId();
+      for (String brokerDestination : brokerDestinations(destination, sessionId)) {
+        SimpMessageHeaderAccessor lookup =
+            SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
+        lookup.setDestination(brokerDestination);
+        List<String> registered =
+            broker
+                .getSubscriptionRegistry()
+                .findSubscriptions(
+                    MessageBuilder.createMessage(new byte[0], lookup.getMessageHeaders()))
+                .get(sessionId);
+        if (registered != null && registered.contains(subscriptionId)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Where the broker files a subscription: {@code /user/**} maps to a per-session destination. */
+  private Set<String> brokerDestinations(String destination, String sessionId) {
+    SimpMessageHeaderAccessor subscribe =
+        SimpMessageHeaderAccessor.create(SimpMessageType.SUBSCRIBE);
+    subscribe.setDestination(destination);
+    subscribe.setSessionId(sessionId);
+    UserDestinationResult resolved =
+        userDestinationResolver.resolveDestination(
+            MessageBuilder.createMessage(new byte[0], subscribe.getMessageHeaders()));
+    return resolved == null ? Set.of(destination) : resolved.getTargetDestinations();
   }
 
   protected StompFrameHandler handler(BlockingQueue<JsonNode> queue) {
