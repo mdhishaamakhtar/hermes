@@ -175,8 +175,8 @@ public class SessionEngine {
 
   /**
    * Ends the session: cancels any pending timer, freezes and grades the in-progress question if
-   * needed, persists ENDED status with the end timestamp, broadcasts SESSION_END to participants,
-   * and cleans up all Redis keys for the session.
+   * needed, persists ENDED status with the end timestamp, cleans up all Redis keys for the session,
+   * and broadcasts SESSION_END to participants once the transaction commits.
    */
   @Transactional
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
@@ -212,6 +212,8 @@ public class SessionEngine {
       }
     }
 
+    // Both messages wait for this transaction to commit, since clients fetch results on receipt,
+    // but are built here: the Redis cleanup below deletes the final standings they carry.
     if (session.getStatus() != SessionStatus.LOBBY) {
       eventPublisher.publishSessionEnd(sessionId);
       eventPublisher.publishSessionEndAnalytics(sessionId);

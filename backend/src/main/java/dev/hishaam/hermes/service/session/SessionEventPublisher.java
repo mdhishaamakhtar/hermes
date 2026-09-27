@@ -22,12 +22,15 @@ import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.broker.BrokerAvailabilityEvent;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Publishes all STOMP WebSocket events for a session: question lifecycle events (displayed, frozen,
  * reviewed), passage events, timer start, leaderboard updates, session end, and per-participant
  * answer feedback. Drops messages silently when the broker relay is offline to avoid blocking
- * callers. Broker availability is tracked via Spring's {@link BrokerAvailabilityEvent}.
+ * callers. Broker availability is tracked via Spring's {@link BrokerAvailabilityEvent}. Session-end
+ * messages are held until the caller's transaction commits.
  */
 @Service
 public class SessionEventPublisher {
@@ -142,15 +145,23 @@ public class SessionEventPublisher {
         new WsPayloads.PassageFrozen(passageId, subQuestionIds));
   }
 
+  /**
+   * Sent once the caller's transaction commits: clients fetch results as soon as SESSION_END
+   * arrives, and results are refused until the ENDED status is committed.
+   */
   public void publishSessionEnd(Long sessionId) {
-    send(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
+    sendAfterCommit(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
   }
 
+  /**
+   * Reads the final standings from Redis now, because the caller clears those keys before it
+   * commits, but sends them after the commit for the same reason as {@link #publishSessionEnd}.
+   */
   public void publishSessionEndAnalytics(Long sessionId) {
     List<SessionResultsResponse.LeaderboardEntry> leaderboard =
         scoringStore.buildLeaderboard(sessionId);
     long participantCount = stateStore.getParticipantCount(sessionId);
-    send(
+    sendAfterCommit(
         WsTopics.sessionAnalytics(sessionId),
         new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
   }
@@ -312,6 +323,24 @@ public class SessionEventPublisher {
     } catch (MessageDeliveryException e) {
       log.warn("Failed to deliver message to {}: {}", destination, e.getMessage());
     }
+  }
+
+  /**
+   * Defers {@link #send} until the current transaction commits, and drops the message if it rolls
+   * back. With no transaction synchronization active there is nothing to wait for, so it sends now.
+   */
+  private void sendAfterCommit(String destination, Object payload) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      send(destination, payload);
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            send(destination, payload);
+          }
+        });
   }
 
   private void sendToUser(String username, String destination, Object payload) {
