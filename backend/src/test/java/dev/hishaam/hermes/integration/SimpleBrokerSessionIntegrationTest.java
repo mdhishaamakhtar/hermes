@@ -11,6 +11,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler;
+import org.springframework.messaging.simp.stomp.StompBrokerRelayMessageHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.test.context.TestPropertySource;
@@ -30,6 +34,23 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
  */
 @TestPropertySource(properties = "app.stomp.broker.mode=simple")
 class SimpleBrokerSessionIntegrationTest extends BaseIntegrationTest {
+
+  @Autowired private ApplicationContext applicationContext;
+
+  /**
+   * Verifies that this class really runs on the in-process broker. Every other test here passes on
+   * either broker, so if the base class's relay pin ever outranked the override above again, as it
+   * once did, only this check would notice.
+   */
+  @Test
+  void theContextRunsTheInProcessBrokerAndNoRelay() {
+    assertThat(applicationContext.getBeansOfType(SimpleBrokerMessageHandler.class))
+        .as("Spring's in-process broker should be handling STOMP")
+        .hasSize(1);
+    assertThat(applicationContext.getBeansOfType(StompBrokerRelayMessageHandler.class))
+        .as("no relay to an external broker should exist")
+        .isEmpty();
+  }
 
   /**
    * Verifies that a whole live session — broadcasts, per-user acknowledgements and organiser-only

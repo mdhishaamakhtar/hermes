@@ -11,6 +11,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler;
+import org.springframework.messaging.simp.stomp.StompBrokerRelayMessageHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
@@ -24,6 +28,23 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
  * updates, answer acknowledgements, and authorization boundaries on topic subscriptions.
  */
 class WebSocketIntegrationTest extends BaseIntegrationTest {
+
+  @Autowired private ApplicationContext applicationContext;
+
+  /**
+   * Verifies that the suite runs over the RabbitMQ relay that {@code BaseIntegrationTest} pins.
+   * {@code subscribe} works on either broker, so nothing else here would notice if the pin stopped
+   * applying and the application default, the in-process broker, took over.
+   */
+  @Test
+  void theContextRunsTheRelayAndNoInProcessBroker() {
+    assertThat(applicationContext.getBeansOfType(StompBrokerRelayMessageHandler.class))
+        .as("the relay to RabbitMQ should be handling STOMP")
+        .hasSize(1);
+    assertThat(applicationContext.getBeansOfType(SimpleBrokerMessageHandler.class))
+        .as("Spring's in-process broker should not be running")
+        .isEmpty();
+  }
 
   /**
    * Verifies that the STOMP flow emits the expected session events and per-user answer
