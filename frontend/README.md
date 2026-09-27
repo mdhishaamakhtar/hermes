@@ -2,7 +2,7 @@
 
 > A fast, real-time quiz interface for organisers and participants.
 
-This is the Hermes web client built with **Next.js 16**, **React 19**, **Tailwind CSS 4**, and selective **Framer Motion**. It handles organiser dashboards, quiz editing, live host controls, participant join flows, and post-session review screens.
+This is the Hermes web client built with **Next.js 16**, **React 19**, **Tailwind CSS 4**, and **Motion**. It handles organiser dashboards, quiz editing, live host controls, participant join flows, and post-session review screens.
 
 ---
 
@@ -12,7 +12,7 @@ This is the Hermes web client built with **Next.js 16**, **React 19**, **Tailwin
 [![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Framer Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?style=for-the-badge&logo=framer&logoColor=white)](https://www.framer.com/motion/)
+[![Motion](https://img.shields.io/badge/Motion-13-0055FF?style=for-the-badge&logo=framer&logoColor=white)](https://motion.dev/)
 [![Bun](https://img.shields.io/badge/Bun-1.x-FBF0DF?style=for-the-badge&logo=bun&logoColor=black)](https://bun.sh/)
 [![STOMP](https://img.shields.io/badge/STOMP-Realtime-111827?style=for-the-badge)](https://stomp.github.io/)
 
@@ -20,11 +20,11 @@ This is the Hermes web client built with **Next.js 16**, **React 19**, **Tailwin
 
 ## 🔥 Key UI Features
 
-- Organiser dashboard for managing events and jumping into quiz editing quickly
-- Event and quiz editor flow with route-level server data loading and client-only editing islands
-- Live host and player screens with real-time updates over STOMP
-- Join and rejoin flows optimized for lightweight participant entry
-- Animated interactions where they add value, with lighter CSS motion elsewhere
+- Organiser dashboard for events, and a quiz editor for standalone questions and reading passages
+- Live host stage and player screens with real-time updates over STOMP, including a presenter shortcut (→ or Page Down) to advance
+- Join and rejoin flows built for phones: a six-character code, a name, and you're in
+- Scoring corrections after grading, with standings that recalculate
+- Branded 404 and error pages, and a clear recovery path wherever a request can fail
 
 ---
 
@@ -81,11 +81,11 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws-hermes
 
 ## 📂 Structure
 
-- `app/`: Next.js App Router routes, layouts, and loading states
-- `components/`: Shared UI plus route-scoped client components
-- `hooks/`: Realtime and client-side hooks
-- `lib/`: API clients, auth token storage, and server fetch helpers
-- `proxy.ts`: Protected-route auth gate for App Router requests
+- `app/`: routes, layouts, loading states, and the 404 and error pages. Organiser pages share one shell through the `(organiser)` route group.
+- `components/`: the shared shell (top bar, page header, providers) and the `ui/` primitives: buttons, fields, dialogs, toasts, icons.
+- `features/`: one folder per flow: `auth`, `dashboard`, `events`, `quizzes` (the editor), `join`, `landing`, and `session` (host, play, results, and the live-state reducers).
+- `lib/`: the API client, auth and device storage, formatting, and the motion vocabulary.
+- `proxy.ts`: the auth gate for organiser routes.
 
 ---
 

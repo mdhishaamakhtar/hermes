@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import { LoadError } from "@/components/LoadError";
 import { TopBar } from "@/components/TopBar";
@@ -14,6 +15,12 @@ import { useHostSession } from "@/features/session/host/useHostSession";
 export default function HostPage() {
   const { id } = useParams<{ id: string }>();
   const session = useHostSession(id);
+
+  // Lobby, stage and wrap-up are separate screens: open each at the top,
+  // not wherever the previous one was scrolled to.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [session.status]);
 
   if (session.loadError) {
     return (

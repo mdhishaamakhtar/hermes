@@ -36,7 +36,7 @@ bun run format             # Prettier auto-fix
 
 ### Tech Stack
 - **Backend:** Spring Boot 4.0.3, Java 25, PostgreSQL 17, Redis 7, STOMP WebSockets, JWT auth
-- **Frontend:** Next.js 16.2, React 19, TypeScript, Tailwind CSS 4, Framer Motion, `@stomp/stompjs`
+- **Frontend:** Next.js 16.3, React 19, TypeScript, Tailwind CSS 4, Motion, `@stomp/stompjs`
 
 ### Session Lifecycle
 ```
@@ -47,7 +47,7 @@ LOBBY → ACTIVE → ENDED
 - **ENDED:** Leaderboard shown; results available for review.
 
 ### Authentication
-- **Organizers** authenticate with JWT, stored in `localStorage` as `hermes_token` and mirrored in a same-name cookie (read only by `frontend/proxy.ts` for route protection). Both are written/cleared together via `frontend/lib/auth-storage.ts`. The token is injected by a ky `beforeRequest` hook (`frontend/lib/api.ts`); a 401 on an authenticated request clears the token and hard-redirects to `/auth/login`. Login/logout use full page loads (not client navigation) to reset SWR and router caches. Validated on STOMP handshake via `StompChannelInterceptor`.
+- **Organizers** authenticate with JWT, stored in `localStorage` as `hermes_token` and mirrored in a same-name cookie that only `frontend/proxy.ts` reads: it sends signed-out requests for organiser routes to `/auth/login?next=…` and signed-in visits to `/auth/*` to the dashboard. Both are written/cleared together via `frontend/lib/auth.ts`. A ky `beforeRequest` hook (`frontend/lib/api.ts`) attaches the token; player calls pass `skipAuth`. A 401 on an authenticated request clears the token and notifies `OrganiserShell`, which drops the SWR cache and routes to login; after signing in the organiser returns to the page they were on. Validated on STOMP handshake via `StompChannelInterceptor`.
 - **Participants** are anonymous. They receive a rejoin token on `POST /api/sessions/join`, stored in `localStorage` as `hermes_rejoin_{sessionId}`.
 
 ### WebSocket Communication (STOMP)
@@ -56,12 +56,14 @@ LOBBY → ACTIVE → ENDED
   The simple broker keeps subscriptions in the process holding the WebSocket, so it is correct
   for a single instance only — running more than one replica requires `relay`.
 - **Endpoint:** `/ws-hermes`
-- **Client → Server:** `/app/session/{sessionId}/answer` — submit an answer
+- **Client → Server:** `/app/session/{sessionId}/answer` (submit or change an answer) and `/app/session/{sessionId}/lock-in`; both have HTTP fallbacks the player uses when no acknowledgement arrives within 2s
 - **Server → Client subscriptions:**
-  - `/topic/session.{sessionId}.question` — `QUESTION_START`, `QUESTION_END`, `SESSION_END` events
-  - `/topic/session.{sessionId}.analytics` — live leaderboard and answer-count updates (organizer only)
+  - `/topic/session.{sessionId}.question` — lifecycle events (`QUESTION_DISPLAYED`, `PASSAGE_DISPLAYED`, `TIMER_START`, `QUESTION_FROZEN`, `PASSAGE_FROZEN`, `QUESTION_REVIEWED`, `SCORING_CORRECTED`, `SESSION_END`), plus `PARTICIPANT_JOINED`, `ANSWER_UPDATE`, `ANSWER_REVEAL` and `PARTICIPANT_LEADERBOARD` repeated for players
+  - `/topic/session.{sessionId}.analytics` — answer counts, `LEADERBOARD_UPDATE`, and `SESSION_END` with final standings (organizer only)
+  - `/topic/session.{sessionId}.control` — `PARTICIPANT_JOINED` (organizer only; the frontend reads it from the question topic instead)
+  - `/user/queue/answers` — a player's own `ANSWER_ACCEPTED` / `ANSWER_REJECTED` acknowledgements
 
-Frontend WebSocket is managed by `frontend/hooks/useStompClient.ts` with automatic reconnect (3s).
+The wire types live in `frontend/features/session/session-types.ts`. The connection is managed by `frontend/features/session/useStompClient.ts`: exponential reconnect from 500ms to 5s, 10s heartbeats, an immediate reconnect when the tab returns or the network comes back, and subscriptions replayed on every reconnect.
 
 ### State Split: PostgreSQL vs Redis
 - **PostgreSQL:** Users, Events, Quizzes, Questions, Sessions, Participants, Answers (persistent).
@@ -88,13 +90,15 @@ Frontend WebSocket is managed by `frontend/hooks/useStompClient.ts` with automat
 ### Key Frontend Files
 | File | Purpose |
 |---|---|
-| `lib/api.ts` | ky wrapper; injects JWT, handles 401 logout |
-| `lib/auth-storage.ts` | Reads/writes the auth token (localStorage + cookie) |
-| `lib/fetcher.ts` | SWR fetcher; throws `FetchError` carrying the HTTP status |
-| `components/SWRProvider.tsx` | Global SWR config: fetcher, capped retries (none on 401/403/404) |
-| `hooks/useStompClient.ts` | STOMP client lifecycle and subscription management |
-| `lib/session-constants.ts` | Shared session-related constants |
-| `lib/design-tokens.ts` | Design system colors and UI constants |
+| `lib/api.ts` | ky client: attaches the JWT, unwraps the response envelope, throws `HermesError`; `describeError` turns a failure into user-facing copy |
+| `lib/auth.ts` | Auth token storage (localStorage + cookie) and the safe post-login redirect |
+| `lib/session-storage.ts` | Device storage: rejoin tokens, player names, hosts' join codes |
+| `components/Providers.tsx` | SWR config (capped retries, none on 401/403/404), reduced-motion handling, toasts |
+| `components/OrganiserShell.tsx` | Organiser top bar, sign-out, and expired-token handling |
+| `features/session/useStompClient.ts` | STOMP connection, subscription replay, queued publishes |
+| `features/session/{host,play}/` | Each side's reducer (`*-state.ts`), hook (`use*Session.ts`), and screens |
+| `app/globals.css` | Design tokens and component classes (buttons, inputs, option tiles, dialogs) |
+| `lib/motion.ts` | Motion vocabulary, mirroring the CSS duration tokens |
 
 ### Environment Variables (Frontend)
 ```
@@ -129,8 +133,8 @@ Anyone, anywhere: teachers running classroom assessments, facilitators running t
 5. **Broad audience, zero ambiguity.** Every action, state, and label must be instantly understood by someone who has never seen the app before.
 
 ### Color System
-Always use semantic tokens from `globals.css` / `lib/design-tokens.ts` — never raw hex values in components.
-- Background: `--color-background` (#0a0a0f), Surface: `--color-surface` (#1a1f2e)
+Always use semantic tokens from `app/globals.css` — never raw hex values in components. The option colours are CSS variables too; `lib/options.ts` maps an option's position to its letter and colour.
+- Background: `--color-background` (#0a0a0f), Surface: `--color-surface` (#0f1117), Border: `--color-border` (#1a1f2e)
 - Primary: `--color-primary` (#2563eb), Accent: `--color-accent` (#38bdf8)
 - Options A–D: blue / violet / amber / rose (defined as `--color-option-a` through `--color-option-d`)
 

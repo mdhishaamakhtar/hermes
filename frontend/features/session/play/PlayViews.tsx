@@ -178,7 +178,13 @@ export function PlayStage({ session }: { session: PlaySession }) {
       >
         {passage && <PassagePanel text={passage.text} />}
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* The next question starts from the top, not wherever the last one
+            was scrolled to. */}
+        <AnimatePresence
+          mode="wait"
+          initial={false}
+          onExitComplete={() => window.scrollTo(0, 0)}
+        >
           <motion.div
             key={questions.map((question) => question.id).join("-")}
             {...stageCut}

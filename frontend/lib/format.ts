@@ -10,6 +10,13 @@ const dateFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
   year: "numeric",
 });
+const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 export function formatNumber(value: number): string {
   return numberFormat.format(value);
@@ -52,9 +59,24 @@ export function formatClock(seconds: number): string {
 
 /** "Sep 26, 2026". Null for a missing timestamp, so callers can omit it. */
 export function formatDate(iso: string | null | undefined): string | null {
+  return formatTimestamp(iso, dateFormat);
+}
+
+/**
+ * "Sep 26, 2026, 7:05 PM", for things that happen more than once a day, like
+ * the same quiz run for three classes.
+ */
+export function formatDateTime(iso: string | null | undefined): string | null {
+  return formatTimestamp(iso, dateTimeFormat);
+}
+
+function formatTimestamp(
+  iso: string | null | undefined,
+  format: Intl.DateTimeFormat,
+): string | null {
   if (!iso) return null;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : dateFormat.format(date);
+  return Number.isNaN(date.getTime()) ? null : format.format(date);
 }
 
 /** Share of a whole, rounded: 7 of 24 → 29. Zero when there is no whole. */

@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { countLabel, formatDate } from "@/lib/format";
+import { countLabel, formatDateTime } from "@/lib/format";
 import type { SessionStatus, SessionSummary } from "@/lib/types";
 
 const STATUS: Record<
@@ -45,7 +45,7 @@ export function SessionList({
                   {status.label}
                 </Badge>
                 <span className="text-sm text-muted">
-                  {formatDate(session.startedAt) ?? "Not started yet"}
+                  {formatDateTime(session.startedAt) ?? "Not started yet"}
                 </span>
                 <span className="text-sm text-subtle">
                   {countLabel(session.participantCount, "player", "players")}

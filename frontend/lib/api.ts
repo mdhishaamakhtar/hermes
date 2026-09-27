@@ -85,6 +85,7 @@ const client = ky.create({
   prefix: BASE_URL,
   headers: { "Content-Type": "application/json" },
   // SWR owns retries for reads; a second retry layer would multiply them.
+  // `retryOn` below is the one narrow exception.
   retry: 0,
   hooks: {
     beforeRequest: [
@@ -155,13 +156,26 @@ interface CallOptions {
   headers?: Record<string, string>;
 }
 
+interface ReadOptions extends CallOptions {
+  /**
+   * Statuses that mean "not yet" rather than "no" for this read, retried in
+   * place a couple of times, quickly. Every other failure is left to SWR.
+   */
+  retryOn?: number[];
+}
+
 export const api = {
-  get: <T>(path: string, opts?: CallOptions) =>
+  get: <T>(path: string, opts?: ReadOptions) =>
     request<T>(
       () =>
         client.get(path, {
           headers: opts?.headers,
           context: { skipAuth: opts?.skipAuth ?? false },
+          // Spread only when asked: ky reads an explicit `retry: undefined`
+          // as "use the defaults".
+          ...(opts?.retryOn && {
+            retry: { limit: 2, statusCodes: opts.retryOn },
+          }),
         }),
       { skipAuth: opts?.skipAuth },
     ),

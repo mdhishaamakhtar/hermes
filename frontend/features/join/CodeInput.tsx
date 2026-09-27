@@ -50,7 +50,8 @@ export function CodeInput({
         onChange={(event) => onChange(normalizeCode(event.target.value))}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        maxLength={CODE_LENGTH}
+        // No maxLength: it would cut a pasted "8NQ-BDZ" to "8NQ-BD" before
+        // normalizeCode drops the dash. normalizeCode caps the length itself.
         autoCapitalize="characters"
         autoComplete="off"
         autoCorrect="off"

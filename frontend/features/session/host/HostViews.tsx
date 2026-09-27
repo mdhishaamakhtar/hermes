@@ -236,7 +236,13 @@ export function HostStage({ session }: { session: HostSession }) {
               />
             </div>
 
-            <AnimatePresence mode="wait" initial={false}>
+            {/* The next question starts from the top, not wherever the last
+                one was scrolled to. */}
+            <AnimatePresence
+              mode="wait"
+              initial={false}
+              onExitComplete={() => window.scrollTo(0, 0)}
+            >
               <motion.div
                 key={questions.map((q) => q.id).join("-")}
                 {...stageCut}
