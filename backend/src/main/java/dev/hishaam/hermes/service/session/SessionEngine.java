@@ -65,7 +65,7 @@ public class SessionEngine {
   public void advanceSessionInternal(Long sessionId) {
     if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) return;
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
     QuizSnapshot.QuestionSnapshot next =
         snapshot.findNextQuestion(stateStore.getCurrentQuestionId(sessionId));
     if (next == null) {
@@ -76,8 +76,7 @@ public class SessionEngine {
     if (next.passageId() != null) {
       QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(next.passageId());
       if (passage != null && PassageTimerMode.ENTIRE_PASSAGE == passage.timerMode()) {
-        displayEntirePassage(sessionId, passage, snapshot);
-        updateDbCurrentQuestion(sessionId, findLastSubQuestion(passage, snapshot));
+        updateDbCurrentQuestion(sessionId, displayEntirePassage(sessionId, passage, snapshot));
         return;
       }
     }
@@ -106,7 +105,7 @@ public class SessionEngine {
       throw AppException.conflict("Timer can only be started when question is in DISPLAYED state");
     }
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
     CurrentTarget target = resolveCurrentTarget(sessionId, snapshot);
     if (target == null) {
       throw AppException.conflict("No current question to start timer for");
@@ -142,20 +141,17 @@ public class SessionEngine {
     if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) return;
     if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.TIMED) return;
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
     CurrentTarget target = resolveCurrentTarget(sessionId, snapshot);
     if (target != null) {
       freezeAnswers(sessionId, target);
       switch (target) {
-        case CurrentTarget.Passage p -> {
-          eventPublisher.publishPassageFrozen(sessionId, p.passage().id(), p.questionIds());
-          gradingService.gradePassage(sessionId, p.passage().id());
-        }
-        case CurrentTarget.Question q -> {
-          eventPublisher.publishQuestionFrozen(sessionId, q.question().id());
-          gradingService.gradeQuestion(sessionId, q.question().id());
-        }
+        case CurrentTarget.Passage p ->
+            eventPublisher.publishPassageFrozen(sessionId, p.passage().id(), p.questionIds());
+        case CurrentTarget.Question q ->
+            eventPublisher.publishQuestionFrozen(sessionId, q.question().id());
       }
+      gradingService.grade(sessionId, snapshot, target.questionIds());
     }
 
     stateStore.setQuestionState(sessionId, QuestionLifecycleState.REVIEWING);
@@ -169,14 +165,14 @@ public class SessionEngine {
    */
   @Transactional
   public void doEndSession(Long sessionId) {
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
     doEndSession(sessionId, snapshot);
   }
 
   /**
    * Ends the session: cancels any pending timer, freezes and grades the in-progress question if
    * needed, persists ENDED status with the end timestamp, cleans up all Redis keys for the session,
-   * and broadcasts SESSION_END to participants once the transaction commits.
+   * and broadcasts SESSION_END once the transaction commits.
    */
   @Transactional
   public void doEndSession(Long sessionId, QuizSnapshot snapshot) {
@@ -204,19 +200,12 @@ public class SessionEngine {
           timedInRedis
               || answerRepository.countUngradedAnswers(sessionId, target.questionIds()) > 0;
       if (shouldGrade) {
-        switch (target) {
-          case CurrentTarget.Passage p -> gradingService.gradePassage(sessionId, p.passage().id());
-          case CurrentTarget.Question q ->
-              gradingService.gradeQuestion(sessionId, q.question().id());
-        }
+        gradingService.grade(sessionId, snapshot, target.questionIds());
       }
     }
 
-    // Both messages wait for this transaction to commit, since clients fetch results on receipt,
-    // but are built here: the Redis cleanup below deletes the final standings they carry.
     if (session.getStatus() != SessionStatus.LOBBY) {
       eventPublisher.publishSessionEnd(sessionId);
-      eventPublisher.publishSessionEndAnalytics(sessionId);
     }
 
     session.setStatus(SessionStatus.ENDED);
@@ -274,8 +263,14 @@ public class SessionEngine {
         .forEach(qid -> answerRepository.freezeAnswersForQuestion(sessionId, qid, frozenAt));
   }
 
-  private void displayEntirePassage(
+  /**
+   * Puts every sub-question of the passage on screen at once and returns the last of them, which is
+   * what the current-question pointer rests on while the block is displayed.
+   */
+  private QuizSnapshot.QuestionSnapshot displayEntirePassage(
       Long sessionId, QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
+    // A passage only becomes current because one of its sub-questions was next in the ordering,
+    // so the list is never empty here.
     List<QuizSnapshot.QuestionSnapshot> subQuestions = snapshot.subQuestionsOf(passage);
     QuizSnapshot.QuestionSnapshot lastSub = subQuestions.getLast();
     stateStore.setCurrentQuestion(sessionId, lastSub.id());
@@ -283,13 +278,7 @@ public class SessionEngine {
     stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED);
     subQuestions.forEach(q -> scoringStore.initQuestionCounts(sessionId, q));
     eventPublisher.publishPassageDisplayed(sessionId, passage, subQuestions, snapshot);
-  }
-
-  private QuizSnapshot.QuestionSnapshot findLastSubQuestion(
-      QuizSnapshot.PassageSnapshot passage, QuizSnapshot snapshot) {
-    // A passage only becomes current because one of its sub-questions was next in the ordering,
-    // so the list is never empty here.
-    return snapshot.subQuestionsOf(passage).getLast();
+    return lastSub;
   }
 
   private void updateDbCurrentQuestion(Long sessionId, QuizSnapshot.QuestionSnapshot question) {

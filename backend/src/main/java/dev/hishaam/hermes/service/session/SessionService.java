@@ -3,8 +3,6 @@ package dev.hishaam.hermes.service.session;
 import dev.hishaam.hermes.dto.session.*;
 import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
-import dev.hishaam.hermes.entity.enums.DisplayMode;
-import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
@@ -14,7 +12,8 @@ import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
-import dev.hishaam.hermes.service.*;
+import dev.hishaam.hermes.service.LeaderboardService;
+import dev.hishaam.hermes.service.OwnershipService;
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -46,9 +45,8 @@ public class SessionService {
   private final SessionStateRedisRepository stateStore;
   private final SessionScoringRedisRepository scoringStore;
   private final SessionEngine engine;
-  private final SessionEventPublisher eventPublisher;
   private final SessionTimerScheduler timerScheduler;
-  private final GradingService gradingService;
+  private final LeaderboardService leaderboardService;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -60,9 +58,8 @@ public class SessionService {
       SessionStateRedisRepository stateStore,
       SessionScoringRedisRepository scoringStore,
       SessionEngine engine,
-      SessionEventPublisher eventPublisher,
       SessionTimerScheduler timerScheduler,
-      GradingService gradingService) {
+      LeaderboardService leaderboardService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.participantAnswerRepository = participantAnswerRepository;
@@ -72,9 +69,8 @@ public class SessionService {
     this.stateStore = stateStore;
     this.scoringStore = scoringStore;
     this.engine = engine;
-    this.eventPublisher = eventPublisher;
     this.timerScheduler = timerScheduler;
-    this.gradingService = gradingService;
+    this.leaderboardService = leaderboardService;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -121,35 +117,14 @@ public class SessionService {
       throw AppException.conflict("Session is not in LOBBY state");
     }
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
-    QuizSnapshot.QuestionSnapshot first = snapshot.findNextQuestion(null);
-    if (first == null) {
-      throw AppException.badRequest("No questions in snapshot");
-    }
-
     session.setStatus(SessionStatus.ACTIVE);
     session.setStartedAt(OffsetDateTime.now());
-    session.setCurrentQuestionId(first.id());
     sessionRepository.save(session);
 
-    // Check if the first question belongs to an ENTIRE_PASSAGE passage
-    if (first.passageId() != null) {
-      QuizSnapshot.PassageSnapshot passage = snapshot.findPassage(first.passageId());
-      if (passage != null && passage.timerMode() == PassageTimerMode.ENTIRE_PASSAGE) {
-        // activateSession sets ACTIVE status; clear current_question so advanceSessionInternal
-        // treats it as "no current question" and finds the first question (min orderIndex).
-        stateStore.activateSession(sessionId, first.id());
-        stateStore.clearCurrentQuestion(sessionId);
-        engine.advanceSessionInternal(sessionId);
-        return;
-      }
-    }
-
-    stateStore.activateSession(sessionId, first.id());
-    scoringStore.initQuestionCounts(sessionId, first);
-    stateStore.setQuestionState(sessionId, QuestionLifecycleState.DISPLAYED);
-    eventPublisher.publishQuestionDisplayed(sessionId, first, snapshot);
-    // Timer is NOT started — host will call /start-timer
+    // Nothing is current yet, so the first advance puts the opening question (or passage block) on
+    // screen. The timer is not started — the host does that with /start-timer.
+    stateStore.activateSession(sessionId);
+    engine.advanceSessionInternal(sessionId);
   }
 
   // ─── Timer commands (host) ─────────────────────────────────────────────────────
@@ -207,7 +182,7 @@ public class SessionService {
 
     // Attempt best-effort cleanup of Redis keys
     try {
-      QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+      QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
       stateStore.cleanupSessionKeys(sessionId, null);
       scoringStore.cleanupScoringKeys(sessionId, snapshot);
     } catch (Exception e) {
@@ -238,56 +213,52 @@ public class SessionService {
 
   /**
    * Returns a complete snapshot of the live session for the host reconnect flow: current
-   * question/passage, per-question answer stats, the active leaderboard, and time left on the
-   * timer. Combines Redis state (fast path) with PostgreSQL counts when Redis is cold.
+   * question/passage, per-question answer stats, the standings, and time left on the timer. The
+   * live pointers come from Redis; the participant count falls back to PostgreSQL when Redis is
+   * cold.
    */
   public HostSessionSyncResponse getHostSyncState(Long sessionId, Long userId) {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
+    boolean active = session.getStatus() == SessionStatus.ACTIVE;
 
     SessionStateRedisRepository.RejoinContext ctx = stateStore.readRejoinContext(sessionId);
-    int participantCount = ctx.participantCount();
-    if (participantCount == 0) {
-      participantCount = (int) participantRepository.countBySessionId(sessionId);
-    }
-    final int totalParticipants = participantCount;
+    int participantCount =
+        ctx.participantCount() != 0
+            ? ctx.participantCount()
+            : (int) participantRepository.countBySessionId(sessionId);
 
-    HostSessionSyncResponse.CurrentQuestion currentQuestion = null;
+    HostSessionSyncResponse.Question currentQuestion = null;
     HostSessionSyncResponse.CurrentPassage currentPassage = null;
-    Map<Long, HostSessionSyncResponse.QuestionStats> questionStatsById = new LinkedHashMap<>();
+    List<QuizSnapshot.QuestionSnapshot> onScreen = List.of();
 
-    if (session.getStatus() == SessionStatus.ACTIVE && ctx.currentQuestionId() != null) {
-      if (ctx.currentPassageId() != null) {
-        QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(ctx.currentPassageId());
-        List<HostSessionSyncResponse.PassageQuestionInfo> subQuestions =
-            snapshot.subQuestionsOf(passage).stream()
-                .map(
-                    q -> {
-                      questionStatsById.put(
-                          q.id(),
-                          buildQuestionStats(
-                              sessionId, q, totalParticipants, ctx.questionLifecycle()));
-                      return buildPassageQuestionInfo(q, snapshot);
-                    })
-                .toList();
+    if (active && ctx.currentPassageId() != null) {
+      QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(ctx.currentPassageId());
+      onScreen = snapshot.subQuestionsOf(passage);
+      currentPassage =
+          new HostSessionSyncResponse.CurrentPassage(
+              passage.id(),
+              passage.text(),
+              passage.timerMode().name(),
+              snapshot.questionPosition(onScreen.getFirst().id()),
+              snapshot.questions().size(),
+              passage.timeLimitSeconds(),
+              onScreen.getFirst().effectiveDisplayMode().name(),
+              onScreen.stream().map(q -> toHostQuestion(q, snapshot)).toList());
+    } else if (active && ctx.currentQuestionId() != null) {
+      QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(ctx.currentQuestionId());
+      onScreen = List.of(question);
+      currentQuestion = toHostQuestion(question, snapshot);
+    }
 
-        currentPassage =
-            new HostSessionSyncResponse.CurrentPassage(
-                passage.id(),
-                passage.text(),
-                passage.timerMode().name(),
-                snapshot.questionPosition(subQuestions.getFirst().id()),
-                snapshot.questions().size(),
-                passage.timeLimitSeconds(),
-                subQuestions.getFirst().effectiveDisplayMode(),
-                subQuestions);
-      } else {
-        QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(ctx.currentQuestionId());
-        currentQuestion = buildCurrentQuestion(question, snapshot);
-        questionStatsById.put(
-            question.id(),
-            buildQuestionStats(sessionId, question, totalParticipants, ctx.questionLifecycle()));
-      }
+    Map<Long, QuestionStats> questionStatsById = new LinkedHashMap<>();
+    for (QuizSnapshot.QuestionSnapshot question : onScreen) {
+      questionStatsById.put(
+          question.id(),
+          QuestionStats.forHost(
+              question,
+              scoringStore.answerStats(sessionId, question.id(), participantCount),
+              ctx.questionLifecycle()));
     }
 
     return new HostSessionSyncResponse(
@@ -295,21 +266,12 @@ public class SessionService {
         session.getStatus().name(),
         ctx.questionLifecycle(),
         session.getJoinCode(),
-        totalParticipants,
+        participantCount,
         currentQuestion,
         currentPassage,
         questionStatsById,
-        session.getStatus() == SessionStatus.ACTIVE
-            ? scoringStore.buildLeaderboard(sessionId)
-            : List.of(),
+        active ? leaderboardService.standings(sessionId) : List.of(),
         ctx.timeLeftSeconds());
-  }
-
-  // ─── Answer correction ────────────────────────────────────────────────────────
-
-  public void correctScoring(
-      Long sessionId, Long questionId, ScoringCorrectionRequest request, Long userId) {
-    gradingService.correctScoring(sessionId, questionId, request, userId);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -328,9 +290,14 @@ public class SessionService {
     throw AppException.internalError("Failed to generate unique join code");
   }
 
-  private HostSessionSyncResponse.CurrentQuestion buildCurrentQuestion(
+  private HostSessionSyncResponse.Question toHostQuestion(
       QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    return new HostSessionSyncResponse.CurrentQuestion(
+    HostSessionSyncResponse.PassageInfo passageInfo = null;
+    if (question.passageId() != null) {
+      QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(question.passageId());
+      passageInfo = new HostSessionSyncResponse.PassageInfo(passage.id(), passage.text());
+    }
+    return new HostSessionSyncResponse.Question(
         question.id(),
         question.text(),
         question.questionType().name(),
@@ -338,65 +305,8 @@ public class SessionService {
         snapshot.questions().size(),
         question.timeLimitSeconds(),
         question.effectiveDisplayMode().name(),
-        buildPassageInfo(question, snapshot),
-        buildOptionInfos(question));
-  }
-
-  private HostSessionSyncResponse.PassageQuestionInfo buildPassageQuestionInfo(
-      QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    return new HostSessionSyncResponse.PassageQuestionInfo(
-        question.id(),
-        question.text(),
-        question.questionType().name(),
-        snapshot.questionPosition(question.id()),
-        snapshot.questions().size(),
-        question.timeLimitSeconds(),
-        question.effectiveDisplayMode().name(),
-        buildPassageInfo(question, snapshot),
-        buildOptionInfos(question));
-  }
-
-  private HostSessionSyncResponse.PassageInfo buildPassageInfo(
-      QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    if (question.passageId() == null) return null;
-    var passage = snapshot.requirePassage(question.passageId());
-    return new HostSessionSyncResponse.PassageInfo(passage.id(), passage.text());
-  }
-
-  private List<HostSessionSyncResponse.OptionInfo> buildOptionInfos(
-      QuizSnapshot.QuestionSnapshot question) {
-    return question.options().stream()
-        .map(o -> new HostSessionSyncResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
-        .toList();
-  }
-
-  private HostSessionSyncResponse.QuestionStats buildQuestionStats(
-      Long sessionId,
-      QuizSnapshot.QuestionSnapshot question,
-      int participantCount,
-      QuestionLifecycleState questionLifecycle) {
-    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
-    question.options().forEach(option -> optionPoints.put(option.id(), option.pointValue()));
-    List<Long> correctOptionIds =
-        question.options().stream()
-            .filter(option -> option.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .toList();
-    boolean reviewed = questionLifecycle == QuestionLifecycleState.REVIEWING;
-    boolean revealed =
-        reviewed
-            && (question.effectiveDisplayMode() == DisplayMode.BLIND
-                || question.effectiveDisplayMode() == DisplayMode.CODE_DISPLAY);
-
-    return new HostSessionSyncResponse.QuestionStats(
-        scoringStore.getQuestionCounts(sessionId, question.id()),
-        scoringStore.getTotalAnswered(sessionId, question.id()),
-        scoringStore.getTotalLockedIn(sessionId, question.id()),
-        participantCount,
-        correctOptionIds,
-        optionPoints,
-        revealed,
-        reviewed);
+        passageInfo,
+        OptionInfo.of(question));
   }
 
   private SessionResponse toResponse(QuizSession session) {

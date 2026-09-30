@@ -8,22 +8,19 @@ import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
-import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.time.OffsetDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Grading orchestration: computes scores via {@link ScoreCalculator}, persists them, updates the
- * leaderboard, and broadcasts results. Also handles host scoring corrections (re-grades).
+ * Grading orchestration: computes scores via {@link ScoreCalculator}, persists them, and broadcasts
+ * the results. Also handles host scoring corrections (re-grades).
  */
 @Service
 public class GradingService {
@@ -32,7 +29,6 @@ public class GradingService {
   private final OwnershipService ownershipService;
   private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
-  private final SessionScoringRedisRepository scoringStore;
   private final SessionEventPublisher eventPublisher;
   private final ScoreCalculator scoreCalculator;
 
@@ -41,95 +37,67 @@ public class GradingService {
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
-      SessionScoringRedisRepository scoringStore,
       SessionEventPublisher eventPublisher,
       ScoreCalculator scoreCalculator) {
     this.answerRepository = answerRepository;
     this.ownershipService = ownershipService;
     this.snapshotService = snapshotService;
     this.stateStore = stateStore;
-    this.scoringStore = scoringStore;
     this.eventPublisher = eventPublisher;
     this.scoreCalculator = scoreCalculator;
   }
 
-  /** Grade a single question (standalone or PER_SUB_QUESTION sub-question). */
+  /**
+   * Grades the frozen answers to the given questions — one standalone question, or every
+   * sub-question of an ENTIRE_PASSAGE block — then reveals each answer key and sends the standings
+   * once for the lot.
+   */
   @Transactional
-  public void gradeQuestion(Long sessionId, Long questionId) {
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(questionId);
-
+  public void grade(Long sessionId, QuizSnapshot snapshot, List<Long> questionIds) {
     Long timerStartedAt = stateStore.getTimerStartedAt(sessionId);
-    Map<Long, Integer> participantScores =
-        gradeAndSave(sessionId, questionId, question, timerStartedAt);
+    OffsetDateTime gradedAt = OffsetDateTime.now();
+    List<QuizSnapshot.QuestionSnapshot> questions =
+        questionIds.stream().map(snapshot::requireQuestion).toList();
 
-    // Update leaderboard
-    participantScores.forEach(
-        (participantId, score) -> scoringStore.incrementScore(sessionId, participantId, score));
-
-    eventPublisher.publishQuestionReviewed(sessionId, questionId, question);
-    eventPublisher.publishLeaderboardUpdates(sessionId);
-  }
-
-  /** Grade all sub-questions of an ENTIRE_PASSAGE passage together. */
-  @Transactional
-  public void gradePassage(Long sessionId, Long passageId) {
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(passageId);
-
-    Long timerStartedAt = stateStore.getTimerStartedAt(sessionId);
-
-    // Grade each sub-question; accumulate per-participant totals for one leaderboard update
-    Map<Long, Integer> totalScores = new HashMap<>();
-    for (Long subQuestionId : passage.subQuestionIds()) {
-      QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(subQuestionId);
-      Map<Long, Integer> scores = gradeAndSave(sessionId, subQuestionId, question, timerStartedAt);
-      scores.forEach(
-          (pid, s) ->
-              totalScores.merge(
-                  pid,
-                  s,
-                  (a, b) -> Integer.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
+    for (QuizSnapshot.QuestionSnapshot question : questions) {
+      List<ParticipantAnswer> answers =
+          answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, question.id());
+      for (ParticipantAnswer answer : answers) {
+        answer.setScore(scoreCalculator.computeScore(answer, question));
+        answer.setGradedAt(gradedAt);
+        if (answer.getAnsweredAt() != null && timerStartedAt != null) {
+          answer.setAnswerTimeMs(
+              scoreCalculator.computeAnswerTimeMs(
+                  answer.getAnsweredAt(), timerStartedAt, question.timeLimitSeconds()));
+        }
+      }
+      answerRepository.saveAll(answers);
     }
 
-    // Single leaderboard update for the whole passage
-    totalScores.forEach(
-        (participantId, score) -> scoringStore.incrementScore(sessionId, participantId, score));
-
-    // Broadcast QUESTION_REVIEWED for each sub-question
-    for (Long subQuestionId : passage.subQuestionIds()) {
-      eventPublisher.publishQuestionReviewed(
-          sessionId, subQuestionId, snapshot.requireQuestion(subQuestionId));
-    }
-    eventPublisher.publishLeaderboardUpdates(sessionId);
+    questions.forEach(question -> eventPublisher.publishQuestionReviewed(sessionId, question));
+    eventPublisher.publishLeaderboard(sessionId);
   }
 
   /**
    * Host corrects the answer key for a question: validates ownership and lifecycle, rewrites the
-   * snapshot's point values, then re-grades.
+   * snapshot's point values, re-scores the frozen answers against them, and broadcasts the
+   * corrected key and standings.
    */
   @Transactional
   public void correctScoring(
       Long sessionId, Long questionId, ScoringCorrectionRequest request, Long userId) {
     QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
 
-    if (session.getStatus() == SessionStatus.ACTIVE) {
-      if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.REVIEWING) {
-        throw AppException.conflict(
-            "Scoring can only be corrected while reviewing or after session ends");
-      }
-    } else if (session.getStatus() != SessionStatus.ENDED) {
+    boolean reviewing =
+        session.getStatus() == SessionStatus.ACTIVE
+            && stateStore.getQuestionState(sessionId) == QuestionLifecycleState.REVIEWING;
+    if (!reviewing && session.getStatus() != SessionStatus.ENDED) {
       throw AppException.conflict(
           "Scoring can only be corrected while reviewing or after session ends");
     }
 
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    if (snapshot.findQuestion(questionId) == null) {
-      throw AppException.notFound("Question not found in session snapshot");
-    }
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
+    snapshot.requireQuestion(questionId);
 
     Map<Long, Integer> newPointValues =
         request.options().stream()
@@ -138,23 +106,11 @@ public class GradingService {
                     ScoringCorrectionRequest.OptionScoring::optionId,
                     ScoringCorrectionRequest.OptionScoring::pointValue));
 
-    QuizSnapshot updated =
+    QuizSnapshot corrected =
         snapshot.withCorrectedScoring(questionId, newPointValues, OffsetDateTime.now());
-    snapshotService.updateSnapshot(sid, sessionId, updated);
+    snapshotService.updateSnapshot(sessionId, corrected);
+    QuizSnapshot.QuestionSnapshot question = corrected.requireQuestion(questionId);
 
-    regradeQuestion(sessionId, questionId);
-  }
-
-  /**
-   * Re-grade a question after the host corrects answer keys. Recomputes scores from the updated
-   * snapshot, does a full leaderboard recompute from DB, and broadcasts corrected results.
-   */
-  private void regradeQuestion(Long sessionId, Long questionId) {
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(questionId);
-
-    // Re-grade frozen answers for this question using updated point values
     List<ParticipantAnswer> answers =
         answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, questionId);
     OffsetDateTime regradedAt = OffsetDateTime.now();
@@ -164,50 +120,7 @@ public class GradingService {
     }
     answerRepository.saveAll(answers);
 
-    // Full leaderboard recompute from DB
-    List<ParticipantAnswer> allGraded = answerRepository.findGradedBySessionId(sessionId);
-    Map<Long, Long> participantTotals = scoreCalculator.sumScoresByParticipant(allGraded);
-
-    // Update Redis ZSet (best-effort — no-op if Redis state was already cleaned up)
-    participantTotals.forEach((pid, total) -> scoringStore.setScore(sessionId, pid, total));
-
-    eventPublisher.publishScoringCorrected(sessionId, questionId, question);
-    eventPublisher.publishLeaderboardFromDb(sessionId, participantTotals);
-  }
-
-  /**
-   * Computes and persists scores for all frozen answers to the given question. Returns a map of
-   * participantId → questionScore for leaderboard updates.
-   */
-  private Map<Long, Integer> gradeAndSave(
-      Long sessionId,
-      Long questionId,
-      QuizSnapshot.QuestionSnapshot question,
-      Long timerStartedAt) {
-    List<ParticipantAnswer> answers =
-        answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, questionId);
-
-    Map<Long, Integer> participantScores = new HashMap<>();
-    OffsetDateTime gradedAt = OffsetDateTime.now();
-
-    for (ParticipantAnswer answer : answers) {
-      int score = scoreCalculator.computeScore(answer, question);
-      answer.setScore(score);
-      answer.setGradedAt(gradedAt);
-
-      if (answer.getAnsweredAt() != null && timerStartedAt != null) {
-        long answerTimeMs =
-            scoreCalculator.computeAnswerTimeMs(
-                answer.getAnsweredAt(), timerStartedAt, question.timeLimitSeconds());
-        scoringStore.incrementCumulativeTime(sessionId, answer.getParticipantId(), answerTimeMs);
-      }
-
-      if (score > 0) {
-        participantScores.put(answer.getParticipantId(), score);
-      }
-    }
-
-    answerRepository.saveAll(answers);
-    return participantScores;
+    eventPublisher.publishScoringCorrected(sessionId, question);
+    eventPublisher.publishLeaderboard(sessionId);
   }
 }

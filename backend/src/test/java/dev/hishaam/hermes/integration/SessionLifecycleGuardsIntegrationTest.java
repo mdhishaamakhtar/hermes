@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.service.session.SessionEngine;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for lifecycle guardrails on sessions.

@@ -2,11 +2,11 @@ package dev.hishaam.hermes.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for surviving the loss of live session state.
@@ -56,8 +56,8 @@ class RedisEvictionRecoveryIntegrationTest extends BaseIntegrationTest {
 
   /**
    * Verifies that a host reconnecting after eviction gets a coherent, degraded view — the session
-   * is still reported as running with its real participant count, but with no live question or
-   * leaderboard to show, instead of a 500.
+   * is still reported as running with its real participant count and standings, but with no live
+   * question to show, instead of a 500.
    */
   @Test
   void hostSyncDegradesToADatabaseBackedViewWhenLiveStateIsGone() throws Exception {
@@ -90,7 +90,10 @@ class RedisEvictionRecoveryIntegrationTest extends BaseIntegrationTest {
         .isTrue();
     assertThat(sync.path("currentPassage").isNull()).isTrue();
     assertThat(sync.path("questionStatsById")).isEmpty();
-    assertThat(sync.path("leaderboard")).isEmpty();
+    assertThat(sync.path("leaderboard"))
+        .as("standings are read from PostgreSQL, so they outlive the eviction")
+        .hasSize(1);
+    assertThat(sync.path("leaderboard").get(0).path("displayName").asText()).isEqualTo("Ada");
     assertThat(sync.path("timeLeftSeconds").isNull()).isTrue();
   }
 

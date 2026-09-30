@@ -2,7 +2,6 @@ package dev.hishaam.hermes.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.sql.Connection;
@@ -24,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.messaging.simp.stomp.StompSession;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for when SESSION_END reaches clients relative to the end-of-session commit.
@@ -99,8 +99,7 @@ class SessionEndBroadcastIntegrationTest extends BaseIntegrationTest {
         awaitBlockedBy(sessionRowLock);
 
         // Parked at commit: Redis has already been cleared, and results are still refused.
-        assertThat(redisTemplate.hasKey(SessionRedisKeys.leaderboardKey(String.valueOf(sessionId))))
-            .isFalse();
+        assertThat(redisTemplate.hasKey(SessionRedisKeys.statusKey(sessionId))).isFalse();
         getJson("/api/sessions/" + sessionId + "/results", organiser, 409);
 
         // Give a premature SESSION_END ample time to cross the broker relay.

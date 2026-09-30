@@ -5,19 +5,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.hishaam.hermes.dto.ApiResponse;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.exception.GlobalExceptionHandler;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
 
 /**
  * Unit tests for {@link GlobalExceptionHandler}.
  *
  * <p>This class verifies the HTTP status and error-code contract for every exception type the
- * handler translates: domain exceptions ({@link AppException}), bean-validation failures, and
- * unhandled exceptions. No database, Redis, or Spring MVC context is involved.
+ * handler translates: domain exceptions ({@link AppException}), bean-validation failures, requests
+ * the framework refuses, and unhandled exceptions. No database, Redis, or Spring MVC context is
+ * involved.
  */
 class GlobalExceptionHandlerTest {
 
@@ -89,19 +96,49 @@ class GlobalExceptionHandlerTest {
    * and aggregated field-error messages.
    */
   @Test
-  void validationFailureReturns400WithAggregatedMessages() {
+  void validationFailureReturns400WithAggregatedMessages() throws Exception {
     BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "target");
     bindingResult.addError(new FieldError("target", "title", "Title is required"));
     bindingResult.addError(new FieldError("target", "email", "Email must be valid"));
     MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
 
-    ResponseEntity<ApiResponse<Void>> response = handler.handleValidation(ex);
+    ResponseEntity<Object> response = handler.handleException(ex, webRequest());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(requireBody(response).error().code()).isEqualTo("VALIDATION_ERROR");
-    assertThat(requireBody(response).error().message())
+    assertThat(response.getBody()).isInstanceOf(ApiResponse.class);
+    ApiResponse<?> body = (ApiResponse<?>) response.getBody();
+    assertThat(body.success()).isFalse();
+    assertThat(body.error().code()).isEqualTo("VALIDATION_ERROR");
+    assertThat(body.error().message())
         .contains("Title is required")
         .contains("Email must be valid");
+  }
+
+  /**
+   * Verifies that a request Spring MVC refuses by itself keeps its client-error status and arrives
+   * in the API's envelope, instead of falling through to the catch-all 500.
+   */
+  @Test
+  void requestsRefusedByTheFrameworkKeepTheirClientErrorStatus() throws Exception {
+    ResponseEntity<Object> response =
+        handler.handleException(
+            new HttpRequestMethodNotSupportedException("GET", List.of("POST")), webRequest());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(response.getBody()).isInstanceOf(ApiResponse.class);
+    ApiResponse<?> body = (ApiResponse<?>) response.getBody();
+    assertThat(body.success()).isFalse();
+    assertThat(body.error().code()).isEqualTo("METHOD_NOT_ALLOWED");
+  }
+
+  /** Verifies that a write losing a unique-key race is reported as a conflict, not a fault. */
+  @Test
+  void uniqueKeyRacesReturn409() {
+    ResponseEntity<ApiResponse<Void>> response =
+        handler.handleDataIntegrity(new DataIntegrityViolationException("duplicate key"));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(requireBody(response).error().code()).isEqualTo("CONFLICT");
   }
 
   /**
@@ -116,6 +153,10 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     assertThat(requireBody(response).error().code()).isEqualTo("INTERNAL_ERROR");
     assertThat(requireBody(response).error().message()).isEqualTo("An unexpected error occurred");
+  }
+
+  private static WebRequest webRequest() {
+    return new ServletWebRequest(new MockHttpServletRequest());
   }
 
   private static void assertResponseError(

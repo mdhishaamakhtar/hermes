@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -14,11 +13,10 @@ import static org.mockito.Mockito.when;
 
 import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import dev.hishaam.hermes.dto.ws.WsPayloads;
-import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
+import dev.hishaam.hermes.service.LeaderboardService;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
-import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import dev.hishaam.hermes.util.WsTopics;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,8 +38,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Unit tests for {@link SessionEventPublisher}'s delivery guards.
  *
  * <p>The publisher starts with the broker marked unavailable and only opens up once Spring reports
- * the relay online, so every integration test runs exclusively on the happy path. What is untested
- * there is precisely what matters when things go wrong: a relay that drops out mid-session must
+ * the broker online, so every integration test runs exclusively on the happy path. What is untested
+ * there is precisely what matters when things go wrong: a broker that drops out mid-session must
  * degrade quietly rather than fail the host's request, and per-user acknowledgements must be
  * skipped for clients that supplied nothing to correlate them with. Session-end messages also wait
  * for the caller's transaction, so they are tested against its commit and rollback.
@@ -53,10 +51,9 @@ class SessionEventPublisherTest {
   private static final Long QUESTION_ID = 2L;
 
   @Mock private SimpMessagingTemplate messaging;
-  @Mock private SessionSnapshotService snapshotService;
   @Mock private SessionStateRedisRepository stateStore;
   @Mock private SessionScoringRedisRepository scoringStore;
-  @Mock private ParticipantRepository participantRepository;
+  @Mock private LeaderboardService leaderboardService;
 
   @InjectMocks private SessionEventPublisher publisher;
 
@@ -88,7 +85,7 @@ class SessionEventPublisherTest {
     verifyNoInteractions(messaging);
   }
 
-  /** Once the relay drops out mid-session, broadcasts are dropped instead of thrown. */
+  /** Once the broker drops out mid-session, broadcasts are dropped instead of thrown. */
   @Test
   void broadcastsAreDroppedQuietlyAfterTheBrokerGoesOffline() {
     publisher.publishParticipantJoined(SESSION_ID, 1);
@@ -99,7 +96,7 @@ class SessionEventPublisherTest {
     publisher.publishAnswerRejected("ws:1", "req-1", QUESTION_ID, "CONFLICT", "nope", false);
 
     // Only the first, pre-offline broadcast reached the template.
-    verify(messaging, times(2)).convertAndSend(anyString(), (Object) any());
+    verify(messaging, times(1)).convertAndSend(anyString(), (Object) any());
   }
 
   /** A broker that rejects a message must not surface as a failed host request. */
@@ -116,26 +113,9 @@ class SessionEventPublisherTest {
     publisher.publishAnswerAccepted("ws:1", "req-1", QUESTION_ID, false);
   }
 
-  /**
-   * Acknowledgements are addressed to a specific STOMP user and correlated by a client-supplied id;
-   * without either there is nobody to notify, so the send is skipped rather than broadcast.
-   */
+  /** Both acknowledgement kinds go to the named user's private queue, never to a topic. */
   @Test
-  void acknowledgementsAreSkippedWithoutAUserAndACorrelationId() {
-    publisher.publishAnswerAccepted(null, "req-1", QUESTION_ID, false);
-    publisher.publishAnswerAccepted("ws:1", null, QUESTION_ID, false);
-    publisher.publishAnswerAccepted("ws:1", "   ", QUESTION_ID, false);
-
-    publisher.publishAnswerRejected(null, "req-1", QUESTION_ID, "CONFLICT", "nope", true);
-    publisher.publishAnswerRejected("ws:1", null, QUESTION_ID, "CONFLICT", "nope", true);
-    publisher.publishAnswerRejected("ws:1", "", QUESTION_ID, "CONFLICT", "nope", true);
-
-    verify(messaging, never()).convertAndSendToUser(anyString(), anyString(), any());
-  }
-
-  /** With a user and a correlation id present, both acknowledgement kinds reach that user. */
-  @Test
-  void acknowledgementsReachTheNamedUserWhenFullyAddressed() {
+  void acknowledgementsReachTheNamedUser() {
     publisher.publishAnswerAccepted("ws:1", "req-1", QUESTION_ID, false);
     publisher.publishAnswerRejected("ws:1", "req-2", QUESTION_ID, "CONFLICT", "nope", true);
 
@@ -160,22 +140,17 @@ class SessionEventPublisherTest {
 
   /**
    * Clients fetch results the moment SESSION_END lands, so nothing goes out until the session's
-   * ENDED status has committed. The standings are still the ones Redis held at publish time, since
-   * the engine deletes them before its transaction commits.
+   * ENDED status has committed. The organiser's copy carries the final standings.
    */
   @Test
-  void sessionEndWaitsForTheCommitButCarriesTheStandingsReadBeforeIt() {
+  void sessionEndWaitsForTheCommitAndCarriesTheFinalStandings() {
     List<SessionResultsResponse.LeaderboardEntry> standings =
         List.of(new SessionResultsResponse.LeaderboardEntry(1, 7L, "Lin", 10));
-    when(scoringStore.buildLeaderboard(SESSION_ID)).thenReturn(standings);
-    when(stateStore.getParticipantCount(SESSION_ID)).thenReturn(1L);
+    when(leaderboardService.standings(SESSION_ID)).thenReturn(standings);
 
     transaction.executeWithoutResult(
         status -> {
           publisher.publishSessionEnd(SESSION_ID);
-          publisher.publishSessionEndAnalytics(SESSION_ID);
-          // The engine clears the session's Redis keys next, still inside its transaction.
-          reset(scoringStore, stateStore);
           verifyNoInteractions(messaging);
         });
 
@@ -196,7 +171,6 @@ class SessionEventPublisherTest {
     transaction.executeWithoutResult(
         status -> {
           publisher.publishSessionEnd(SESSION_ID);
-          publisher.publishSessionEndAnalytics(SESSION_ID);
           status.setRollbackOnly();
         });
 
@@ -207,7 +181,6 @@ class SessionEventPublisherTest {
   @Test
   void sessionEndIsSentAtOnceOutsideATransaction() {
     publisher.publishSessionEnd(SESSION_ID);
-    publisher.publishSessionEndAnalytics(SESSION_ID);
 
     verify(messaging, times(2)).convertAndSend(anyString(), (Object) any());
   }

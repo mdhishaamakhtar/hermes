@@ -3,10 +3,10 @@ package dev.hishaam.hermes.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for authentication and CRUD endpoints.

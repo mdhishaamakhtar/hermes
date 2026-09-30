@@ -29,63 +29,60 @@ public class AnswerWebSocketHandler {
   @MessageMapping("/session/{sessionId}/answer")
   public void submitAnswer(
       @DestinationVariable Long sessionId, @Payload AnswerRequest request, Principal principal) {
-    try {
-      answerService.submitAnswer(sessionId, request);
-      sendAccepted(principal, request.clientRequestId(), request.questionId(), false);
-    } catch (AppException e) {
-      sendRejected(principal, request.clientRequestId(), request.questionId(), e, false);
-      log.warn("Answer submission failed for session {}: {}", sessionId, e.getMessage());
-    } catch (Exception e) {
-      sendRejected(
-          principal,
-          request.clientRequestId(),
-          request.questionId(),
-          AppException.internalError("Failed to save answer"),
-          false);
-      log.warn("Answer submission failed for session {}: {}", sessionId, e.getMessage());
-    }
+    acknowledge(
+        principal,
+        request.clientRequestId(),
+        request.questionId(),
+        false,
+        "Failed to save answer",
+        () -> answerService.submitAnswer(sessionId, request));
   }
 
   @MessageMapping("/session/{sessionId}/lock-in")
   public void lockIn(
       @DestinationVariable Long sessionId, @Payload LockInRequest request, Principal principal) {
-    try {
-      answerService.lockInAnswer(sessionId, request);
-      sendAccepted(principal, request.clientRequestId(), request.questionId(), true);
-    } catch (AppException e) {
-      sendRejected(principal, request.clientRequestId(), request.questionId(), e, true);
-      log.warn("Lock-in failed for session {}: {}", sessionId, e.getMessage());
-    } catch (Exception e) {
-      sendRejected(
-          principal,
-          request.clientRequestId(),
-          request.questionId(),
-          AppException.internalError("Failed to lock in answer"),
-          true);
-      log.warn("Lock-in failed for session {}: {}", sessionId, e.getMessage());
-    }
+    acknowledge(
+        principal,
+        request.clientRequestId(),
+        request.questionId(),
+        true,
+        "Failed to lock in answer",
+        () -> answerService.lockInAnswer(sessionId, request));
   }
 
-  private void sendAccepted(
-      Principal principal, String clientRequestId, Long questionId, boolean lockedIn) {
-    if (principal == null || clientRequestId == null || clientRequestId.isBlank()) return;
-    eventPublisher.publishAnswerAccepted(
-        principal.getName(), clientRequestId, questionId, lockedIn);
-  }
-
-  private void sendRejected(
+  /**
+   * Runs the action and tells the sender how it went on their private queue. There is nobody to
+   * tell when the frame carries no correlation id or the connection has no principal, so those are
+   * processed without an acknowledgement.
+   */
+  private void acknowledge(
       Principal principal,
       String clientRequestId,
       Long questionId,
-      AppException exception,
-      boolean lockedIn) {
-    if (principal == null || clientRequestId == null || clientRequestId.isBlank()) return;
-    eventPublisher.publishAnswerRejected(
-        principal.getName(),
-        clientRequestId,
-        questionId,
-        exception.getCode(),
-        exception.getMessage(),
-        lockedIn);
+      boolean lockedIn,
+      String failureMessage,
+      Runnable action) {
+    boolean addressable =
+        principal != null && clientRequestId != null && !clientRequestId.isBlank();
+    try {
+      action.run();
+      if (addressable) {
+        eventPublisher.publishAnswerAccepted(
+            principal.getName(), clientRequestId, questionId, lockedIn);
+      }
+    } catch (Exception e) {
+      log.warn("{} for question {}: {}", failureMessage, questionId, e.getMessage());
+      AppException rejection =
+          e instanceof AppException known ? known : AppException.internalError(failureMessage);
+      if (addressable) {
+        eventPublisher.publishAnswerRejected(
+            principal.getName(),
+            clientRequestId,
+            questionId,
+            rejection.getCode(),
+            rejection.getMessage(),
+            lockedIn);
+      }
+    }
   }
 }

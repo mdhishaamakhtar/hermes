@@ -1,0 +1,14 @@
+# Development defaults for running the backend straight from source against the Postgres and Redis
+# that `docker-compose up postgres redis` provides:
+#
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+#
+# Never enable this profile on a deployment — the signing key below is public.
+jwt:
+  secret: local-development-signing-key-not-for-deployment-0123456789
+
+spring:
+  quartz:
+    jdbc:
+      # Creates the QRTZ_ tables on first run; without them starting or ending a session fails.
+      initialize-schema: always

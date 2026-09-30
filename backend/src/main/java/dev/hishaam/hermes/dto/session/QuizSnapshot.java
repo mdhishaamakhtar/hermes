@@ -1,11 +1,13 @@
 package dev.hishaam.hermes.dto.session;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.exception.AppException;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,7 +23,21 @@ public record QuizSnapshot(
       Long passageId,
       DisplayMode effectiveDisplayMode,
       List<OptionSnapshot> options,
-      OffsetDateTime correctedAt) {}
+      OffsetDateTime correctedAt) {
+
+    /** The answer key: every option that scores. */
+    @JsonIgnore
+    public List<Long> correctOptionIds() {
+      return options.stream().filter(o -> o.pointValue() > 0).map(OptionSnapshot::id).toList();
+    }
+
+    @JsonIgnore
+    public Map<Long, Integer> optionPoints() {
+      Map<Long, Integer> points = new LinkedHashMap<>();
+      options.forEach(o -> points.put(o.id(), o.pointValue()));
+      return points;
+    }
+  }
 
   public record OptionSnapshot(Long id, String text, int pointValue, int orderIndex) {}
 

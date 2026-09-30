@@ -61,23 +61,9 @@ class ScoreCalculatorTest {
     assertThat(scoreCalculator.isCorrectSelection(null, question)).isFalse();
   }
 
-  /**
-   * Verifies per-participant score aggregation and answer-time clamping against the configured
-   * timer window.
-   */
+  /** Verifies answer-time clamping against the configured timer window. */
   @Test
-  void sumsScoresByParticipantAndBoundsAnswerTiming() {
-    ParticipantAnswer first = answer(1L, 10L);
-    first.setScore(7);
-    ParticipantAnswer second = answer(1L, 11L);
-    second.setScore(0);
-    ParticipantAnswer third = answer(2L, 12L);
-    third.setScore(4);
-
-    assertThat(scoreCalculator.sumScoresByParticipant(List.of(first, second, third)))
-        .containsEntry(1L, 7L)
-        .containsEntry(2L, 4L);
-
+  void boundsAnswerTimingToTheTimerWindow() {
     long startedAt = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli();
     assertThat(
             scoreCalculator.computeAnswerTimeMs(

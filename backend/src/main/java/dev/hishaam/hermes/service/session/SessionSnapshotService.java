@@ -1,7 +1,5 @@
 package dev.hishaam.hermes.service.session;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.Passage;
 import dev.hishaam.hermes.entity.Question;
@@ -13,6 +11,8 @@ import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Builds, serializes, and persists the immutable quiz snapshot a session runs against. The snapshot
@@ -21,15 +21,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class SessionSnapshotService {
 
-  private final ObjectMapper objectMapper;
+  private final JsonMapper jsonMapper;
   private final QuizSessionRepository sessionRepository;
   private final SessionStateRedisRepository stateStore;
 
   public SessionSnapshotService(
-      ObjectMapper objectMapper,
+      JsonMapper jsonMapper,
       QuizSessionRepository sessionRepository,
       SessionStateRedisRepository stateStore) {
-    this.objectMapper = objectMapper;
+    this.jsonMapper = jsonMapper;
     this.sessionRepository = sessionRepository;
     this.stateStore = stateStore;
   }
@@ -66,24 +66,24 @@ public class SessionSnapshotService {
 
   public String serialize(QuizSnapshot snapshot) {
     try {
-      return objectMapper.writeValueAsString(snapshot);
-    } catch (JsonProcessingException e) {
+      return jsonMapper.writeValueAsString(snapshot);
+    } catch (JacksonException e) {
       throw AppException.internalError("Failed to serialize snapshot");
     }
   }
 
   public QuizSnapshot deserialize(String json) {
     try {
-      return objectMapper.readValue(json, QuizSnapshot.class);
-    } catch (Exception e) {
+      return jsonMapper.readValue(json, QuizSnapshot.class);
+    } catch (JacksonException e) {
       throw AppException.internalError("Failed to deserialize snapshot");
     }
   }
 
   /** Persists the updated snapshot to both Redis and PostgreSQL. */
-  public void updateSnapshot(String sid, Long sessionId, QuizSnapshot updated) {
+  public void updateSnapshot(Long sessionId, QuizSnapshot updated) {
     String json = serialize(updated);
-    stateStore.setSnapshotJson(sid, json);
+    stateStore.setSnapshotJson(sessionId, json);
     sessionRepository
         .findById(sessionId)
         .ifPresent(
@@ -98,15 +98,15 @@ public class SessionSnapshotService {
    * snapshot} column in PostgreSQL. Re-populates Redis on a cache miss so subsequent loads are
    * served from memory.
    */
-  public QuizSnapshot loadSnapshot(String sid) {
-    String json = stateStore.getSnapshotJson(sid);
+  public QuizSnapshot loadSnapshot(Long sessionId) {
+    String json = stateStore.getSnapshotJson(sessionId);
     if (json == null || json.isEmpty()) {
       QuizSession session =
           sessionRepository
-              .findById(Long.parseLong(sid))
+              .findById(sessionId)
               .orElseThrow(() -> AppException.notFound("Session not found"));
       json = session.getSnapshot();
-      stateStore.setSnapshotJson(sid, json);
+      stateStore.setSnapshotJson(sessionId, json);
     }
     return deserialize(json);
   }

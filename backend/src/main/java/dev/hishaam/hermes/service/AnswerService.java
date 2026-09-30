@@ -1,7 +1,6 @@
 package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.session.AnswerRequest;
-import dev.hishaam.hermes.dto.session.AnswerStats;
 import dev.hishaam.hermes.dto.session.LockInRequest;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
@@ -16,7 +15,6 @@ import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles participant answer submission and lock-in during a live session. Validates that the
  * session is in the TIMED lifecycle state, enforces question ownership (passage vs standalone),
- * persists answers to PostgreSQL, updates per-question option counts in Redis, and broadcasts live
- * answer statistics to the organizer dashboard.
+ * persists answers to PostgreSQL, updates the live per-question tallies in Redis, and broadcasts
+ * them.
  */
 @Service
 public class AnswerService {
@@ -55,7 +53,7 @@ public class AnswerService {
   /**
    * Records or replaces a participant's answer for the active question. An empty {@code
    * selectedOptionIds} clears any existing selection. Idempotent — re-submitting the same options
-   * is a no-op in terms of Redis counts.
+   * leaves the live tallies unchanged.
    */
   @Transactional
   public void submitAnswer(Long sessionId, AnswerRequest request) {
@@ -68,7 +66,7 @@ public class AnswerService {
 
     ParticipantAnswer answer =
         answerRepository
-            .findByParticipantIdAndQuestionId(participantId, request.questionId())
+            .findForUpdate(participantId, request.questionId())
             .orElseGet(
                 () ->
                     ParticipantAnswer.builder()
@@ -79,14 +77,14 @@ public class AnswerService {
 
     ensureAnswerMutable(answer);
 
-    Set<Long> previousSelectionIds = previousSelectionIds(sessionId, participantId, answer);
+    Set<Long> previousSelectionIds = answer.getSelectedOptionIds();
     answer.setSelectedOptionIds(selectedOptionIds);
     answer.setAnsweredAt(selectedOptionIds.isEmpty() ? null : OffsetDateTime.now());
     answerRepository.save(answer);
 
-    scoringStore.replaceParticipantSelections(
+    scoringStore.moveSelection(
         sessionId, request.questionId(), participantId, previousSelectionIds, selectedOptionIds);
-    broadcastAnswerState(sessionId, request.questionId());
+    broadcastAnswerState(sessionId, question);
   }
 
   /**
@@ -97,11 +95,12 @@ public class AnswerService {
   public void lockInAnswer(Long sessionId, LockInRequest request) {
     Long participantId = participantService.resolveParticipantId(request.rejoinToken(), sessionId);
 
-    requireMutableCurrentQuestion(sessionId, request.questionId());
+    QuizSnapshot.QuestionSnapshot question =
+        requireMutableCurrentQuestion(sessionId, request.questionId());
 
     ParticipantAnswer answer =
         answerRepository
-            .findByParticipantIdAndQuestionId(participantId, request.questionId())
+            .findForUpdate(participantId, request.questionId())
             .orElseThrow(() -> AppException.conflict("Cannot lock in before submitting an answer"));
 
     ensureAnswerMutable(answer);
@@ -115,7 +114,7 @@ public class AnswerService {
     answerRepository.save(answer);
 
     scoringStore.markLockedIn(sessionId, request.questionId(), participantId);
-    broadcastAnswerState(sessionId, request.questionId());
+    broadcastAnswerState(sessionId, question);
   }
 
   private QuizSnapshot.QuestionSnapshot requireMutableCurrentQuestion(
@@ -128,7 +127,7 @@ public class AnswerService {
       throw AppException.conflict("Question is not currently accepting answers");
     }
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
 
     // For ENTIRE_PASSAGE mode: accept answers for any sub-question in the current passage
     Long currentPassageId = stateStore.getCurrentPassageId(sessionId);
@@ -162,11 +161,7 @@ public class AnswerService {
 
   private void validateSelections(
       QuizSnapshot.QuestionSnapshot question, Set<Long> selectedOptionIds) {
-    Set<Long> validOptionIds =
-        question.options().stream()
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .collect(LinkedHashSet::new, Set::add, Set::addAll);
-    if (!validOptionIds.containsAll(selectedOptionIds)) {
+    if (!question.optionPoints().keySet().containsAll(selectedOptionIds)) {
       throw AppException.badRequest(
           "Selection contains an option that does not belong to the question");
     }
@@ -182,26 +177,11 @@ public class AnswerService {
     }
   }
 
-  private Set<Long> previousSelectionIds(
-      Long sessionId, Long participantId, ParticipantAnswer answer) {
-    Set<Long> previousSelectionIds =
-        scoringStore.getParticipantSelectionIds(sessionId, answer.getQuestionId(), participantId);
-    if (!previousSelectionIds.isEmpty()) {
-      return previousSelectionIds;
-    }
-
-    return new LinkedHashSet<>(answer.getSelectedOptionIds());
-  }
-
-  private void broadcastAnswerState(Long sessionId, Long questionId) {
-    Map<Long, Long> counts = scoringStore.getQuestionCounts(sessionId, questionId);
-    long totalAnswered = scoringStore.getTotalAnswered(sessionId, questionId);
-    long totalParticipants = stateStore.getParticipantCount(sessionId);
-    long totalLockedIn = scoringStore.getTotalLockedIn(sessionId, questionId);
-
+  private void broadcastAnswerState(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
     eventPublisher.publishAnswerUpdate(
         sessionId,
-        questionId,
-        new AnswerStats(counts, totalAnswered, totalParticipants, totalLockedIn));
+        question,
+        scoringStore.answerStats(
+            sessionId, question.id(), stateStore.getParticipantCount(sessionId)));
   }
 }

@@ -2,14 +2,14 @@ package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.session.JoinResponse;
 import dev.hishaam.hermes.dto.session.JoinSessionRequest;
+import dev.hishaam.hermes.dto.session.OptionInfo;
+import dev.hishaam.hermes.dto.session.QuestionStats;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.dto.session.RejoinRequest;
 import dev.hishaam.hermes.dto.session.RejoinResponse;
-import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
-import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
@@ -31,9 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Manages anonymous participant join and rejoin flows. Join creates a new {@link
- * dev.hishaam.hermes.entity.Participant} row, issues a 32-character rejoin token, and initialises
- * the participant's leaderboard entry in Redis. Rejoin reconstructs the full live-session view from
- * Redis state and the quiz snapshot so a reconnecting client can resume without missing events.
+ * dev.hishaam.hermes.entity.Participant} row and issues a 32-character rejoin token. Rejoin
+ * reconstructs the live-session view from Redis state and the quiz snapshot so a reconnecting
+ * client can resume without missing events — and without learning anything it has not been told
+ * yet.
  */
 @Service
 public class ParticipantService {
@@ -50,6 +51,7 @@ public class ParticipantService {
   private final SessionScoringRedisRepository scoringStore;
   private final SessionEventPublisher eventPublisher;
   private final ParticipantRejoinTokenRedisRepository rejoinTokenStore;
+  private final LeaderboardService leaderboardService;
 
   public ParticipantService(
       QuizSessionRepository sessionRepository,
@@ -59,7 +61,8 @@ public class ParticipantService {
       SessionStateRedisRepository stateStore,
       SessionScoringRedisRepository scoringStore,
       SessionEventPublisher eventPublisher,
-      ParticipantRejoinTokenRedisRepository rejoinTokenStore) {
+      ParticipantRejoinTokenRedisRepository rejoinTokenStore,
+      LeaderboardService leaderboardService) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
@@ -68,6 +71,7 @@ public class ParticipantService {
     this.scoringStore = scoringStore;
     this.eventPublisher = eventPublisher;
     this.rejoinTokenStore = rejoinTokenStore;
+    this.leaderboardService = leaderboardService;
   }
 
   @Transactional
@@ -104,12 +108,8 @@ public class ParticipantService {
 
     rejoinTokenStore.store(rejoinToken, participant.getId(), sessionId);
 
-    long count = stateStore.incrementParticipantCount(sessionId);
-    stateStore.cacheParticipantName(sessionId, participant.getId(), request.displayName());
-    // Initialize with score 0 so zero-correct participants appear in leaderboard
-    scoringStore.initEntry(sessionId, participant.getId());
-
-    eventPublisher.publishParticipantJoined(sessionId, count);
+    eventPublisher.publishParticipantJoined(
+        sessionId, stateStore.incrementParticipantCount(sessionId));
 
     return new JoinResponse(participant.getId(), rejoinToken, sessionId);
   }
@@ -128,45 +128,43 @@ public class ParticipantService {
 
     List<Long> answered = answerRepository.findAnsweredQuestionIds(participantId);
 
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId.toString());
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
+    boolean active = SessionStatus.ACTIVE == status;
 
     RejoinResponse.CurrentQuestion currentQuestion = null;
     RejoinResponse.CurrentPassage currentPassage = null;
-    Map<Long, RejoinResponse.QuestionStats> questionStatsById = new LinkedHashMap<>();
-    if (SessionStatus.ACTIVE == status && ctx.currentQuestionId() != null) {
-      if (ctx.currentPassageId() != null) {
-        QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(ctx.currentPassageId());
-        List<RejoinResponse.QuestionInfo> subQuestions =
-            snapshot.subQuestionsOf(passage).stream()
-                .map(
-                    qSnap -> {
-                      questionStatsById.put(qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
-                      return buildQuestionInfo(participantId, qSnap, snapshot);
-                    })
-                .toList();
+    List<QuizSnapshot.QuestionSnapshot> onScreen = List.of();
 
-        currentPassage =
-            new RejoinResponse.CurrentPassage(
-                passage.id(),
-                passage.text(),
-                passage.timerMode().name(),
-                snapshot.questionPosition(subQuestions.getFirst().id()),
-                snapshot.questions().size(),
-                passage.timeLimitSeconds(),
-                subQuestions.getFirst().effectiveDisplayMode(),
-                subQuestions);
-      } else {
-        QuizSnapshot.QuestionSnapshot qSnap = snapshot.requireQuestion(ctx.currentQuestionId());
-        currentQuestion = buildCurrentQuestion(participantId, qSnap, snapshot);
-        questionStatsById.put(qSnap.id(), buildQuestionStats(sessionId, qSnap, ctx));
-      }
+    if (active && ctx.currentPassageId() != null) {
+      QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(ctx.currentPassageId());
+      onScreen = snapshot.subQuestionsOf(passage);
+      currentPassage =
+          new RejoinResponse.CurrentPassage(
+              passage.id(),
+              passage.text(),
+              passage.timerMode().name(),
+              snapshot.questionPosition(onScreen.getFirst().id()),
+              snapshot.questions().size(),
+              passage.timeLimitSeconds(),
+              onScreen.getFirst().effectiveDisplayMode().name(),
+              onScreen.stream().map(q -> buildQuestionInfo(participantId, q, snapshot)).toList());
+    } else if (active && ctx.currentQuestionId() != null) {
+      QuizSnapshot.QuestionSnapshot question = snapshot.requireQuestion(ctx.currentQuestionId());
+      onScreen = List.of(question);
+      currentQuestion = buildCurrentQuestion(participantId, question, snapshot);
     }
 
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        SessionStatus.ACTIVE == status
-                && ctx.questionLifecycle() == QuestionLifecycleState.REVIEWING
-            ? scoringStore.buildLeaderboard(sessionId)
-            : List.of();
+    Map<Long, QuestionStats> questionStatsById = new LinkedHashMap<>();
+    for (QuizSnapshot.QuestionSnapshot question : onScreen) {
+      questionStatsById.put(
+          question.id(),
+          QuestionStats.forParticipant(
+              question,
+              scoringStore.answerStats(sessionId, question.id(), ctx.participantCount()),
+              ctx.questionLifecycle()));
+    }
+
+    boolean reviewing = active && ctx.questionLifecycle() == QuestionLifecycleState.REVIEWING;
 
     return new RejoinResponse(
         participantId,
@@ -181,7 +179,7 @@ public class ParticipantService {
         currentQuestion,
         currentPassage,
         questionStatsById,
-        leaderboard,
+        reviewing ? leaderboardService.standings(sessionId) : List.of(),
         ctx.timeLeftSeconds());
   }
 
@@ -220,12 +218,7 @@ public class ParticipantService {
 
   private RejoinResponse.CurrentQuestion buildCurrentQuestion(
       Long participantId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    List<RejoinResponse.OptionInfo> options =
-        question.options().stream()
-            .map(o -> new RejoinResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
-            .toList();
     ParticipantAnswer answer = currentAnswer(participantId, question.id());
-    List<Long> selectedOptionIds = selectedOptionIds(answer);
     var foundPassage =
         question.passageId() != null ? snapshot.findPassage(question.passageId()) : null;
     RejoinResponse.PassageInfo passageInfo =
@@ -243,18 +236,14 @@ public class ParticipantService {
         question.questionType().name(),
         question.effectiveDisplayMode().name(),
         passageInfo,
-        options,
-        selectedOptionIds,
+        OptionInfo.of(question),
+        selectedOptionIds(answer),
         answer != null && answer.isLockedIn());
   }
 
   private RejoinResponse.QuestionInfo buildQuestionInfo(
       Long participantId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
     ParticipantAnswer answer = currentAnswer(participantId, question.id());
-    List<RejoinResponse.OptionInfo> options =
-        question.options().stream()
-            .map(o -> new RejoinResponse.OptionInfo(o.id(), o.text(), o.orderIndex()))
-            .toList();
     return new RejoinResponse.QuestionInfo(
         question.id(),
         question.text(),
@@ -262,37 +251,9 @@ public class ParticipantService {
         question.timeLimitSeconds(),
         question.questionType().name(),
         question.effectiveDisplayMode().name(),
-        options,
+        OptionInfo.of(question),
         selectedOptionIds(answer),
         answer != null && answer.isLockedIn());
-  }
-
-  private RejoinResponse.QuestionStats buildQuestionStats(
-      Long sessionId,
-      QuizSnapshot.QuestionSnapshot question,
-      SessionStateRedisRepository.RejoinContext ctx) {
-    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
-    question.options().forEach(option -> optionPoints.put(option.id(), option.pointValue()));
-    List<Long> correctOptionIds =
-        question.options().stream()
-            .filter(option -> option.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .toList();
-    boolean reviewed = ctx.questionLifecycle() == QuestionLifecycleState.REVIEWING;
-    boolean revealed =
-        reviewed
-            && (question.effectiveDisplayMode() == DisplayMode.BLIND
-                || question.effectiveDisplayMode() == DisplayMode.CODE_DISPLAY);
-
-    return new RejoinResponse.QuestionStats(
-        scoringStore.getQuestionCounts(sessionId, question.id()),
-        scoringStore.getTotalAnswered(sessionId, question.id()),
-        scoringStore.getTotalLockedIn(sessionId, question.id()),
-        ctx.participantCount(),
-        correctOptionIds,
-        optionPoints,
-        revealed,
-        reviewed);
   }
 
   private ParticipantAnswer currentAnswer(Long participantId, Long questionId) {

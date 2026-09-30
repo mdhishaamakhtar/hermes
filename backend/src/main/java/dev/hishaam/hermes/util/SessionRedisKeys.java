@@ -10,72 +10,56 @@ public final class SessionRedisKeys {
 
   private SessionRedisKeys() {}
 
-  public static String sessionKey(String sid, String suffix) {
-    return "session:" + sid + ":" + suffix;
+  private static String sessionKey(Long sessionId, String suffix) {
+    return "session:" + sessionId + ":" + suffix;
   }
 
-  public static String questionCountsKey(String sid, Long questionId) {
-    return sessionKey(sid, "question:" + questionId + ":counts");
+  public static String questionCountsKey(Long sessionId, Long questionId) {
+    return sessionKey(sessionId, "question:" + questionId + ":counts");
   }
 
-  public static String questionAnsweredKey(String sid, Long questionId) {
-    return sessionKey(sid, "question:" + questionId + ":answered");
+  public static String questionAnsweredKey(Long sessionId, Long questionId) {
+    return sessionKey(sessionId, "question:" + questionId + ":answered");
   }
 
-  public static String questionLockedInKey(String sid, Long questionId) {
-    return sessionKey(sid, "question:" + questionId + ":locked_in");
+  public static String questionLockedInKey(Long sessionId, Long questionId) {
+    return sessionKey(sessionId, "question:" + questionId + ":locked_in");
   }
 
-  public static String participantSelectionKey(String sid, Long questionId, Long participantId) {
-    return sessionKey(sid, "question:" + questionId + ":participant:" + participantId);
+  public static String statusKey(Long sessionId) {
+    return sessionKey(sessionId, "status");
   }
 
-  public static String statusKey(String sid) {
-    return sessionKey(sid, "status");
+  public static String snapshotKey(Long sessionId) {
+    return sessionKey(sessionId, "snapshot");
   }
 
-  public static String snapshotKey(String sid) {
-    return sessionKey(sid, "snapshot");
+  public static String currentQuestionKey(Long sessionId) {
+    return sessionKey(sessionId, "current_question");
   }
 
-  public static String currentQuestionKey(String sid) {
-    return sessionKey(sid, "current_question");
+  public static String participantCountKey(Long sessionId) {
+    return sessionKey(sessionId, "participant_count");
   }
 
-  public static String participantCountKey(String sid) {
-    return sessionKey(sid, "participant_count");
+  public static String questionSequenceKey(Long sessionId) {
+    return sessionKey(sessionId, "question_seq");
   }
 
-  public static String questionSequenceKey(String sid) {
-    return sessionKey(sid, "question_seq");
+  public static String timerKey(Long sessionId) {
+    return sessionKey(sessionId, "timer");
   }
 
-  public static String timerKey(String sid) {
-    return sessionKey(sid, "timer");
+  public static String questionStateKey(Long sessionId) {
+    return sessionKey(sessionId, "question_state");
   }
 
-  public static String participantNamesKey(String sid) {
-    return sessionKey(sid, "names");
+  public static String currentPassageKey(Long sessionId) {
+    return sessionKey(sessionId, "current_passage");
   }
 
-  public static String leaderboardKey(String sid) {
-    return sessionKey(sid, "leaderboard");
-  }
-
-  public static String questionStateKey(String sid) {
-    return sessionKey(sid, "question_state");
-  }
-
-  public static String currentPassageKey(String sid) {
-    return sessionKey(sid, "current_passage");
-  }
-
-  public static String timerStartedAtKey(String sid) {
-    return sessionKey(sid, "timer_started_at");
-  }
-
-  public static String cumulativeTimeKey(String sid) {
-    return sessionKey(sid, "cumulative_time");
+  public static String timerStartedAtKey(Long sessionId) {
+    return sessionKey(sessionId, "timer_started_at");
   }
 
   public static String joinCodeKey(String joinCode) {

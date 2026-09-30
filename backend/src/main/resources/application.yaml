@@ -73,7 +73,10 @@ app:
       system-passcode: ${BROKER_RELAY_SYSTEM_PASSCODE:hermes}
 
 jwt:
-  secret: ${JWT_SECRET:7A4F3D8B2E6C1A9F5B7E3D0C4A8F2B6E9D1C5A7F3B0E8D2C6A4F7B1E5D9C3A0F}
+  # No fallback on purpose: a deployment that forgets JWT_SECRET must fail to start rather than
+  # sign tokens with a key published in this repository. The `local` profile supplies one for
+  # development.
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 management:

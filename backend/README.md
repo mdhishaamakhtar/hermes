@@ -8,7 +8,7 @@ Hermes Backend is a Spring Boot service responsible for authentication, event an
 
 ## 🛠 Tech Stack
 
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.8-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-25-007396?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Spring Security](https://img.shields.io/badge/Spring_Security-JWT-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)](https://spring.io/projects/spring-security)
 [![Spring WebSocket](https://img.shields.io/badge/Spring-WebSocket-6DB33F?style=for-the-badge&logo=spring&logoColor=white)](https://docs.spring.io/spring-framework/reference/web/websocket.html)
@@ -71,10 +71,10 @@ docker-compose up --build
 
    ```bash
    cd backend
-   ./mvnw spring-boot:run
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
    ```
 
-The app defaults to local infrastructure on startup, so no extra config is required for local development unless you want custom ports or secrets.
+The `local` profile supplies a development JWT signing key and creates the Quartz tables on first run; everything else defaults to the local infrastructure above. Without the profile the app refuses to start unless `JWT_SECRET` is set — deliberately, so a deployment can never fall back to a key that is published in this repository.
 
 ---
 
@@ -124,8 +124,8 @@ Hermes reads configuration from `src/main/resources/application.yaml`, with envi
 | --------------------- | ---------------- | ------------------------------------- |
 | `QUARTZ_AUTO_STARTUP` | `true`           | Enables Quartz scheduler              |
 | `QUARTZ_SCHEMA_INIT`  | `never`          | Quartz schema initialization strategy |
-| `QUARTZ_THREAD_COUNT` | `10`             | Quartz worker threads                 |
-| `JWT_SECRET`          | local dev secret | JWT signing secret                    |
+| `QUARTZ_THREAD_COUNT` | `2`              | Quartz worker threads                 |
+| `JWT_SECRET`          | none (required)  | JWT signing secret                    |
 | `JWT_EXPIRATION_MS`   | `86400000`       | Token lifetime in milliseconds        |
 
 ---
