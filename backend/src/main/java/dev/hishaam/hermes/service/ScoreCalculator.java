@@ -2,6 +2,7 @@ package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
+import dev.hishaam.hermes.entity.enums.QuestionType;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Objects;
@@ -34,8 +35,10 @@ public class ScoreCalculator {
   }
 
   /**
-   * Returns {@code true} if the answer's selected options exactly match the set of options with a
-   * positive point value. An empty selection is never considered correct.
+   * Whether an answer counts as right. On a multi-select question that means picking exactly the
+   * options with a positive point value. On a single-select question it means picking one of them:
+   * a scoring correction can leave more than one option worth points, and a player can only ever
+   * choose one. An empty selection is never correct.
    */
   public boolean isCorrectSelection(
       ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
@@ -44,8 +47,13 @@ public class ScoreCalculator {
     }
 
     Set<Long> selectedOptionIds = answer.getSelectedOptionIds();
-    return !selectedOptionIds.isEmpty()
-        && selectedOptionIds.equals(Set.copyOf(question.correctOptionIds()));
+    if (selectedOptionIds.isEmpty()) {
+      return false;
+    }
+    Set<Long> correctOptionIds = Set.copyOf(question.correctOptionIds());
+    return question.questionType() == QuestionType.SINGLE_SELECT
+        ? correctOptionIds.containsAll(selectedOptionIds)
+        : selectedOptionIds.equals(correctOptionIds);
   }
 
   /**

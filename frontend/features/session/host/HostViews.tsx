@@ -72,9 +72,7 @@ export function HostLobby({ session }: { session: HostSession }) {
           >
             {pending === "start" ? "Starting…" : "Start the quiz"}
           </Button>
-          <p className="text-sm text-subtle">
-            Latecomers can still join once you start.
-          </p>
+          <p className="text-sm text-subtle">Nobody can join once you start.</p>
         </div>
       </main>
     </>

@@ -43,11 +43,11 @@ class ScoreCalculatorTest {
   }
 
   /**
-   * Verifies that correctness requires an exact, non-empty match with all positive-value options
-   * and rejects partial, extra, or null selections.
+   * Verifies that on a multi-select question correctness requires an exact, non-empty match with
+   * all positive-value options and rejects partial, extra, or null selections.
    */
   @Test
-  void correctSelectionRequiresExactNonEmptySetOfPositiveOptions() {
+  void multiSelectCorrectnessRequiresExactNonEmptySetOfPositiveOptions() {
     QuizSnapshot.QuestionSnapshot question =
         question(
             new QuizSnapshot.OptionSnapshot(10L, "Correct A", 5, 0),
@@ -59,6 +59,26 @@ class ScoreCalculatorTest {
     assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L, 11L, 12L), question)).isFalse();
     assertThat(scoreCalculator.isCorrectSelection(answer(1L), question)).isFalse();
     assertThat(scoreCalculator.isCorrectSelection(null, question)).isFalse();
+  }
+
+  /**
+   * Verifies that on a single-select question picking any scoring option is correct. After a
+   * scoring correction two options can both be worth points; a player can only choose one of them,
+   * so demanding the full set would mark everyone wrong — including the people who just scored.
+   */
+  @Test
+  void singleSelectCorrectnessAcceptsAnyScoringOption() {
+    QuizSnapshot.QuestionSnapshot question =
+        question(
+            QuestionType.SINGLE_SELECT,
+            new QuizSnapshot.OptionSnapshot(10L, "Original answer", 10, 0),
+            new QuizSnapshot.OptionSnapshot(11L, "Also accepted after correction", 25, 1),
+            new QuizSnapshot.OptionSnapshot(12L, "Wrong", 0, 2));
+
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L), question)).isTrue();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 11L), question)).isTrue();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 12L), question)).isFalse();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L), question)).isFalse();
   }
 
   /** Verifies answer-time clamping against the configured timer window. */
@@ -86,16 +106,13 @@ class ScoreCalculatorTest {
   }
 
   private QuizSnapshot.QuestionSnapshot question(QuizSnapshot.OptionSnapshot... options) {
+    return question(QuestionType.MULTI_SELECT, options);
+  }
+
+  private QuizSnapshot.QuestionSnapshot question(
+      QuestionType type, QuizSnapshot.OptionSnapshot... options) {
     return new QuizSnapshot.QuestionSnapshot(
-        100L,
-        "Question",
-        QuestionType.MULTI_SELECT,
-        1,
-        30,
-        null,
-        DisplayMode.LIVE,
-        List.of(options),
-        null);
+        100L, "Question", type, 1, 30, null, DisplayMode.LIVE, List.of(options), null);
   }
 
   private ParticipantAnswer answer(Long participantId, Long... selectedOptionIds) {

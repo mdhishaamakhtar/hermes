@@ -143,6 +143,56 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
+   * Verifies that a correction which accepts a second answer on a single-select question leaves
+   * both answers marked correct. A player can only ever pick one option there, so everyone who
+   * chose either scoring option got it right — nobody should see "incorrect" beside points they
+   * were just awarded.
+   */
+  @Test
+  void acceptingASecondAnswerOnASingleSelectQuestionMarksBothAnswersCorrect() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Two Right Answers Event");
+    long quizId = createQuiz(organiser, eventId, "Two Right Answers Quiz");
+    JsonNode question = createSingleSelectQuestion(organiser, quizId, "Ambiguous", 1, 30);
+    long questionId = question.path("id").asLong();
+    long originalOptionId = question.path("options").get(0).path("id").asLong();
+    long otherOptionId = question.path("options").get(1).path("id").asLong();
+
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+    String joinCode = session.path("joinCode").asText();
+    String adaToken = join(joinCode, "Ada");
+    String graceToken = join(joinCode, "Grace");
+
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/start-timer", organiser, Map.of(), 200);
+    answer(sessionId, adaToken, questionId, originalOptionId);
+    answer(sessionId, graceToken, questionId, otherOptionId);
+    postJson("/api/sessions/" + sessionId + "/end-timer", organiser, Map.of(), 200);
+
+    // The host decides the other option was a fair answer too
+    patchJson(
+        "/api/sessions/" + sessionId + "/questions/" + questionId + "/scoring",
+        organiser,
+        Map.of(
+            "options",
+            new Object[] {
+              Map.of("optionId", originalOptionId, "pointValue", 10),
+              Map.of("optionId", otherOptionId, "pointValue", 10)
+            }),
+        200);
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+
+    for (String token : List.of(adaToken, graceToken)) {
+      JsonNode mine = myResults(sessionId, token);
+      assertThat(mine.path("correctCount").asInt()).isEqualTo(1);
+      assertThat(mine.path("questions").get(0).path("isCorrect").asBoolean()).isTrue();
+      assertThat(mine.path("questions").get(0).path("pointsEarned").asInt()).isEqualTo(10);
+    }
+  }
+
+  /**
    * Verifies that two participants level on score are separated by who answered faster, and that
    * every screen agrees on it: the live leaderboard, the organiser's results page once the session
    * has ended, and each player's own results. Grace joins first so that join order alone would put
@@ -223,14 +273,16 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
         200);
   }
 
-  private int myRank(long sessionId, String token) throws Exception {
+  private JsonNode myResults(long sessionId, String token) throws Exception {
     return getJson(
             "/api/sessions/" + sessionId + "/my-results",
             null,
             Map.of("X-Rejoin-Token", token),
             200)
-        .path("data")
-        .path("rank")
-        .asInt();
+        .path("data");
+  }
+
+  private int myRank(long sessionId, String token) throws Exception {
+    return myResults(sessionId, token).path("rank").asInt();
   }
 }
