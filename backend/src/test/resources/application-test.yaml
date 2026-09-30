@@ -21,6 +21,9 @@ logging:
     org.springframework.boot.test: WARN
     dev.hishaam.hermes: INFO
 
+jwt:
+  secret: test-only-signing-key-0123456789abcdef0123456789abcdef
+
 app:
   cors:
     allowed-origin: http://localhost:3000

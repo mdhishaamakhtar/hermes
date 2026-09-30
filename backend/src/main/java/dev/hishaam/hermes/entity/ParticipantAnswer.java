@@ -73,4 +73,12 @@ public class ParticipantAnswer {
    */
   @Column(name = "graded_at")
   private OffsetDateTime gradedAt;
+
+  /**
+   * How long after the timer started this answer was given, clamped to the time limit. Stamped at
+   * grading; summed per participant, it breaks score ties on the leaderboard in favour of whoever
+   * answered faster. Null when the answer was never graded against a running timer.
+   */
+  @Column(name = "answer_time_ms")
+  private Long answerTimeMs;
 }

@@ -2,7 +2,6 @@ package dev.hishaam.hermes.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +18,7 @@ import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for running without an external STOMP broker.
@@ -74,12 +74,10 @@ class SimpleBrokerSessionIntegrationTest extends BaseIntegrationTest {
     StompSession organiserSession = connect(organiserClient, organiser.token());
     StompSession participantSession = connect(participantClient, null);
 
-    BlockingQueue<JsonNode> controlEvents = new LinkedBlockingQueue<>();
     BlockingQueue<JsonNode> questionEvents = new LinkedBlockingQueue<>();
     BlockingQueue<JsonNode> analyticsEvents = new LinkedBlockingQueue<>();
     BlockingQueue<JsonNode> answerAcks = new LinkedBlockingQueue<>();
 
-    subscribe(organiserSession, "/topic/session." + sessionId + ".control", controlEvents);
     subscribe(organiserSession, "/topic/session." + sessionId + ".analytics", analyticsEvents);
     subscribe(participantSession, "/topic/session." + sessionId + ".question", questionEvents);
     subscribe(participantSession, "/user/queue/answers", answerAcks);
@@ -96,7 +94,7 @@ class SimpleBrokerSessionIntegrationTest extends BaseIntegrationTest {
 
     // Topic broadcast — the publisher only reaches this point if the in-process broker announced
     // itself as available on startup.
-    assertThat(waitForEvent(controlEvents, "PARTICIPANT_JOINED").path("count").asLong())
+    assertThat(waitForEvent(questionEvents, "PARTICIPANT_JOINED").path("count").asLong())
         .isEqualTo(1);
 
     postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
@@ -140,6 +138,50 @@ class SimpleBrokerSessionIntegrationTest extends BaseIntegrationTest {
 
     participantSession.disconnect();
     organiserSession.disconnect();
+  }
+
+  /**
+   * Verifies that a client cannot publish to a session topic on the in-process broker either — the
+   * mode the deployed instance runs. Here the broker lives in the same JVM, so a frame a client
+   * sends to {@code /topic/**} would be delivered to subscribers directly.
+   */
+  @Test
+  void clientsCannotPublishToSessionTopicsWithoutARelay() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "No Broker Forgery Event");
+    long quizId = createQuiz(organiser, eventId, "No Broker Forgery Quiz");
+    createSingleSelectQuestion(organiser, quizId, "Question", 1, 30);
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+    String questionTopic = "/topic/session." + sessionId + ".question";
+
+    WebSocketStompClient playerClient = stompClient();
+    StompSession player = connect(playerClient, null);
+    BlockingQueue<JsonNode> playerEvents = new LinkedBlockingQueue<>();
+    subscribe(player, questionTopic, playerEvents);
+
+    CountDownLatch forgerRejected = new CountDownLatch(1);
+    WebSocketStompClient forgerClient = stompClient();
+    StompSession forger = connect(forgerClient, null, forgerRejected);
+    StompHeaders forged = new StompHeaders();
+    forged.setDestination(questionTopic);
+    forger.send(forged, Map.of("event", "SESSION_END"));
+
+    assertThat(forgerRejected.await(10, TimeUnit.SECONDS))
+        .as("a client SEND to a topic must be refused")
+        .isTrue();
+
+    postJson(
+        "/api/sessions/join",
+        null,
+        Map.of("joinCode", session.path("joinCode").asText(), "displayName", "Lin"),
+        200);
+    JsonNode first = playerEvents.poll(10, TimeUnit.SECONDS);
+    assertThat(first).as("the genuine event stream keeps flowing").isNotNull();
+    assertThat(first.path("event").asText()).isEqualTo("PARTICIPANT_JOINED");
+
+    player.disconnect();
   }
 
   /**

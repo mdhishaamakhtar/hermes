@@ -13,10 +13,10 @@ import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.stereotype.Repository;
 
 /**
- * Live session state in Redis: status, current question/passage, question lifecycle state,
- * participant tracking, the countdown timer and question sequence, the quiz snapshot JSON, and
+ * Live session state in Redis: status, current question/passage, question lifecycle state, the
+ * participant count, the countdown timer and question sequence, the quiz snapshot JSON, and
  * join-code reservations. Everything here shares the session TTL and is cleaned up together via
- * {@link #cleanupSessionKeys}. Scoring data (answer stats, leaderboard) lives in {@link
+ * {@link #cleanupSessionKeys}. The live answer tallies live in {@link
  * SessionScoringRedisRepository}.
  */
 @Repository
@@ -28,7 +28,7 @@ public class SessionStateRedisRepository {
     this.redis = redis;
   }
 
-  /** Volatile state needed to rebuild a client's live view after reconnect. */
+  /** Volatile state needed to rebuild a client's live view after reconnect, host or player. */
   public record RejoinContext(
       QuestionLifecycleState questionLifecycle,
       Long currentQuestionId,
@@ -40,83 +40,78 @@ public class SessionStateRedisRepository {
 
   /** Pipeline-initialises all keys for a newly created session. */
   public void initSessionKeys(Long sessionId, String joinCode, String snapshotJson) {
-    String sid = sessionId.toString();
     Expiration ttl = Expiration.from(SessionRedisKeys.SESSION_TTL);
     redis.executePipelined(
         (RedisConnection conn) -> {
           conn.stringCommands()
               .set(
-                  SessionRedisKeys.statusKey(sid).getBytes(),
+                  SessionRedisKeys.statusKey(sessionId).getBytes(),
                   SessionStatus.LOBBY.name().getBytes(),
                   ttl,
                   RedisStringCommands.SetOption.UPSERT);
           conn.stringCommands()
               .set(
-                  SessionRedisKeys.snapshotKey(sid).getBytes(),
+                  SessionRedisKeys.snapshotKey(sessionId).getBytes(),
                   snapshotJson.getBytes(),
                   ttl,
                   RedisStringCommands.SetOption.UPSERT);
           conn.stringCommands()
               .set(
-                  SessionRedisKeys.currentQuestionKey(sid).getBytes(),
+                  SessionRedisKeys.currentQuestionKey(sessionId).getBytes(),
                   "".getBytes(),
                   ttl,
                   RedisStringCommands.SetOption.UPSERT);
           conn.stringCommands()
               .set(
-                  SessionRedisKeys.participantCountKey(sid).getBytes(),
+                  SessionRedisKeys.participantCountKey(sessionId).getBytes(),
                   "0".getBytes(),
                   ttl,
                   RedisStringCommands.SetOption.UPSERT);
           conn.stringCommands()
               .set(
-                  SessionRedisKeys.questionSequenceKey(sid).getBytes(),
+                  SessionRedisKeys.questionSequenceKey(sessionId).getBytes(),
                   "0".getBytes(),
                   ttl,
                   RedisStringCommands.SetOption.UPSERT);
           conn.stringCommands()
               .set(
                   SessionRedisKeys.joinCodeKey(joinCode).getBytes(),
-                  sid.getBytes(),
+                  sessionId.toString().getBytes(),
                   ttl,
                   RedisStringCommands.SetOption.UPSERT);
           return null;
         });
   }
 
-  /** Transitions the session status to ACTIVE and sets the first current question. */
-  public void activateSession(Long sessionId, Long firstQuestionId) {
-    String sid = sessionId.toString();
+  /**
+   * Marks the session ACTIVE. No question is current yet — the first advance picks the opening one.
+   */
+  public void activateSession(Long sessionId) {
     redis
         .opsForValue()
         .set(
-            SessionRedisKeys.statusKey(sid),
+            SessionRedisKeys.statusKey(sessionId),
             SessionStatus.ACTIVE.name(),
-            SessionRedisKeys.SESSION_TTL);
-    redis
-        .opsForValue()
-        .set(
-            SessionRedisKeys.currentQuestionKey(sid),
-            firstQuestionId.toString(),
             SessionRedisKeys.SESSION_TTL);
   }
 
   public SessionStatus getStatus(Long sessionId) {
     return parse(
-        redis.opsForValue().get(SessionRedisKeys.statusKey(sessionId.toString())),
-        SessionStatus::valueOf);
+        redis.opsForValue().get(SessionRedisKeys.statusKey(sessionId)), SessionStatus::valueOf);
   }
 
   public void setQuestionState(Long sessionId, QuestionLifecycleState state) {
-    String sid = sessionId.toString();
     redis
         .opsForValue()
-        .set(SessionRedisKeys.questionStateKey(sid), state.name(), SessionRedisKeys.SESSION_TTL);
+        .set(
+            SessionRedisKeys.questionStateKey(sessionId),
+            state.name(),
+            SessionRedisKeys.SESSION_TTL);
   }
 
   public QuestionLifecycleState getQuestionState(Long sessionId) {
     return parse(
-        redis.opsForValue().get(SessionRedisKeys.questionStateKey(sessionId.toString())),
+        redis.opsForValue().get(SessionRedisKeys.questionStateKey(sessionId)),
         QuestionLifecycleState::valueOf);
   }
 
@@ -125,26 +120,15 @@ public class SessionStateRedisRepository {
    */
   public Long getCurrentQuestionId(Long sessionId) {
     return parse(
-        redis.opsForValue().get(SessionRedisKeys.currentQuestionKey(sessionId.toString())),
-        Long::valueOf);
+        redis.opsForValue().get(SessionRedisKeys.currentQuestionKey(sessionId)), Long::valueOf);
   }
 
   public void setCurrentQuestion(Long sessionId, Long questionId) {
     redis
         .opsForValue()
         .set(
-            SessionRedisKeys.currentQuestionKey(sessionId.toString()),
+            SessionRedisKeys.currentQuestionKey(sessionId),
             questionId.toString(),
-            SessionRedisKeys.SESSION_TTL);
-  }
-
-  /** Resets current_question to empty so the next advance finds the first question. */
-  public void clearCurrentQuestion(Long sessionId) {
-    redis
-        .opsForValue()
-        .set(
-            SessionRedisKeys.currentQuestionKey(sessionId.toString()),
-            "",
             SessionRedisKeys.SESSION_TTL);
   }
 
@@ -152,7 +136,7 @@ public class SessionStateRedisRepository {
     redis
         .opsForValue()
         .set(
-            SessionRedisKeys.currentPassageKey(sessionId.toString()),
+            SessionRedisKeys.currentPassageKey(sessionId),
             passageId.toString(),
             SessionRedisKeys.SESSION_TTL);
   }
@@ -160,12 +144,11 @@ public class SessionStateRedisRepository {
   /** Returns null when the session is not inside an ENTIRE_PASSAGE block. */
   public Long getCurrentPassageId(Long sessionId) {
     return parse(
-        redis.opsForValue().get(SessionRedisKeys.currentPassageKey(sessionId.toString())),
-        Long::valueOf);
+        redis.opsForValue().get(SessionRedisKeys.currentPassageKey(sessionId)), Long::valueOf);
   }
 
   public void clearCurrentPassage(Long sessionId) {
-    redis.delete(SessionRedisKeys.currentPassageKey(sessionId.toString()));
+    redis.delete(SessionRedisKeys.currentPassageKey(sessionId));
   }
 
   // ─── Join codes ────────────────────────────────────────────────────────────────
@@ -190,33 +173,25 @@ public class SessionStateRedisRepository {
   // ─── Participants ──────────────────────────────────────────────────────────────
 
   public long incrementParticipantCount(Long sessionId) {
-    Long count =
-        redis.opsForValue().increment(SessionRedisKeys.participantCountKey(sessionId.toString()));
+    Long count = redis.opsForValue().increment(SessionRedisKeys.participantCountKey(sessionId));
     return count != null ? count : 0L;
   }
 
   public long getParticipantCount(Long sessionId) {
-    String val =
-        redis.opsForValue().get(SessionRedisKeys.participantCountKey(sessionId.toString()));
+    String val = redis.opsForValue().get(SessionRedisKeys.participantCountKey(sessionId));
     return val != null ? Long.parseLong(val) : 0L;
-  }
-
-  public void cacheParticipantName(Long sessionId, Long participantId, String displayName) {
-    String sid = sessionId.toString();
-    redis
-        .opsForHash()
-        .put(SessionRedisKeys.participantNamesKey(sid), participantId.toString(), displayName);
-    redis.expire(SessionRedisKeys.participantNamesKey(sid), SessionRedisKeys.SESSION_TTL);
   }
 
   // ─── Snapshot JSON ─────────────────────────────────────────────────────────────
 
-  public String getSnapshotJson(String sid) {
-    return redis.opsForValue().get(SessionRedisKeys.snapshotKey(sid));
+  public String getSnapshotJson(Long sessionId) {
+    return redis.opsForValue().get(SessionRedisKeys.snapshotKey(sessionId));
   }
 
-  public void setSnapshotJson(String sid, String json) {
-    redis.opsForValue().set(SessionRedisKeys.snapshotKey(sid), json, SessionRedisKeys.SESSION_TTL);
+  public void setSnapshotJson(Long sessionId, String json) {
+    redis
+        .opsForValue()
+        .set(SessionRedisKeys.snapshotKey(sessionId), json, SessionRedisKeys.SESSION_TTL);
   }
 
   // ─── Timer & question sequence ─────────────────────────────────────────────────
@@ -225,72 +200,72 @@ public class SessionStateRedisRepository {
    * Records the timer as a volatile key with its own TTL matching {@code timeLimitSeconds}. The key
    * expiring naturally signals timer end; explicit deletion via {@link #clearTimer} cancels it
    * early. The remaining TTL is used by {@link #readRejoinContext} to compute time-left for
-   * reconnecting participants.
+   * reconnecting clients.
    */
   public void setTimer(Long sessionId, int timeLimitSeconds) {
     redis
         .opsForValue()
-        .set(
-            SessionRedisKeys.timerKey(sessionId.toString()),
-            "1",
-            Duration.ofSeconds(timeLimitSeconds));
+        .set(SessionRedisKeys.timerKey(sessionId), "1", Duration.ofSeconds(timeLimitSeconds));
   }
 
   public void clearTimer(Long sessionId) {
-    redis.delete(SessionRedisKeys.timerKey(sessionId.toString()));
-  }
-
-  public Long getTimerTtlSeconds(Long sessionId) {
-    return redis.getExpire(SessionRedisKeys.timerKey(sessionId.toString()));
+    redis.delete(SessionRedisKeys.timerKey(sessionId));
   }
 
   public void recordTimerStartedAt(Long sessionId, long epochMillis) {
     redis
         .opsForValue()
         .set(
-            SessionRedisKeys.timerStartedAtKey(sessionId.toString()),
+            SessionRedisKeys.timerStartedAtKey(sessionId),
             String.valueOf(epochMillis),
             SessionRedisKeys.SESSION_TTL);
   }
 
   public Long getTimerStartedAt(Long sessionId) {
-    String val = redis.opsForValue().get(SessionRedisKeys.timerStartedAtKey(sessionId.toString()));
+    String val = redis.opsForValue().get(SessionRedisKeys.timerStartedAtKey(sessionId));
     return val != null ? Long.parseLong(val) : null;
   }
 
   public long incrementQuestionSequence(Long sessionId) {
-    Long next =
-        redis.opsForValue().increment(SessionRedisKeys.questionSequenceKey(sessionId.toString()));
+    Long next = redis.opsForValue().increment(SessionRedisKeys.questionSequenceKey(sessionId));
     return next != null ? next : 0L;
   }
 
   public long getQuestionSequence(Long sessionId) {
-    String raw =
-        redis.opsForValue().get(SessionRedisKeys.questionSequenceKey(sessionId.toString()));
+    String raw = redis.opsForValue().get(SessionRedisKeys.questionSequenceKey(sessionId));
     return raw != null ? Long.parseLong(raw) : 0L;
   }
 
   // ─── Rejoin context ────────────────────────────────────────────────────────────
 
   /**
-   * Reads all volatile session state needed to reconstruct a participant's view on rejoin in one
-   * place, avoiding repeated round-trips from callers.
+   * Reads everything needed to rebuild a client's live view in two round trips: one MGET for the
+   * state keys, one TTL for the time left on the countdown.
    */
   public RejoinContext readRejoinContext(Long sessionId) {
-    Long ttl = getTimerTtlSeconds(sessionId);
+    List<String> values =
+        redis
+            .opsForValue()
+            .multiGet(
+                List.of(
+                    SessionRedisKeys.questionStateKey(sessionId),
+                    SessionRedisKeys.currentQuestionKey(sessionId),
+                    SessionRedisKeys.currentPassageKey(sessionId),
+                    SessionRedisKeys.participantCountKey(sessionId)));
+    Long ttl = redis.getExpire(SessionRedisKeys.timerKey(sessionId));
+    Integer participantCount = parse(values.get(3), Integer::valueOf);
 
     return new RejoinContext(
-        getQuestionState(sessionId),
-        getCurrentQuestionId(sessionId),
-        getCurrentPassageId(sessionId),
-        (int) getParticipantCount(sessionId),
+        parse(values.get(0), QuestionLifecycleState::valueOf),
+        parse(values.get(1), Long::valueOf),
+        parse(values.get(2), Long::valueOf),
+        participantCount != null ? participantCount : 0,
         (ttl != null && ttl > 0) ? ttl.intValue() : null);
   }
 
   /**
    * Converts a raw Redis string into a typed value, treating both a missing key and the
-   * empty-string placeholder written by {@link #initSessionKeys} / {@link #clearCurrentQuestion} as
-   * absent.
+   * empty-string placeholder written by {@link #initSessionKeys} as absent.
    */
   private static <T> T parse(String raw, Function<String, T> converter) {
     return (raw == null || raw.isEmpty()) ? null : converter.apply(raw);
@@ -303,22 +278,20 @@ public class SessionStateRedisRepository {
    * SessionScoringRedisRepository#cleanupScoringKeys}.
    */
   public void cleanupSessionKeys(Long sessionId, String joinCode) {
-    String sid = sessionId.toString();
     if (joinCode != null) {
       redis.delete(SessionRedisKeys.joinCodeKey(joinCode));
     }
 
     redis.delete(
         List.of(
-            SessionRedisKeys.statusKey(sid),
-            SessionRedisKeys.snapshotKey(sid),
-            SessionRedisKeys.currentQuestionKey(sid),
-            SessionRedisKeys.participantCountKey(sid),
-            SessionRedisKeys.questionSequenceKey(sid),
-            SessionRedisKeys.timerKey(sid),
-            SessionRedisKeys.participantNamesKey(sid),
-            SessionRedisKeys.questionStateKey(sid),
-            SessionRedisKeys.currentPassageKey(sid),
-            SessionRedisKeys.timerStartedAtKey(sid)));
+            SessionRedisKeys.statusKey(sessionId),
+            SessionRedisKeys.snapshotKey(sessionId),
+            SessionRedisKeys.currentQuestionKey(sessionId),
+            SessionRedisKeys.participantCountKey(sessionId),
+            SessionRedisKeys.questionSequenceKey(sessionId),
+            SessionRedisKeys.timerKey(sessionId),
+            SessionRedisKeys.questionStateKey(sessionId),
+            SessionRedisKeys.currentPassageKey(sessionId),
+            SessionRedisKeys.timerStartedAtKey(sessionId)));
   }
 }

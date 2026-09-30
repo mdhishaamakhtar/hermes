@@ -10,13 +10,14 @@ public record HostSessionSyncResponse(
     QuestionLifecycleState questionLifecycle,
     String joinCode,
     int participantCount,
-    CurrentQuestion currentQuestion,
+    Question currentQuestion,
     CurrentPassage currentPassage,
     Map<Long, QuestionStats> questionStatsById,
     List<SessionResultsResponse.LeaderboardEntry> leaderboard,
     Integer timeLeftSeconds) {
 
-  public record CurrentQuestion(
+  /** A question as the host sees it — standalone, or one sub-question of the current passage. */
+  public record Question(
       Long id,
       String text,
       String questionType,
@@ -35,30 +36,7 @@ public record HostSessionSyncResponse(
       int totalQuestions,
       Integer timeLimitSeconds,
       String effectiveDisplayMode,
-      List<PassageQuestionInfo> subQuestions) {}
-
-  public record PassageQuestionInfo(
-      Long id,
-      String text,
-      String questionType,
-      int orderIndex,
-      int totalQuestions,
-      int timeLimitSeconds,
-      String effectiveDisplayMode,
-      PassageInfo passage,
-      List<OptionInfo> options) {}
+      List<Question> subQuestions) {}
 
   public record PassageInfo(Long id, String text) {}
-
-  public record OptionInfo(Long id, String text, int orderIndex) {}
-
-  public record QuestionStats(
-      Map<Long, Long> counts,
-      long totalAnswered,
-      long totalLockedIn,
-      long totalParticipants,
-      List<Long> correctOptionIds,
-      Map<Long, Integer> optionPoints,
-      boolean revealed,
-      boolean reviewed) {}
 }

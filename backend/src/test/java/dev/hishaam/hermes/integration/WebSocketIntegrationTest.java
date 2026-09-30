@@ -2,7 +2,6 @@ package dev.hishaam.hermes.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.List;
 import java.util.Map;
@@ -20,12 +19,14 @@ import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
 import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for the STOMP/WebSocket event stream.
  *
- * <p>This suite validates the live publish/subscribe layer for session control events, question
- * updates, answer acknowledgements, and authorization boundaries on topic subscriptions.
+ * <p>This suite validates the live publish/subscribe layer for session events, question updates,
+ * answer acknowledgements, and the authorization boundaries on what a client may subscribe to and
+ * send.
  */
 class WebSocketIntegrationTest extends BaseIntegrationTest {
 
@@ -68,12 +69,10 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     StompSession organiserSession = connect(organiserClient, organiser.token());
     StompSession participantSession = connect(participantClient, null);
 
-    BlockingQueue<JsonNode> controlEvents = new LinkedBlockingQueue<>();
     BlockingQueue<JsonNode> questionEvents = new LinkedBlockingQueue<>();
     BlockingQueue<JsonNode> analyticsEvents = new LinkedBlockingQueue<>();
     BlockingQueue<JsonNode> answerAcks = new LinkedBlockingQueue<>();
 
-    subscribe(organiserSession, "/topic/session." + sessionId + ".control", controlEvents);
     subscribe(organiserSession, "/topic/session." + sessionId + ".analytics", analyticsEvents);
     subscribe(participantSession, "/topic/session." + sessionId + ".question", questionEvents);
     subscribe(participantSession, "/user/queue/answers", answerAcks);
@@ -86,7 +85,7 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
                 200)
             .path("data");
     String rejoinToken = join.path("rejoinToken").asText();
-    assertThat(waitForEvent(controlEvents, "PARTICIPANT_JOINED").path("count").asLong())
+    assertThat(waitForEvent(questionEvents, "PARTICIPANT_JOINED").path("count").asLong())
         .isEqualTo(1);
 
     postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
@@ -240,6 +239,53 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     participantSession.disconnect();
   }
 
+  /**
+   * Verifies that a client cannot publish to a session topic. A frame addressed straight to {@code
+   * /topic/**} never passes through the application, so without a guard the broker would fan it out
+   * to every subscriber — letting anyone end a session, or fake a question or a leaderboard, for
+   * everybody in it. The forged frame must reach no one, the sender must be cut off, and the real
+   * event stream must carry on.
+   */
+  @Test
+  void clientsCannotPublishToSessionTopics() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Forgery Event");
+    long quizId = createQuiz(organiser, eventId, "Forgery Quiz");
+    createSingleSelectQuestion(organiser, quizId, "Question", 1, 30);
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+    String questionTopic = "/topic/session." + sessionId + ".question";
+
+    WebSocketStompClient playerClient = stompClient();
+    StompSession player = connect(playerClient, null);
+    BlockingQueue<JsonNode> playerEvents = new LinkedBlockingQueue<>();
+    subscribe(player, questionTopic, playerEvents);
+
+    CountDownLatch forgerRejected = new CountDownLatch(1);
+    WebSocketStompClient forgerClient = stompClient();
+    StompSession forger = connect(forgerClient, null, forgerRejected);
+    StompHeaders forged = new StompHeaders();
+    forged.setDestination(questionTopic);
+    forger.send(forged, Map.of("event", "SESSION_END"));
+
+    assertThat(forgerRejected.await(10, TimeUnit.SECONDS))
+        .as("a client SEND to a topic must be refused")
+        .isTrue();
+
+    // The next genuine event is the first thing the player hears: the forgery was never relayed.
+    postJson(
+        "/api/sessions/join",
+        null,
+        Map.of("joinCode", session.path("joinCode").asText(), "displayName", "Lin"),
+        200);
+    JsonNode first = playerEvents.poll(10, TimeUnit.SECONDS);
+    assertThat(first).as("the genuine event stream keeps flowing").isNotNull();
+    assertThat(first.path("event").asText()).isEqualTo("PARTICIPANT_JOINED");
+
+    player.disconnect();
+  }
+
   /** Connects with a verbatim Authorization header, bypassing the Bearer-prefixing helper. */
   private StompSession connectWithRawAuthHeader(WebSocketStompClient client, String authHeader)
       throws Exception {
@@ -379,9 +425,9 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
     CountDownLatch anonymousRejected = new CountDownLatch(1);
     StompSession anonymousSession = connect(anonymousClient, null, anonymousRejected);
     anonymousSession.subscribe(
-        "/topic/session." + sessionId + ".control", handler(new LinkedBlockingQueue<>()));
+        "/topic/session." + sessionId + ".analytics", handler(new LinkedBlockingQueue<>()));
     assertThat(anonymousRejected.await(10, TimeUnit.SECONDS))
-        .as("anonymous subscription to the control topic must be rejected")
+        .as("anonymous subscription to the analytics topic must be rejected")
         .isTrue();
   }
 }

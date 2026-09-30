@@ -5,20 +5,20 @@ import dev.hishaam.hermes.dto.session.*;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.security.AuthenticatedUser;
 import dev.hishaam.hermes.service.AnswerService;
+import dev.hishaam.hermes.service.GradingService;
 import dev.hishaam.hermes.service.ParticipantService;
 import dev.hishaam.hermes.service.session.SessionResultsService;
 import dev.hishaam.hermes.service.session.SessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * REST controller for session lifecycle, participant join/rejoin, answer submission, and results.
- * Organizer-facing endpoints require JWT authentication via
- * {@code @PreAuthorize("isAuthenticated()")} and resolve the caller's ID from the injected {@link
+ * Organizer-facing endpoints require a JWT — {@code SecurityConfig} lists the few public paths and
+ * authenticates everything else — and resolve the caller's ID from the injected {@link
  * dev.hishaam.hermes.security.AuthenticatedUser} principal. Participant endpoints are
  * unauthenticated and identify participants by rejoin token.
  */
@@ -30,20 +30,22 @@ public class SessionController {
   private final ParticipantService participantService;
   private final AnswerService answerService;
   private final SessionResultsService resultsService;
+  private final GradingService gradingService;
 
   public SessionController(
       SessionService sessionService,
       ParticipantService participantService,
       AnswerService answerService,
-      SessionResultsService resultsService) {
+      SessionResultsService resultsService,
+      GradingService gradingService) {
     this.sessionService = sessionService;
     this.participantService = participantService;
     this.answerService = answerService;
     this.resultsService = resultsService;
+    this.gradingService = gradingService;
   }
 
   @PostMapping
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionResponse>> createSession(
       @Valid @RequestBody CreateSessionRequest request,
       @AuthenticationPrincipal AuthenticatedUser user) {
@@ -52,7 +54,6 @@ public class SessionController {
   }
 
   @PostMapping("/{id}/start")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> startSession(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.startSession(id, user.getId());
@@ -60,7 +61,6 @@ public class SessionController {
   }
 
   @PostMapping("/{id}/start-timer")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> startTimer(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.startTimer(id, user.getId());
@@ -68,7 +68,6 @@ public class SessionController {
   }
 
   @PostMapping("/{id}/end-timer")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> endTimerEarly(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.endTimerEarly(id, user.getId());
@@ -76,7 +75,6 @@ public class SessionController {
   }
 
   @PostMapping("/{id}/next")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> nextQuestion(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.advanceSession(id, user.getId());
@@ -84,7 +82,6 @@ public class SessionController {
   }
 
   @PostMapping("/{id}/end")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> endSession(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.endSessionByOrganiser(id, user.getId());
@@ -92,7 +89,6 @@ public class SessionController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> abandonSession(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     sessionService.abandonSession(id, user.getId());
@@ -100,28 +96,24 @@ public class SessionController {
   }
 
   @GetMapping("/{id}/status")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionStatus>> getSessionStatus(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     return ResponseEntity.ok(ApiResponse.ok(sessionService.getSessionStatus(id, user.getId())));
   }
 
   @GetMapping("/{id}/lobby")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<LobbyStateResponse>> getLobbyState(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     return ResponseEntity.ok(ApiResponse.ok(sessionService.getLobbyState(id, user.getId())));
   }
 
   @GetMapping("/{id}/results")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<SessionResultsResponse>> getResults(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     return ResponseEntity.ok(ApiResponse.ok(resultsService.getResults(id, user.getId())));
   }
 
   @GetMapping("/{id}/host-sync")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<HostSessionSyncResponse>> getHostSyncState(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     return ResponseEntity.ok(ApiResponse.ok(sessionService.getHostSyncState(id, user.getId())));
@@ -160,13 +152,12 @@ public class SessionController {
   }
 
   @PatchMapping("/{id}/questions/{questionId}/scoring")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> correctScoring(
       @PathVariable Long id,
       @PathVariable Long questionId,
       @Valid @RequestBody ScoringCorrectionRequest request,
       @AuthenticationPrincipal AuthenticatedUser user) {
-    sessionService.correctScoring(id, questionId, request, user.getId());
+    gradingService.correctScoring(id, questionId, request, user.getId());
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 }

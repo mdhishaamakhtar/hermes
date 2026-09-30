@@ -2,19 +2,17 @@ package dev.hishaam.hermes.service;
 
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
+import dev.hishaam.hermes.entity.enums.QuestionType;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
 /**
- * Stateless scoring math: per-answer scores, correctness checks, participant totals, and
- * answer-time clamping. Orchestration (persisting grades, leaderboard updates, broadcasts) lives in
- * {@link GradingService}.
+ * Stateless scoring math: per-answer scores, correctness checks, and answer-time clamping.
+ * Orchestration (persisting grades, leaderboard updates, broadcasts) lives in {@link
+ * GradingService}.
  */
 @Service
 public class ScoreCalculator {
@@ -24,8 +22,7 @@ public class ScoreCalculator {
    * options. Negative raw scores (e.g., penalty options) are clamped to zero.
    */
   public int computeScore(ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
-    Map<Long, Integer> pointsByOptionId = new LinkedHashMap<>();
-    question.options().forEach(o -> pointsByOptionId.put(o.id(), o.pointValue()));
+    Map<Long, Integer> pointsByOptionId = question.optionPoints();
 
     int rawScore =
         answer.getSelectedOptionIds().stream()
@@ -38,8 +35,10 @@ public class ScoreCalculator {
   }
 
   /**
-   * Returns {@code true} if the answer's selected options exactly match the set of options with a
-   * positive point value. An empty selection is never considered correct.
+   * Whether an answer counts as right. On a multi-select question that means picking exactly the
+   * options with a positive point value. On a single-select question it means picking one of them:
+   * a scoring correction can leave more than one option worth points, and a player can only ever
+   * choose one. An empty selection is never correct.
    */
   public boolean isCorrectSelection(
       ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
@@ -47,26 +46,14 @@ public class ScoreCalculator {
       return false;
     }
 
-    Set<Long> selectedOptionIds = new LinkedHashSet<>(answer.getSelectedOptionIds());
-    Set<Long> correctOptionIds =
-        question.options().stream()
-            .filter(option -> option.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .collect(LinkedHashSet::new, Set::add, Set::addAll);
-
-    return !selectedOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds);
-  }
-
-  /** Aggregates graded answers into a map of participantId → total score across all questions. */
-  public Map<Long, Long> sumScoresByParticipant(List<ParticipantAnswer> answers) {
-    Map<Long, Long> participantTotals = new LinkedHashMap<>();
-    answers.forEach(
-        answer ->
-            participantTotals.merge(
-                answer.getParticipantId(),
-                (long) answer.getScore(),
-                (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
-    return participantTotals;
+    Set<Long> selectedOptionIds = answer.getSelectedOptionIds();
+    if (selectedOptionIds.isEmpty()) {
+      return false;
+    }
+    Set<Long> correctOptionIds = Set.copyOf(question.correctOptionIds());
+    return question.questionType() == QuestionType.SINGLE_SELECT
+        ? correctOptionIds.containsAll(selectedOptionIds)
+        : selectedOptionIds.equals(correctOptionIds);
   }
 
   /**

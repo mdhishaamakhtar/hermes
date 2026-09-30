@@ -55,16 +55,4 @@ public record RejoinResponse(
       boolean lockedIn) {}
 
   public record PassageInfo(Long id, String text, String timerMode) {}
-
-  public record OptionInfo(Long id, String text, int orderIndex) {}
-
-  public record QuestionStats(
-      Map<Long, Long> counts,
-      long totalAnswered,
-      long totalLockedIn,
-      long totalParticipants,
-      List<Long> correctOptionIds,
-      Map<Long, Integer> optionPoints,
-      boolean revealed,
-      boolean reviewed) {}
 }

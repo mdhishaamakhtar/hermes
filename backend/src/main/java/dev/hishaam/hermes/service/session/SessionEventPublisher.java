@@ -1,18 +1,15 @@
 package dev.hishaam.hermes.service.session;
 
 import dev.hishaam.hermes.dto.session.AnswerStats;
+import dev.hishaam.hermes.dto.session.OptionInfo;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
-import dev.hishaam.hermes.dto.session.SessionResultsResponse;
+import dev.hishaam.hermes.dto.session.SessionResultsResponse.LeaderboardEntry;
 import dev.hishaam.hermes.dto.ws.WsPayloads;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
-import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
-import dev.hishaam.hermes.util.LeaderboardBuilder;
+import dev.hishaam.hermes.service.LeaderboardService;
 import dev.hishaam.hermes.util.WsTopics;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -28,9 +25,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Publishes all STOMP WebSocket events for a session: question lifecycle events (displayed, frozen,
  * reviewed), passage events, timer start, leaderboard updates, session end, and per-participant
- * answer feedback. Drops messages silently when the broker relay is offline to avoid blocking
- * callers. Broker availability is tracked via Spring's {@link BrokerAvailabilityEvent}. Session-end
- * messages are held until the caller's transaction commits.
+ * answer feedback. Drops messages silently while the broker is unavailable, to avoid blocking
+ * callers; availability is tracked via Spring's {@link BrokerAvailabilityEvent}, which both the
+ * in-process broker and the relay raise. Session-end messages are held until the caller's
+ * transaction commits.
  */
 @Service
 public class SessionEventPublisher {
@@ -40,40 +38,27 @@ public class SessionEventPublisher {
   private volatile boolean brokerAvailable = false;
 
   private final SimpMessagingTemplate messaging;
-  private final SessionSnapshotService snapshotService;
   private final SessionStateRedisRepository stateStore;
   private final SessionScoringRedisRepository scoringStore;
-  private final ParticipantRepository participantRepository;
+  private final LeaderboardService leaderboardService;
 
   public SessionEventPublisher(
       SimpMessagingTemplate messaging,
-      SessionSnapshotService snapshotService,
       SessionStateRedisRepository stateStore,
       SessionScoringRedisRepository scoringStore,
-      ParticipantRepository participantRepository) {
+      LeaderboardService leaderboardService) {
     this.messaging = messaging;
-    this.snapshotService = snapshotService;
     this.stateStore = stateStore;
     this.scoringStore = scoringStore;
-    this.participantRepository = participantRepository;
+    this.leaderboardService = leaderboardService;
   }
 
   public void publishParticipantJoined(Long sessionId, long participantCount) {
-    var payload = new WsPayloads.ParticipantJoined(participantCount);
-    send(WsTopics.sessionControl(sessionId), payload);
-    send(WsTopics.sessionQuestion(sessionId), payload);
+    send(WsTopics.sessionQuestion(sessionId), new WsPayloads.ParticipantJoined(participantCount));
   }
 
   public void publishQuestionDisplayed(
       Long sessionId, QuizSnapshot.QuestionSnapshot question, QuizSnapshot snapshot) {
-    int questionIndex = snapshot.questionPosition(question.id());
-    int totalQuestions = snapshot.questions().size();
-
-    List<WsPayloads.Option> options =
-        question.options().stream()
-            .map(o -> new WsPayloads.Option(o.id(), o.text(), o.orderIndex()))
-            .toList();
-
     WsPayloads.PassageContext passageContext = null;
     if (question.passageId() != null) {
       QuizSnapshot.PassageSnapshot passage = snapshot.requirePassage(question.passageId());
@@ -86,9 +71,9 @@ public class SessionEventPublisher {
             question.id(),
             question.text(),
             question.questionType().name(),
-            options,
-            questionIndex,
-            totalQuestions,
+            OptionInfo.of(question),
+            snapshot.questionPosition(question.id()),
+            snapshot.questions().size(),
             passageContext,
             question.effectiveDisplayMode().name()));
   }
@@ -98,23 +83,13 @@ public class SessionEventPublisher {
       QuizSnapshot.PassageSnapshot passage,
       List<QuizSnapshot.QuestionSnapshot> subQuestions,
       QuizSnapshot snapshot) {
-    int questionIndex = snapshot.questionPosition(subQuestions.getFirst().id());
-    int totalQuestions = snapshot.questions().size();
-
     List<WsPayloads.SubQuestion> wsSubQuestions =
         subQuestions.stream()
             .map(
-                q -> {
-                  List<WsPayloads.Option> opts =
-                      q.options().stream()
-                          .map(o -> new WsPayloads.Option(o.id(), o.text(), o.orderIndex()))
-                          .toList();
-                  return new WsPayloads.SubQuestion(
-                      q.id(), q.text(), q.questionType().name(), opts);
-                })
+                q ->
+                    new WsPayloads.SubQuestion(
+                        q.id(), q.text(), q.questionType().name(), OptionInfo.of(q)))
             .toList();
-
-    String effectiveDisplayMode = subQuestions.getFirst().effectiveDisplayMode().name();
 
     send(
         WsTopics.sessionQuestion(sessionId),
@@ -123,9 +98,9 @@ public class SessionEventPublisher {
             passage.text(),
             passage.timeLimitSeconds(),
             wsSubQuestions,
-            questionIndex,
-            totalQuestions,
-            effectiveDisplayMode));
+            snapshot.questionPosition(subQuestions.getFirst().id()),
+            snapshot.questions().size(),
+            subQuestions.getFirst().effectiveDisplayMode().name()));
   }
 
   public void publishTimerStart(
@@ -146,82 +121,55 @@ public class SessionEventPublisher {
   }
 
   /**
-   * Sent once the caller's transaction commits: clients fetch results as soon as SESSION_END
+   * Tells players the session is over and hands the organiser the final standings. Both messages
+   * wait for the caller's transaction to commit: clients fetch results as soon as SESSION_END
    * arrives, and results are refused until the ENDED status is committed.
    */
   public void publishSessionEnd(Long sessionId) {
+    List<LeaderboardEntry> leaderboard = leaderboardService.standings(sessionId);
     sendAfterCommit(WsTopics.sessionQuestion(sessionId), new WsPayloads.SessionEnd());
+    sendAfterCommit(
+        WsTopics.sessionAnalytics(sessionId),
+        new WsPayloads.SessionEndAnalytics(leaderboard, leaderboard.size()));
   }
 
   /**
-   * Reads the final standings from Redis now, because the caller clears those keys before it
-   * commits, but sends them after the commit for the same reason as {@link #publishSessionEnd}.
+   * Reveals a graded question's answer key and, where the display mode kept the tallies hidden
+   * during the countdown, the final answer distribution.
    */
-  public void publishSessionEndAnalytics(Long sessionId) {
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        scoringStore.buildLeaderboard(sessionId);
-    long participantCount = stateStore.getParticipantCount(sessionId);
-    sendAfterCommit(
-        WsTopics.sessionAnalytics(sessionId),
-        new WsPayloads.SessionEndAnalytics(leaderboard, participantCount));
-  }
-
-  public void publishQuestionReviewed(
-      Long sessionId, Long questionId, QuizSnapshot.QuestionSnapshot question) {
-    List<Long> correctOptionIds =
-        question.options().stream()
-            .filter(o -> o.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .toList();
-
-    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
-    question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
-
+  public void publishQuestionReviewed(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
     send(
         WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.QuestionReviewed(questionId, correctOptionIds, optionPoints));
+        new WsPayloads.QuestionReviewed(
+            question.id(), question.correctOptionIds(), question.optionPoints()));
 
-    DisplayMode mode = question.effectiveDisplayMode();
-    if (mode == DisplayMode.BLIND || mode == DisplayMode.CODE_DISPLAY) {
-      Map<Long, Long> counts = scoringStore.getQuestionCounts(sessionId, questionId);
-      long totalAnswered = scoringStore.getTotalAnswered(sessionId, questionId);
-      long totalParticipants = stateStore.getParticipantCount(sessionId);
-
+    if (question.effectiveDisplayMode() != DisplayMode.LIVE) {
+      AnswerStats stats =
+          scoringStore.answerStats(
+              sessionId, question.id(), stateStore.getParticipantCount(sessionId));
       var answerReveal =
-          new WsPayloads.AnswerReveal(questionId, counts, totalAnswered, totalParticipants);
+          new WsPayloads.AnswerReveal(
+              question.id(),
+              stats.optionCounts(),
+              stats.totalAnswered(),
+              stats.totalParticipants());
       send(WsTopics.sessionAnalytics(sessionId), answerReveal);
       send(WsTopics.sessionQuestion(sessionId), answerReveal);
     }
   }
 
-  public void publishScoringCorrected(
-      Long sessionId, Long questionId, QuizSnapshot.QuestionSnapshot question) {
-    List<Long> correctOptionIds =
-        question.options().stream()
-            .filter(o -> o.pointValue() > 0)
-            .map(QuizSnapshot.OptionSnapshot::id)
-            .toList();
-
-    Map<Long, Integer> optionPoints = new LinkedHashMap<>();
-    question.options().forEach(o -> optionPoints.put(o.id(), o.pointValue()));
-
+  public void publishScoringCorrected(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
     send(
         WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.ScoringCorrected(questionId, correctOptionIds, optionPoints));
+        new WsPayloads.ScoringCorrected(
+            question.id(), question.correctOptionIds(), question.optionPoints()));
   }
 
-  public void publishLeaderboardFromDb(Long sessionId, Map<Long, Long> participantTotals) {
-    Map<Long, String> names = new HashMap<>();
-    participantRepository
-        .findBySessionId(sessionId)
-        .forEach(p -> names.put(p.getId(), p.getDisplayName()));
-    long totalParticipants = participantRepository.countBySessionId(sessionId);
-
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        LeaderboardBuilder.rank(participantTotals, names);
+  /** Sends the current standings to the organiser and to every player. */
+  public void publishLeaderboard(Long sessionId) {
+    List<LeaderboardEntry> leaderboard = leaderboardService.standings(sessionId);
 
     send(WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
-
     send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ParticipantLeaderboard(
@@ -231,44 +179,24 @@ public class SessionEventPublisher {
                         new WsPayloads.ParticipantLeaderboardEntry(
                             e.participantId(), e.rank(), e.displayName(), e.score()))
                 .toList(),
-            totalParticipants));
+            leaderboard.size()));
   }
 
-  public void publishLeaderboardUpdates(Long sessionId) {
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        scoringStore.buildLeaderboard(sessionId);
-    long totalParticipants = stateStore.getParticipantCount(sessionId);
-
-    send(WsTopics.sessionAnalytics(sessionId), new WsPayloads.LeaderboardUpdate(leaderboard));
-
-    send(
-        WsTopics.sessionQuestion(sessionId),
-        new WsPayloads.ParticipantLeaderboard(
-            leaderboard.stream()
-                .sorted(Comparator.comparingInt(SessionResultsResponse.LeaderboardEntry::rank))
-                .map(
-                    e ->
-                        new WsPayloads.ParticipantLeaderboardEntry(
-                            e.participantId(), e.rank(), e.displayName(), e.score()))
-                .toList(),
-            totalParticipants));
-  }
-
-  public void publishAnswerUpdate(Long sessionId, Long questionId, AnswerStats stats) {
-    String sid = sessionId.toString();
-    QuizSnapshot snapshot = snapshotService.loadSnapshot(sid);
-    QuizSnapshot.QuestionSnapshot question = snapshot.findQuestion(questionId);
-    DisplayMode mode = question != null ? question.effectiveDisplayMode() : DisplayMode.LIVE;
-
+  /**
+   * Streams the live tallies for a question. What goes out follows its display mode: LIVE shows the
+   * per-option counts, BLIND only how many have answered, CODE_DISPLAY nothing until review.
+   */
+  public void publishAnswerUpdate(
+      Long sessionId, QuizSnapshot.QuestionSnapshot question, AnswerStats stats) {
+    DisplayMode mode = question.effectiveDisplayMode();
     if (mode == DisplayMode.CODE_DISPLAY) {
       return;
     }
 
-    Map<Long, Long> broadcastCounts = mode == DisplayMode.BLIND ? Map.of() : stats.optionCounts();
     var answerUpdate =
         new WsPayloads.AnswerUpdate(
-            questionId,
-            broadcastCounts,
+            question.id(),
+            mode == DisplayMode.BLIND ? Map.of() : stats.optionCounts(),
             stats.totalAnswered(),
             stats.totalParticipants(),
             stats.totalLockedIn());
@@ -278,9 +206,6 @@ public class SessionEventPublisher {
 
   public void publishAnswerAccepted(
       String username, String clientRequestId, Long questionId, boolean lockedIn) {
-    if (username == null || clientRequestId == null || clientRequestId.isBlank()) {
-      return;
-    }
     sendToUser(
         username,
         "/queue/answers",
@@ -294,9 +219,6 @@ public class SessionEventPublisher {
       String code,
       String message,
       boolean lockedIn) {
-    if (username == null || clientRequestId == null || clientRequestId.isBlank()) {
-      return;
-    }
     sendToUser(
         username,
         "/queue/answers",
@@ -307,9 +229,9 @@ public class SessionEventPublisher {
   public void onBrokerAvailability(BrokerAvailabilityEvent event) {
     this.brokerAvailable = event.isBrokerAvailable();
     if (!brokerAvailable) {
-      log.warn("STOMP broker relay went offline");
+      log.warn("STOMP broker went offline");
     } else {
-      log.info("STOMP broker relay is online");
+      log.info("STOMP broker is online");
     }
   }
 

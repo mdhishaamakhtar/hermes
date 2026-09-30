@@ -2,17 +2,18 @@ package dev.hishaam.hermes.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.hishaam.hermes.support.BaseIntegrationTest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for scoring correction and leaderboard ordering.
  *
  * <p>This suite exercises the API path that allows hosts to revise scoring after answers have
- * already been persisted, and verifies that score ties are resolved by cumulative answer time.
+ * already been persisted, and verifies that score ties are resolved by cumulative answer time —
+ * identically during play and in the final results.
  */
 class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
 
@@ -142,11 +143,63 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
-   * Verifies that leaderboard ranking prefers participants with the same score who answered faster
-   * overall.
+   * Verifies that a correction which accepts a second answer on a single-select question leaves
+   * both answers marked correct. A player can only ever pick one option there, so everyone who
+   * chose either scoring option got it right — nobody should see "incorrect" beside points they
+   * were just awarded.
    */
   @Test
-  void leaderboardBreaksScoreTiesByFasterCumulativeAnswerTime() throws Exception {
+  void acceptingASecondAnswerOnASingleSelectQuestionMarksBothAnswersCorrect() throws Exception {
+    Auth organiser = organiser();
+    long eventId = createEvent(organiser, "Two Right Answers Event");
+    long quizId = createQuiz(organiser, eventId, "Two Right Answers Quiz");
+    JsonNode question = createSingleSelectQuestion(organiser, quizId, "Ambiguous", 1, 30);
+    long questionId = question.path("id").asLong();
+    long originalOptionId = question.path("options").get(0).path("id").asLong();
+    long otherOptionId = question.path("options").get(1).path("id").asLong();
+
+    JsonNode session =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
+    long sessionId = session.path("id").asLong();
+    String joinCode = session.path("joinCode").asText();
+    String adaToken = join(joinCode, "Ada");
+    String graceToken = join(joinCode, "Grace");
+
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/start-timer", organiser, Map.of(), 200);
+    answer(sessionId, adaToken, questionId, originalOptionId);
+    answer(sessionId, graceToken, questionId, otherOptionId);
+    postJson("/api/sessions/" + sessionId + "/end-timer", organiser, Map.of(), 200);
+
+    // The host decides the other option was a fair answer too
+    patchJson(
+        "/api/sessions/" + sessionId + "/questions/" + questionId + "/scoring",
+        organiser,
+        Map.of(
+            "options",
+            new Object[] {
+              Map.of("optionId", originalOptionId, "pointValue", 10),
+              Map.of("optionId", otherOptionId, "pointValue", 10)
+            }),
+        200);
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+
+    for (String token : List.of(adaToken, graceToken)) {
+      JsonNode mine = myResults(sessionId, token);
+      assertThat(mine.path("correctCount").asInt()).isEqualTo(1);
+      assertThat(mine.path("questions").get(0).path("isCorrect").asBoolean()).isTrue();
+      assertThat(mine.path("questions").get(0).path("pointsEarned").asInt()).isEqualTo(10);
+    }
+  }
+
+  /**
+   * Verifies that two participants level on score are separated by who answered faster, and that
+   * every screen agrees on it: the live leaderboard, the organiser's results page once the session
+   * has ended, and each player's own results. Grace joins first so that join order alone would put
+   * her on top — only the answer time can rank Ada above her.
+   */
+  @Test
+  void scoreTiesAreBrokenByAnswerTimeOnTheLiveBoardAndInTheFinalResults() throws Exception {
     Auth organiser = organiser();
     long eventId = createEvent(organiser, "Tie Break Event");
     long quizId = createQuiz(organiser, eventId, "Tie Break Quiz");
@@ -158,56 +211,38 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
         postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
     long sessionId = session.path("id").asLong();
     String joinCode = session.path("joinCode").asText();
-    String adaToken =
-        postJson(
-                "/api/sessions/join", null, Map.of("joinCode", joinCode, "displayName", "Ada"), 200)
-            .path("data")
-            .path("rejoinToken")
-            .asText();
-    String graceToken =
-        postJson(
-                "/api/sessions/join",
-                null,
-                Map.of("joinCode", joinCode, "displayName", "Grace"),
-                200)
-            .path("data")
-            .path("rejoinToken")
-            .asText();
+    String graceToken = join(joinCode, "Grace");
+    String adaToken = join(joinCode, "Ada");
 
     postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
     postJson("/api/sessions/" + sessionId + "/start-timer", organiser, Map.of(), 200);
 
-    postJson(
-        "/api/sessions/" + sessionId + "/answers",
-        null,
-        Map.of(
-            "rejoinToken",
-            adaToken,
-            "questionId",
-            questionId,
-            "selectedOptionIds",
-            List.of(correctOptionId)),
-        200);
+    answer(sessionId, adaToken, questionId, correctOptionId);
     // Grace gives the same correct answer measurably later than Ada
     Thread.sleep(500);
-    postJson(
-        "/api/sessions/" + sessionId + "/answers",
-        null,
-        Map.of(
-            "rejoinToken",
-            graceToken,
-            "questionId",
-            questionId,
-            "selectedOptionIds",
-            List.of(correctOptionId)),
-        200);
+    answer(sessionId, graceToken, questionId, correctOptionId);
 
     postJson("/api/sessions/" + sessionId + "/end-timer", organiser, Map.of(), 200);
 
-    JsonNode leaderboard =
+    JsonNode live =
         getJson("/api/sessions/" + sessionId + "/host-sync", organiser, 200)
             .path("data")
             .path("leaderboard");
+    assertAdaAheadOfGrace(live);
+
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+
+    JsonNode finalBoard =
+        getJson("/api/sessions/" + sessionId + "/results", organiser, 200)
+            .path("data")
+            .path("leaderboard");
+    assertAdaAheadOfGrace(finalBoard);
+
+    assertThat(myRank(sessionId, adaToken)).isEqualTo(1);
+    assertThat(myRank(sessionId, graceToken)).isEqualTo(2);
+  }
+
+  private static void assertAdaAheadOfGrace(JsonNode leaderboard) {
     assertThat(leaderboard).hasSize(2);
     assertThat(leaderboard.get(0).path("displayName").asText()).isEqualTo("Ada");
     assertThat(leaderboard.get(0).path("rank").asInt()).isEqualTo(1);
@@ -215,5 +250,39 @@ class ScoringAndLeaderboardIntegrationTest extends BaseIntegrationTest {
     assertThat(leaderboard.get(1).path("displayName").asText()).isEqualTo("Grace");
     assertThat(leaderboard.get(1).path("rank").asInt()).isEqualTo(2);
     assertThat(leaderboard.get(1).path("score").asLong()).isEqualTo(10);
+  }
+
+  private String join(String joinCode, String displayName) throws Exception {
+    return postJson(
+            "/api/sessions/join",
+            null,
+            Map.of("joinCode", joinCode, "displayName", displayName),
+            200)
+        .path("data")
+        .path("rejoinToken")
+        .asText();
+  }
+
+  private void answer(long sessionId, String token, long questionId, long optionId)
+      throws Exception {
+    postJson(
+        "/api/sessions/" + sessionId + "/answers",
+        null,
+        Map.of(
+            "rejoinToken", token, "questionId", questionId, "selectedOptionIds", List.of(optionId)),
+        200);
+  }
+
+  private JsonNode myResults(long sessionId, String token) throws Exception {
+    return getJson(
+            "/api/sessions/" + sessionId + "/my-results",
+            null,
+            Map.of("X-Rejoin-Token", token),
+            200)
+        .path("data");
+  }
+
+  private int myRank(long sessionId, String token) throws Exception {
+    return myResults(sessionId, token).path("rank").asInt();
   }
 }

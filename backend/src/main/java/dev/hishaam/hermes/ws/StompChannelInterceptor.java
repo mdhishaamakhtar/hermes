@@ -24,15 +24,20 @@ import org.springframework.stereotype.Component;
  * STOMP principal. Anonymous clients fall back to a {@code ws:<sessionId>} principal so every
  * connection has a non-null principal.
  *
- * <p>On {@code SUBSCRIBE}: restricts {@code /topic/session.{id}.analytics} and {@code
- * /topic/session.{id}.control} to the session's owning organizer. All other destinations are open.
+ * <p>On {@code SUBSCRIBE}: restricts {@code /topic/session.{id}.analytics} to the session's owning
+ * organizer. All other destinations are open.
+ *
+ * <p>On {@code SEND}: only application destinations ({@code /app/**}) are accepted. A frame a
+ * client addresses straight to {@code /topic/**} or {@code /queue/**} would otherwise be handed to
+ * the broker and fanned out to every subscriber, letting anyone forge a session event.
  */
 @Component
 public class StompChannelInterceptor implements ChannelInterceptor {
 
   private static final Logger log = LoggerFactory.getLogger(StompChannelInterceptor.class);
   private static final Pattern ORGANISER_TOPIC =
-      Pattern.compile("^/topic/session\\.(\\d+)\\.(analytics|control)$");
+      Pattern.compile("^/topic/session\\.(\\d+)\\.analytics$");
+  private static final String APPLICATION_PREFIX = "/app/";
 
   private final JwtUtil jwtUtil;
   private final UserRepository userRepository;
@@ -65,6 +70,12 @@ public class StompChannelInterceptor implements ChannelInterceptor {
       if (accessor.getUser() == null) {
         String sessionId = accessor.getSessionId();
         accessor.setUser(() -> sessionId != null ? "ws:" + sessionId : "ws:anonymous");
+      }
+    } else if (StompCommand.SEND.equals(accessor.getCommand())) {
+      String destination = accessor.getDestination();
+      if (destination == null || !destination.startsWith(APPLICATION_PREFIX)) {
+        throw new MessageDeliveryException(
+            message, "Clients may only send to /app destinations, not " + destination);
       }
     } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
       String destination = accessor.getDestination();

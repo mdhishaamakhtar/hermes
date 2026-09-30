@@ -9,9 +9,15 @@ import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
-import dev.hishaam.hermes.service.*;
-import dev.hishaam.hermes.util.LeaderboardBuilder;
-import java.util.*;
+import dev.hishaam.hermes.service.LeaderboardService;
+import dev.hishaam.hermes.service.OwnershipService;
+import dev.hishaam.hermes.service.ParticipantService;
+import dev.hishaam.hermes.service.ScoreCalculator;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +36,7 @@ public class SessionResultsService {
   private final SessionSnapshotService snapshotService;
   private final ParticipantService participantService;
   private final ScoreCalculator scoreCalculator;
+  private final LeaderboardService leaderboardService;
 
   public SessionResultsService(
       QuizSessionRepository sessionRepository,
@@ -38,7 +45,8 @@ public class SessionResultsService {
       OwnershipService ownershipService,
       SessionSnapshotService snapshotService,
       ParticipantService participantService,
-      ScoreCalculator scoreCalculator) {
+      ScoreCalculator scoreCalculator,
+      LeaderboardService leaderboardService) {
     this.sessionRepository = sessionRepository;
     this.participantRepository = participantRepository;
     this.answerRepository = answerRepository;
@@ -46,6 +54,7 @@ public class SessionResultsService {
     this.snapshotService = snapshotService;
     this.participantService = participantService;
     this.scoreCalculator = scoreCalculator;
+    this.leaderboardService = leaderboardService;
   }
 
   @Transactional(readOnly = true)
@@ -89,26 +98,14 @@ public class SessionResultsService {
                 .count();
     int totalScore = answers.stream().mapToInt(ParticipantAnswer::getScore).sum();
 
-    // Compute rank from all session answers
-    List<ParticipantAnswer> allAnswers = answerRepository.findBySessionId(sessionId);
-    long totalParticipants = participantRepository.countBySessionId(sessionId);
-
-    Map<Long, Long> scores = new LinkedHashMap<>();
-    // Initialize all participants with 0 so zero-score participants get ranked
-    participantRepository.findBySessionId(sessionId).forEach(p -> scores.put(p.getId(), 0L));
-    allAnswers.forEach(
-        answer ->
-            scores.merge(
-                answer.getParticipantId(),
-                (long) answer.getScore(),
-                (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
-
-    List<Long> sortedIds =
-        scores.entrySet().stream()
-            .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
-            .map(Map.Entry::getKey)
-            .toList();
-    int rank = sortedIds.indexOf(participantId) + 1;
+    List<SessionResultsResponse.LeaderboardEntry> standings =
+        leaderboardService.standings(sessionId);
+    int rank =
+        standings.stream()
+            .filter(entry -> entry.participantId().equals(participantId))
+            .mapToInt(SessionResultsResponse.LeaderboardEntry::rank)
+            .findFirst()
+            .orElse(0);
 
     List<MyResultsResponse.QuestionResult> questions =
         snapshot.questions().stream()
@@ -116,12 +113,6 @@ public class SessionResultsService {
             .map(
                 q -> {
                   ParticipantAnswer ans = answerMap.get(q.id());
-                  List<Long> selectedOptionIds = selectedOptionIds(ans);
-                  List<Long> correctOptionIds =
-                      q.options().stream()
-                          .filter(o -> o.pointValue() > 0)
-                          .map(QuizSnapshot.OptionSnapshot::id)
-                          .toList();
                   List<MyResultsResponse.OptionInfo> options =
                       q.options().stream()
                           .sorted(Comparator.comparingInt(QuizSnapshot.OptionSnapshot::orderIndex))
@@ -145,8 +136,8 @@ public class SessionResultsService {
                       q.questionType().name(),
                       q.passageId(),
                       passageText,
-                      selectedOptionIds,
-                      correctOptionIds,
+                      selectedOptionIds(ans),
+                      q.correctOptionIds(),
                       options,
                       isCorrect,
                       pointsEarned);
@@ -160,7 +151,7 @@ public class SessionResultsService {
         correctCount,
         snapshot.questions().size(),
         rank,
-        totalParticipants,
+        standings.size(),
         questions);
   }
 
@@ -172,10 +163,8 @@ public class SessionResultsService {
 
     QuizSnapshot snapshot = snapshotService.deserialize(session.getSnapshot());
     List<ParticipantAnswer> allAnswers = answerRepository.findBySessionId(sessionId);
-    List<Participant> participants = participantRepository.findBySessionId(sessionId);
-
-    Map<Long, String> displayNames = new LinkedHashMap<>();
-    participants.forEach(p -> displayNames.put(p.getId(), p.getDisplayName()));
+    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
+        leaderboardService.standings(sessionId);
 
     // Build per-question results
     List<SessionResultsResponse.QuestionResult> questionResults =
@@ -191,15 +180,7 @@ public class SessionResultsService {
                       answer ->
                           answer
                               .getSelectedOptionIds()
-                              .forEach(
-                                  optionId ->
-                                      optionCounts.merge(
-                                          optionId,
-                                          1L,
-                                          (a, b) ->
-                                              Long.sum(
-                                                  Objects.requireNonNull(a),
-                                                  Objects.requireNonNull(b)))));
+                              .forEach(optionId -> optionCounts.merge(optionId, 1L, Long::sum)));
 
                   long totalAnswers =
                       questionAnswers.stream()
@@ -233,19 +214,6 @@ public class SessionResultsService {
                 })
             .toList();
 
-    // Build leaderboard — include ALL participants (zero-score get score 0)
-    Map<Long, Long> scores = new LinkedHashMap<>();
-    participants.forEach(p -> scores.put(p.getId(), 0L));
-    allAnswers.forEach(
-        answer ->
-            scores.merge(
-                answer.getParticipantId(),
-                (long) answer.getScore(),
-                (a, b) -> Long.sum(Objects.requireNonNull(a), Objects.requireNonNull(b))));
-
-    List<SessionResultsResponse.LeaderboardEntry> leaderboard =
-        LeaderboardBuilder.rank(scores, displayNames);
-
     return new SessionResultsResponse(
         sessionId,
         quizId,
@@ -253,7 +221,7 @@ public class SessionResultsService {
         quizTitle,
         session.getStartedAt(),
         session.getEndedAt(),
-        participants.size(),
+        leaderboard.size(),
         questionResults,
         leaderboard);
   }

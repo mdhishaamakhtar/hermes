@@ -43,11 +43,11 @@ class ScoreCalculatorTest {
   }
 
   /**
-   * Verifies that correctness requires an exact, non-empty match with all positive-value options
-   * and rejects partial, extra, or null selections.
+   * Verifies that on a multi-select question correctness requires an exact, non-empty match with
+   * all positive-value options and rejects partial, extra, or null selections.
    */
   @Test
-  void correctSelectionRequiresExactNonEmptySetOfPositiveOptions() {
+  void multiSelectCorrectnessRequiresExactNonEmptySetOfPositiveOptions() {
     QuizSnapshot.QuestionSnapshot question =
         question(
             new QuizSnapshot.OptionSnapshot(10L, "Correct A", 5, 0),
@@ -62,22 +62,28 @@ class ScoreCalculatorTest {
   }
 
   /**
-   * Verifies per-participant score aggregation and answer-time clamping against the configured
-   * timer window.
+   * Verifies that on a single-select question picking any scoring option is correct. After a
+   * scoring correction two options can both be worth points; a player can only choose one of them,
+   * so demanding the full set would mark everyone wrong — including the people who just scored.
    */
   @Test
-  void sumsScoresByParticipantAndBoundsAnswerTiming() {
-    ParticipantAnswer first = answer(1L, 10L);
-    first.setScore(7);
-    ParticipantAnswer second = answer(1L, 11L);
-    second.setScore(0);
-    ParticipantAnswer third = answer(2L, 12L);
-    third.setScore(4);
+  void singleSelectCorrectnessAcceptsAnyScoringOption() {
+    QuizSnapshot.QuestionSnapshot question =
+        question(
+            QuestionType.SINGLE_SELECT,
+            new QuizSnapshot.OptionSnapshot(10L, "Original answer", 10, 0),
+            new QuizSnapshot.OptionSnapshot(11L, "Also accepted after correction", 25, 1),
+            new QuizSnapshot.OptionSnapshot(12L, "Wrong", 0, 2));
 
-    assertThat(scoreCalculator.sumScoresByParticipant(List.of(first, second, third)))
-        .containsEntry(1L, 7L)
-        .containsEntry(2L, 4L);
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L), question)).isTrue();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 11L), question)).isTrue();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 12L), question)).isFalse();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L), question)).isFalse();
+  }
 
+  /** Verifies answer-time clamping against the configured timer window. */
+  @Test
+  void boundsAnswerTimingToTheTimerWindow() {
     long startedAt = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli();
     assertThat(
             scoreCalculator.computeAnswerTimeMs(
@@ -100,16 +106,13 @@ class ScoreCalculatorTest {
   }
 
   private QuizSnapshot.QuestionSnapshot question(QuizSnapshot.OptionSnapshot... options) {
+    return question(QuestionType.MULTI_SELECT, options);
+  }
+
+  private QuizSnapshot.QuestionSnapshot question(
+      QuestionType type, QuizSnapshot.OptionSnapshot... options) {
     return new QuizSnapshot.QuestionSnapshot(
-        100L,
-        "Question",
-        QuestionType.MULTI_SELECT,
-        1,
-        30,
-        null,
-        DisplayMode.LIVE,
-        List.of(options),
-        null);
+        100L, "Question", type, 1, 30, null, DisplayMode.LIVE, List.of(options), null);
   }
 
   private ParticipantAnswer answer(Long participantId, Long... selectedOptionIds) {

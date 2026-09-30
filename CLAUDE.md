@@ -16,7 +16,7 @@ docker-compose up          # Start all services (postgres, redis, backend, front
 ### Backend
 ```bash
 cd backend
-./mvnw spring-boot:run     # Run (requires postgres + redis on localhost)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # Run (requires postgres + redis on localhost)
 ./mvnw clean package       # Build JAR
 ./mvnw test                # Run tests
 ./mvnw spotless:apply      # Format code (Google Java Format — run before committing)
@@ -35,7 +35,7 @@ bun run format             # Prettier auto-fix
 ## Architecture
 
 ### Tech Stack
-- **Backend:** Spring Boot 4.0.3, Java 25, PostgreSQL 17, Redis 7, STOMP WebSockets, JWT auth
+- **Backend:** Spring Boot 4.0.8, Java 25, PostgreSQL 17, Redis 7, STOMP WebSockets, JWT auth
 - **Frontend:** Next.js 16.3, React 19, TypeScript, Tailwind CSS 4, Motion, `@stomp/stompjs`
 
 ### Session Lifecycle
@@ -56,18 +56,17 @@ LOBBY → ACTIVE → ENDED
   The simple broker keeps subscriptions in the process holding the WebSocket, so it is correct
   for a single instance only — running more than one replica requires `relay`.
 - **Endpoint:** `/ws-hermes`
-- **Client → Server:** `/app/session/{sessionId}/answer` (submit or change an answer) and `/app/session/{sessionId}/lock-in`; both have HTTP fallbacks the player uses when no acknowledgement arrives within 2s
+- **Client → Server:** `/app/session/{sessionId}/answer` (submit or change an answer) and `/app/session/{sessionId}/lock-in`; both have HTTP fallbacks the player uses when no acknowledgement arrives within 2s. `StompChannelInterceptor` refuses a client SEND to anything outside `/app/**`, so clients cannot publish to topics
 - **Server → Client subscriptions:**
   - `/topic/session.{sessionId}.question` — lifecycle events (`QUESTION_DISPLAYED`, `PASSAGE_DISPLAYED`, `TIMER_START`, `QUESTION_FROZEN`, `PASSAGE_FROZEN`, `QUESTION_REVIEWED`, `SCORING_CORRECTED`, `SESSION_END`), plus `PARTICIPANT_JOINED`, `ANSWER_UPDATE`, `ANSWER_REVEAL` and `PARTICIPANT_LEADERBOARD` repeated for players
   - `/topic/session.{sessionId}.analytics` — answer counts, `LEADERBOARD_UPDATE`, and `SESSION_END` with final standings (organizer only)
-  - `/topic/session.{sessionId}.control` — `PARTICIPANT_JOINED` (organizer only; the frontend reads it from the question topic instead)
   - `/user/queue/answers` — a player's own `ANSWER_ACCEPTED` / `ANSWER_REJECTED` acknowledgements
 
 The wire types live in `frontend/features/session/session-types.ts`. The connection is managed by `frontend/features/session/useStompClient.ts`: exponential reconnect from 500ms to 5s, 10s heartbeats, an immediate reconnect when the tab returns or the network comes back, and subscriptions replayed on every reconnect.
 
 ### State Split: PostgreSQL vs Redis
-- **PostgreSQL:** Users, Events, Quizzes, Questions, Sessions, Participants, Answers (persistent).
-- **Redis:** Active session state, current question index, timers, leaderboard caches (ephemeral, replaced on session end).
+- **PostgreSQL:** Users, Events, Quizzes, Questions, Sessions, Participants, Answers (persistent). Scores and standings are always derived from the graded answers here.
+- **Redis:** Active session state, current question index, timers, live answer tallies (ephemeral, removed on session end).
 
 ### Key Backend Services
 | Service | Responsibility |
@@ -78,13 +77,14 @@ The wire types live in `frontend/features/session/session-types.ts`. The connect
 | `session/SessionSnapshotService` | Builds, serializes, and loads the quiz snapshot frozen at session creation |
 | `session/SessionEventPublisher` | All STOMP broadcasts; drops messages silently while the broker is offline |
 | `session/SessionResultsService` | Post-session results and per-participant results, computed purely from PostgreSQL |
-| `GradingService` + `ScoreCalculator` | Grading orchestration (persist, leaderboard, broadcast) and the stateless scoring math it calls |
+| `GradingService` + `ScoreCalculator` | Grading orchestration (persist, broadcast) and the stateless scoring math it calls |
+| `LeaderboardService` | The single source of standings — live, at session end, and on the results pages — ranked from PostgreSQL by score, then answer time |
 | `AnswerService` | Answer submission and lock-in during a live session |
 | `ParticipantService` | Anonymous join/rejoin logic and rejoin-token management |
 | `OwnershipService` | Ensures organizers can only manage their own resources |
 | `util/SessionRedisKeys` | Static Redis key builders and the shared session/rejoin TTLs |
 | `repository/redis/SessionStateRedisRepository` | Live state: status, current question/passage, lifecycle, participant count, timer, sequence, snapshot JSON, join-code reservations |
-| `repository/redis/SessionScoringRedisRepository` | Answer counts, lock-ins, leaderboard ZSet, cumulative answer time |
+| `repository/redis/SessionScoringRedisRepository` | Live tallies per question: option counts, who has answered, who has locked in |
 | `repository/redis/ParticipantRejoinTokenRedisRepository` | Rejoin-token cache (pure cache; the Postgres fallback lives in `ParticipantService`) |
 
 ### Key Frontend Files

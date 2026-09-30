@@ -1,5 +1,6 @@
 package dev.hishaam.hermes.dto.ws;
 
+import dev.hishaam.hermes.dto.session.OptionInfo;
 import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,7 @@ public final class WsPayloads {
       Long questionId,
       String text,
       String questionType,
-      List<Option> options,
+      List<OptionInfo> options,
       int questionIndex,
       int totalQuestions,
       PassageContext passage,
@@ -49,7 +50,7 @@ public final class WsPayloads {
         Long questionId,
         String text,
         String questionType,
-        List<Option> options,
+        List<OptionInfo> options,
         int questionIndex,
         int totalQuestions,
         PassageContext passage,
@@ -101,7 +102,7 @@ public final class WsPayloads {
   }
 
   public record SubQuestion(
-      Long questionId, String text, String questionType, List<Option> options) {}
+      Long questionId, String text, String questionType, List<OptionInfo> options) {}
 
   /**
    * Host started the timer. {@code questionId} is set for standalone / PER_SUB_QUESTION questions;
@@ -144,7 +145,7 @@ public final class WsPayloads {
     }
   }
 
-  /** Top-5 leaderboard broadcast to all participants after each question is reviewed. */
+  /** The full standings, broadcast to all participants after each question is reviewed. */
   public record ParticipantLeaderboard(
       EventType event, List<ParticipantLeaderboardEntry> leaderboard, long totalParticipants) {
     public ParticipantLeaderboard(
@@ -264,8 +265,4 @@ public final class WsPayloads {
       this(EventType.SCORING_CORRECTED, questionId, correctOptionIds, optionPoints);
     }
   }
-
-  // ─── Shared ───────────────────────────────────────────────────────────────────
-
-  public record Option(Long id, String text, int orderIndex) {}
 }

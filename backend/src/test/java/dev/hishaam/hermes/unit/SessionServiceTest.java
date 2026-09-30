@@ -23,10 +23,9 @@ import dev.hishaam.hermes.repository.QuizRepository;
 import dev.hishaam.hermes.repository.QuizSessionRepository;
 import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
-import dev.hishaam.hermes.service.GradingService;
+import dev.hishaam.hermes.service.LeaderboardService;
 import dev.hishaam.hermes.service.OwnershipService;
 import dev.hishaam.hermes.service.session.SessionEngine;
-import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.service.session.SessionService;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import dev.hishaam.hermes.service.session.SessionTimerScheduler;
@@ -63,9 +62,8 @@ class SessionServiceTest {
   @Mock private SessionStateRedisRepository stateStore;
   @Mock private SessionScoringRedisRepository scoringStore;
   @Mock private SessionEngine engine;
-  @Mock private SessionEventPublisher eventPublisher;
   @Mock private SessionTimerScheduler timerScheduler;
-  @Mock private GradingService gradingService;
+  @Mock private LeaderboardService leaderboardService;
 
   @InjectMocks private SessionService sessionService;
 
@@ -155,7 +153,7 @@ class SessionServiceTest {
      */
     @Test
     void abandonDeletesPersistedRowsEvenWhenRedisCleanupFails() {
-      when(snapshotService.loadSnapshot(SESSION_ID.toString()))
+      when(snapshotService.loadSnapshot(SESSION_ID))
           .thenThrow(new IllegalStateException("snapshot key evicted"));
 
       assertThatCode(() -> sessionService.abandonSession(SESSION_ID, USER_ID))
@@ -173,7 +171,7 @@ class SessionServiceTest {
     @Test
     void abandonCleansRedisStateAndScoringKeysWhenTheSnapshotLoads() {
       QuizSnapshot snapshot = new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of());
-      when(snapshotService.loadSnapshot(SESSION_ID.toString())).thenReturn(snapshot);
+      when(snapshotService.loadSnapshot(SESSION_ID)).thenReturn(snapshot);
 
       sessionService.abandonSession(SESSION_ID, USER_ID);
 
