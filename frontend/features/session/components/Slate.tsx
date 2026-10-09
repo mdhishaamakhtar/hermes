@@ -5,8 +5,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { duration, ease } from "@/lib/motion";
 import type { QuestionLifecycle } from "../session-types";
 
-/** How long the slate holds once it is down, before it rolls back up. */
-const HOLD_MS = 1150;
+/** From arrival to lift-off: about 0.8s fully down, long enough to read. */
+const HOLD_MS = 1300;
 
 function pad(number: number) {
   return String(number).padStart(2, "0");
@@ -26,14 +26,15 @@ export function slateDetail(questions: { questionType: string }[]): string {
 }
 
 /*
- * A blind, not a cut: it rolls down over the question area, holds while
- * the room reads which segment is next, and rolls back up the way it came.
- * Down is quick and decisive; up is slower and eased at both ends, so the
- * question is uncovered rather than snatched away. The header, clock and
- * dock stay in view the whole time, so nobody loses their place.
+ * The panel drops in from above and lifts back out the way it came, moving
+ * on a transform inside a clipping frame. Both legs share one top speed
+ * (about 54px a frame at 60Hz on a 600px stage), so neither feels faster
+ * than the other: the drop eases in and settles (`arrive`), the lift eases
+ * out of rest and accelerates away (`inOut`). The header, clock and dock
+ * stay in view throughout, so nobody loses their place.
  */
-const BLIND_UP = "inset(0% 0% 100% 0%)";
-const BLIND_DOWN = "inset(0% 0% 0% 0%)";
+const ABOVE = "translateY(-100%)";
+const IN_PLACE = "translateY(0%)";
 
 /**
  * The key-blue slate before a question: which segment this is, how many
@@ -70,49 +71,56 @@ export function QuestionSlate({
     return () => window.clearTimeout(timer);
   }, [holding]);
 
+  const [gone, setGone] = useState(!holding);
   const down = holding && lifecycle === "DISPLAYED";
+  if (gone) return null;
 
   return (
-    <AnimatePresence>
-      {down && (
-        <motion.div
-          key="slate"
-          aria-hidden
-          className="slate"
-          initial={reduceMotion ? { opacity: 0 } : { clipPath: BLIND_UP }}
-          animate={reduceMotion ? { opacity: 1 } : { clipPath: BLIND_DOWN }}
-          exit={
-            reduceMotion
-              ? { opacity: 0, transition: { duration: duration.enter } }
-              : {
-                  clipPath: BLIND_UP,
-                  transition: { duration: duration.lift, ease: ease.inOut },
-                }
-          }
-          transition={{ duration: duration.sheet, ease: ease.out }}
-        >
-          <p
-            className={`display display-tight leading-[0.82] ${
-              size === "stage"
-                ? "text-[clamp(4.5rem,11vw,8.5rem)]"
-                : "text-[clamp(3.75rem,17vw,5.5rem)]"
-            }`}
+    <div aria-hidden className="slate-frame">
+      <AnimatePresence onExitComplete={() => setGone(true)}>
+        {down && (
+          <motion.div
+            key="slate"
+            className="slate"
+            initial={reduceMotion ? { opacity: 0 } : { transform: ABOVE }}
+            animate={reduceMotion ? { opacity: 1 } : { transform: IN_PLACE }}
+            exit={
+              reduceMotion
+                ? { opacity: 0, transition: { duration: duration.enter } }
+                : {
+                    transform: ABOVE,
+                    transition: { duration: duration.lift, ease: ease.inOut },
+                  }
+            }
+            transition={
+              reduceMotion
+                ? { duration: duration.enter }
+                : { duration: duration.lift, ease: ease.arrive }
+            }
           >
-            {segmentLabel(first, last)}
-          </p>
-          <p
-            className={`mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono font-medium text-on-primary-muted uppercase ${
-              size === "stage" ? "text-base sm:text-lg" : "text-sm"
-            }`}
-          >
-            <span>of {pad(total)}</span>
-            <span aria-hidden className="text-on-primary-muted">
-              /
-            </span>
-            <span>{detail}</span>
-          </p>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <p
+              className={`display display-tight leading-[0.82] ${
+                size === "stage"
+                  ? "text-[clamp(4.5rem,11vw,8.5rem)]"
+                  : "text-[clamp(3.75rem,17vw,5.5rem)]"
+              }`}
+            >
+              {segmentLabel(first, last)}
+            </p>
+            <p
+              className={`mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono font-medium text-on-primary-muted uppercase ${
+                size === "stage" ? "text-base sm:text-lg" : "text-sm"
+              }`}
+            >
+              <span>of {pad(total)}</span>
+              <span aria-hidden className="text-on-primary-muted">
+                /
+              </span>
+              <span>{detail}</span>
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

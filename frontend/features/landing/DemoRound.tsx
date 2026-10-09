@@ -270,7 +270,8 @@ export function DemoRound() {
               total={ROUNDS.length}
               detail="One answer"
             />
-            <AnimatePresence mode="wait" initial={false}>
+            {/* popLayout keeps the area's height settled under the slate. */}
+            <AnimatePresence mode="popLayout" initial={false}>
               <motion.div key={state.round} {...stageCut}>
                 <p className="display text-[1.625rem] leading-[1.1] text-foreground sm:text-3xl">
                   {round.text}

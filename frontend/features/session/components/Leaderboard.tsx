@@ -11,6 +11,19 @@ import type { LeaderboardEntry } from "../session-types";
 
 type Climbs = Record<number, number>;
 
+/*
+ * A reshuffle is told in order, cause then effect, the way a broadcast
+ * scoreboard does it: the points land first (scores roll in place), then
+ * the order follows (rows travel to their new slots), then the climb marks
+ * say who moved. Each beat starts as the last one is mostly done, so the
+ * whole thing reads as one move, not three things at once.
+ */
+const REORDER_DELAY = 0.22;
+const CLIMB_DELAY = 0.5;
+
+/** A row that climbed into view rises from below; one that fell out sinks. */
+const ROW_TRAVEL = 14;
+
 /**
  * Places each player gained in the latest reshuffle. Held until the order
  * next changes, so a repeated update with the same ranks keeps the marks.
@@ -64,16 +77,34 @@ export function Leaderboard({
   }
 
   return (
-    <ol className="flex flex-col gap-1.5">
-      <AnimatePresence initial={false}>
+    // popLayout lifts a leaving row out of the flow at once, so the rows
+    // that stay travel straight to their final slot in a single move instead
+    // of being shoved past it and snapping back.
+    <ol className="relative flex flex-col gap-1.5">
+      <AnimatePresence initial={false} mode="popLayout">
         {shown.map((entry) => (
           <motion.li
             key={entry.participantId}
             layout="position"
-            transition={spring.slot}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: ROW_TRAVEL }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{
+              opacity: 0,
+              y: ROW_TRAVEL,
+              transition: {
+                duration: duration.base,
+                ease: ease.out,
+                delay: REORDER_DELAY,
+              },
+            }}
+            transition={{
+              layout: { ...spring.slot, delay: REORDER_DELAY },
+              default: {
+                duration: duration.enter,
+                ease: ease.out,
+                delay: REORDER_DELAY,
+              },
+            }}
           >
             <Row
               entry={entry}
@@ -125,14 +156,19 @@ function Row({
           <span className="ml-2 text-xs font-semibold text-accent">You</span>
         )}
       </span>
-      <AnimatePresence initial={false}>
+      {/* Lands once the row has arrived, rising the way the row moved. */}
+      <AnimatePresence>
         {climb && (
           <motion.span
             key={`${entry.rank}-${climb}`}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: duration.enter, ease: ease.out }}
+            exit={{ opacity: 0, transition: { duration: duration.base } }}
+            transition={{
+              duration: duration.enter,
+              ease: ease.out,
+              delay: CLIMB_DELAY,
+            }}
             className="flex shrink-0 items-center gap-0.5 font-mono text-xs font-semibold text-success tabular-nums"
           >
             <Icon name="arrow-up" size={12} />

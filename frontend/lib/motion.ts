@@ -8,7 +8,8 @@
  * Pick an entrance by whether movement tells the truth:
  *   fade      content appearing in place, often over cached data
  *   rise      a surface that genuinely arrived: panel, form, toast
- *   stageCut  the next question cutting in on the live stage
+ *   stageCut  the next question settling onto the live stage, under its
+ *             slate; the slate is the authored moment, so this stays quiet
  *
  * Reduced motion is handled once, by <MotionConfig reducedMotion="user"> in
  * Providers: transforms and layout animations drop out, opacity stays.
@@ -34,17 +35,32 @@ export const ease = {
   out: [0.16, 1, 0.3, 1] as Bezier,
   /** Symmetric, for moves between two on-screen states. Mirrors --ease-in-out. */
   inOut: [0.65, 0, 0.35, 1] as Bezier,
+  /**
+   * A large surface travelling in: a gentle start, a top speed reached a
+   * third of the way, then a long settle. Unlike `out`, it does not cover
+   * half the distance in the first few frames, which on a tall surface
+   * reads as a jump-cut followed by a crawl (176px in the first 60Hz frame
+   * of a 600px slate, against 1.5px for this curve).
+   */
+  arrive: [0.4, 0, 0.2, 1] as Bezier,
 } as const;
 
 export const spring = {
   /** Values that grow to represent a quantity: response bars. */
   bar: { type: "spring", stiffness: 260, damping: 30 },
-  /** Things that move to a new slot: reordered rows, a tab indicator. */
-  slot: { type: "spring", stiffness: 480, damping: 38 },
+  /**
+   * Things that move to a new slot: reordered rows, a tab indicator.
+   * Critically damped (2 * sqrt(480) ~ 44): nobody flicked these, so they
+   * settle without overshooting the slot.
+   */
+  slot: { type: "spring", stiffness: 480, damping: 44 },
   /** A mark pressed onto a surface: a lock on commit, a tick on reveal. */
   stamp: { type: "spring", duration: 0.32, bounce: 0.3 },
-  /** The clock's last five seconds, punching in on every tick. */
-  tick: { type: "spring", stiffness: 600, damping: 22 },
+  /**
+   * The clock's last five seconds, punching in on every tick: one small
+   * overshoot, then still. A lower damping ratio wobbled the digits.
+   */
+  tick: { type: "spring", duration: 0.3, bounce: 0.2 },
 } as const;
 
 export const fade = {
@@ -62,12 +78,14 @@ export const rise = {
 } as const;
 
 /**
- * A new question arriving on the stage: a top-down wipe, like a broadcast
- * cut. Clip-path keeps the layout still while the content is revealed.
+ * A new question arriving on the stage. It usually lands under the slate,
+ * which carries the moment, so this is a short settle on the compositor
+ * (opacity and a transform, never a per-frame repaint) that still reads as
+ * an arrival when a question comes in with no slate, after a reconnect.
  */
 export const stageCut = {
-  initial: { opacity: 0, clipPath: "inset(0% 0% 100% 0%)" },
-  animate: { opacity: 1, clipPath: "inset(0% 0% 0% 0%)" },
+  initial: { opacity: 0, transform: "translateY(10px)" },
+  animate: { opacity: 1, transform: "translateY(0px)" },
   exit: { opacity: 0, transition: { duration: duration.base } },
   transition: { duration: duration.stage, ease: ease.out },
 } as const;

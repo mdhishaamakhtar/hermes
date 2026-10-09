@@ -246,8 +246,11 @@ export function HostStage({ session }: { session: HostSession }) {
 
               {/* The next question starts from the top, not wherever the last
                 one was scrolled to. */}
+              {/* popLayout, not wait: the new question mounts at once, so
+                  the area under the slate reaches its final height in the
+                  slate's first frame instead of resizing mid-drop. */}
               <AnimatePresence
-                mode="wait"
+                mode="popLayout"
                 initial={false}
                 onExitComplete={() => window.scrollTo(0, 0)}
               >
