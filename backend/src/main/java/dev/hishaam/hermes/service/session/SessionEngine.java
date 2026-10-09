@@ -54,6 +54,31 @@ public class SessionEngine {
     this.gradingService = gradingService;
   }
 
+  // ─── Session start ─────────────────────────────────────────────────────────────
+
+  /**
+   * Takes a LOBBY session live and puts its opening question (or passage block) on screen. The
+   * timer is not started; the host does that with /start-timer.
+   */
+  @Transactional
+  public void startSessionInternal(Long sessionId) {
+    QuizSession session =
+        sessionRepository
+            .findById(sessionId)
+            .orElseThrow(() -> AppException.notFound("Session not found"));
+    if (session.getStatus() != SessionStatus.LOBBY) {
+      throw AppException.conflict("Session is not in LOBBY state");
+    }
+
+    session.setStatus(SessionStatus.ACTIVE);
+    session.setStartedAt(OffsetDateTime.now());
+    sessionRepository.save(session);
+
+    // Nothing is current yet, so the first advance puts the opening question on screen.
+    stateStore.activateSession(sessionId);
+    advanceSessionInternal(sessionId);
+  }
+
   // ─── Question advancement ──────────────────────────────────────────────────────
 
   /**

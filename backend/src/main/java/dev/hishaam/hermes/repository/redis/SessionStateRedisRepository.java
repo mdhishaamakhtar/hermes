@@ -5,10 +5,13 @@ import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.stereotype.Repository;
 
@@ -21,6 +24,15 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class SessionStateRedisRepository {
+
+  /**
+   * Deletes the lock only if the caller still holds it, so an expired holder can't free another.
+   */
+  private static final RedisScript<Long> RELEASE_LOCK =
+      new DefaultRedisScript<>(
+          "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end"
+              + " return 0",
+          Long.class);
 
   private final StringRedisTemplate redis;
 
@@ -234,6 +246,24 @@ public class SessionStateRedisRepository {
   public long getQuestionSequence(Long sessionId) {
     String raw = redis.opsForValue().get(SessionRedisKeys.questionSequenceKey(sessionId));
     return raw != null ? Long.parseLong(raw) : 0L;
+  }
+
+  // ─── Transition lock ───────────────────────────────────────────────────────────
+
+  /**
+   * Takes the session's transition lock if it is free and returns the token that releases it, or
+   * null if another holder has it. The lock lapses after {@code ttl}, so a holder that dies cannot
+   * wedge the session.
+   */
+  public String tryLockTransitions(Long sessionId, Duration ttl) {
+    String token = UUID.randomUUID().toString();
+    Boolean taken =
+        redis.opsForValue().setIfAbsent(SessionRedisKeys.transitionLockKey(sessionId), token, ttl);
+    return Boolean.TRUE.equals(taken) ? token : null;
+  }
+
+  public void unlockTransitions(Long sessionId, String token) {
+    redis.execute(RELEASE_LOCK, List.of(SessionRedisKeys.transitionLockKey(sessionId)), token);
   }
 
   // ─── Rejoin context ────────────────────────────────────────────────────────────

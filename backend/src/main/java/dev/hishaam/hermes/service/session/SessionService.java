@@ -15,7 +15,6 @@ import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.LeaderboardService;
 import dev.hishaam.hermes.service.OwnershipService;
 import java.security.SecureRandom;
-import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Organizer-facing session API: authorizes every call, validates lifecycle preconditions, and
- * delegates state transitions to {@link SessionEngine}.
+ * delegates state transitions to {@link SessionEngine}. Each transition runs under the session's
+ * {@link SessionTransitions} lock, so the precondition it checks still holds when it acts.
  */
 @Service
 public class SessionService {
@@ -47,6 +47,7 @@ public class SessionService {
   private final SessionEngine engine;
   private final SessionTimerScheduler timerScheduler;
   private final LeaderboardService leaderboardService;
+  private final SessionTransitions transitions;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -59,7 +60,8 @@ public class SessionService {
       SessionScoringRedisRepository scoringStore,
       SessionEngine engine,
       SessionTimerScheduler timerScheduler,
-      LeaderboardService leaderboardService) {
+      LeaderboardService leaderboardService,
+      SessionTransitions transitions) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.participantAnswerRepository = participantAnswerRepository;
@@ -71,6 +73,7 @@ public class SessionService {
     this.engine = engine;
     this.timerScheduler = timerScheduler;
     this.leaderboardService = leaderboardService;
+    this.transitions = transitions;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -110,21 +113,9 @@ public class SessionService {
 
   // ─── Start Session ─────────────────────────────────────────────────────────────
 
-  @Transactional
   public void startSession(Long sessionId, Long userId) {
-    QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
-    if (session.getStatus() != SessionStatus.LOBBY) {
-      throw AppException.conflict("Session is not in LOBBY state");
-    }
-
-    session.setStatus(SessionStatus.ACTIVE);
-    session.setStartedAt(OffsetDateTime.now());
-    sessionRepository.save(session);
-
-    // Nothing is current yet, so the first advance puts the opening question (or passage block) on
-    // screen. The timer is not started — the host does that with /start-timer.
-    stateStore.activateSession(sessionId);
-    engine.advanceSessionInternal(sessionId);
+    ownershipService.requireSessionOwner(sessionId, userId);
+    transitions.run(sessionId, () -> engine.startSessionInternal(sessionId));
   }
 
   // ─── Timer commands (host) ─────────────────────────────────────────────────────
@@ -132,7 +123,7 @@ public class SessionService {
   /** Authorises ownership and delegates to {@link SessionEngine#startTimerInternal}. */
   public void startTimer(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    engine.startTimerInternal(sessionId);
+    transitions.run(sessionId, () -> engine.startTimerInternal(sessionId));
   }
 
   /**
@@ -141,32 +132,45 @@ public class SessionService {
    */
   public void endTimerEarly(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.TIMED) {
-      throw AppException.conflict("Timer can only be ended while question is in TIMED state");
-    }
+    transitions.run(
+        sessionId,
+        () -> {
+          if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.TIMED) {
+            throw AppException.conflict("Timer can only be ended while question is in TIMED state");
+          }
 
-    timerScheduler.cancelQuestionTimer(sessionId);
-    stateStore.clearTimer(sessionId);
-    engine.onTimerExpired(sessionId);
+          timerScheduler.cancelQuestionTimer(sessionId);
+          stateStore.clearTimer(sessionId);
+          engine.onTimerExpired(sessionId);
+        });
   }
 
   // ─── Advance / End (delegate to engine — cross-bean call, @Transactional works)
 
   public void advanceSession(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.REVIEWING) {
-      throw AppException.conflict("Cannot advance: current question is not in REVIEWING state");
-    }
-    stateStore.incrementQuestionSequence(sessionId);
-    engine.advanceSessionInternal(sessionId);
+    transitions.run(
+        sessionId,
+        () -> {
+          if (stateStore.getQuestionState(sessionId) != QuestionLifecycleState.REVIEWING) {
+            throw AppException.conflict(
+                "Cannot advance: current question is not in REVIEWING state");
+          }
+          stateStore.incrementQuestionSequence(sessionId);
+          engine.advanceSessionInternal(sessionId);
+        });
   }
 
   public void endSessionByOrganiser(Long sessionId, Long userId) {
     ownershipService.requireSessionOwner(sessionId, userId);
-    timerScheduler.cancelQuestionTimer(sessionId);
-    stateStore.clearTimer(sessionId);
-    stateStore.incrementQuestionSequence(sessionId);
-    engine.doEndSession(sessionId);
+    transitions.run(
+        sessionId,
+        () -> {
+          timerScheduler.cancelQuestionTimer(sessionId);
+          stateStore.clearTimer(sessionId);
+          stateStore.incrementQuestionSequence(sessionId);
+          engine.doEndSession(sessionId);
+        });
   }
 
   /**
