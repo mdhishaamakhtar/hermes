@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { countLabel, formatDateTime } from "@/lib/format";
+import { Icon } from "@/components/ui/Icon";
+import { countNoun, formatDateTime, formatNumber } from "@/lib/format";
 import type { SessionStatus, SessionSummary } from "@/lib/types";
 
 const STATUS: Record<
@@ -39,27 +40,46 @@ export function SessionList({
             return (
               <li
                 key={session.id}
-                className="flex flex-wrap items-center gap-x-5 gap-y-3 border border-border bg-surface px-5 py-3.5"
+                className="flex items-center gap-4 border border-border bg-surface px-4 py-3 sm:px-5"
               >
-                <Badge tone={status.tone} dot={running}>
-                  {status.label}
-                </Badge>
-                <span className="text-sm text-muted">
-                  {formatDateTime(session.startedAt) ?? "Not started yet"}
-                </span>
-                <span className="text-sm text-subtle">
-                  {countLabel(session.participantCount, "player", "players")}
-                </span>
-                <div className="ml-auto flex items-center gap-2">
+                {/* Stacked on a phone, so the actions keep their place on
+                    the right instead of wrapping onto a line of their own. */}
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-4">
+                  <Badge tone={status.tone} dot={running}>
+                    {status.label}
+                  </Badge>
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                    <span>
+                      {formatDateTime(session.startedAt) ?? "Not started yet"}
+                    </span>
+                    {/* On a phone the count is a figure by a person, as in
+                        the session header; the noun stays for screen readers. */}
+                    <span className="flex items-center gap-1.5 text-subtle">
+                      <Icon name="user" size={13} className="sm:hidden" />
+                      <span>
+                        {formatNumber(session.participantCount)}{" "}
+                        <span className="max-sm:sr-only">
+                          {countNoun(
+                            session.participantCount,
+                            "player",
+                            "players",
+                          )}
+                        </span>
+                      </span>
+                    </span>
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                   {running ? (
                     <>
                       <Button
                         variant="ghost"
                         size="sm"
+                        icon="trash"
                         onClick={() => onDiscard(session)}
                         className="hover:text-danger"
                       >
-                        Discard
+                        <span className="max-sm:sr-only">Discard</span>
                       </Button>
                       <ButtonLink
                         href={`/session/${session.id}/host`}
@@ -67,7 +87,10 @@ export function SessionList({
                         size="sm"
                         trailingIcon="arrow-right"
                       >
-                        Open host view
+                        <span className="max-sm:sr-only">Open host view</span>
+                        <span aria-hidden className="sm:hidden">
+                          Open
+                        </span>
                       </ButtonLink>
                     </>
                   ) : (

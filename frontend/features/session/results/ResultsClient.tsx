@@ -23,7 +23,12 @@ export function ResultsClient({ sessionId }: { sessionId: string }) {
   return (
     <>
       <TopBar>
-        <ButtonLink href="/join" variant="ghost" size="sm">
+        <ButtonLink
+          href="/join"
+          variant="ghost"
+          size="sm"
+          className="ghost-flush-end"
+        >
           Join another session
         </ButtonLink>
       </TopBar>
@@ -102,11 +107,15 @@ function Results({ sessionId }: { sessionId: string }) {
         />
       </section>
 
-      <div className="mt-12 flex flex-wrap gap-3 border-t border-border pt-8">
+      <div className="mt-12 flex flex-col items-start gap-3 border-t border-border pt-8 sm:flex-row sm:items-center">
         <ButtonLink href="/join" variant="primary" trailingIcon="arrow-right">
           Join another session
         </ButtonLink>
-        <ButtonLink href="/" variant="ghost">
+        <ButtonLink
+          href="/"
+          variant="ghost"
+          className="max-sm:ghost-flush-start"
+        >
           Back to Hermes
         </ButtonLink>
       </div>

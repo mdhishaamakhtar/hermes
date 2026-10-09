@@ -17,7 +17,12 @@ export default function AuthLayout({
   return (
     <>
       <TopBar>
-        <ButtonLink href="/join" variant="ghost" size="sm">
+        <ButtonLink
+          href="/join"
+          variant="ghost"
+          size="sm"
+          className="ghost-flush-end"
+        >
           Join a session
         </ButtonLink>
       </TopBar>

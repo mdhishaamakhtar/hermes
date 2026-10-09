@@ -584,6 +584,35 @@
     }
   }
 
+  /*
+   * A line of facts split by middle dots: "Q2 · Several answers · 30 sec".
+   * Each item carries the dot before it, and the line is shifted left by one
+   * dot's width and clipped there, which hides exactly the dots that land at
+   * the start of a row. A wrap never leaves a dot hanging at either end.
+   * Every direct child is an item; wrap a badge in a span to make it one.
+   */
+  .meta-line {
+    --meta-dot: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.25rem;
+    margin-inline-start: calc(-1 * var(--meta-dot));
+    clip-path: inset(0 0 0 var(--meta-dot));
+
+    & > * {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    & > *::before {
+      content: "·" / "";
+      flex-shrink: 0;
+      width: var(--meta-dot);
+      text-align: center;
+    }
+  }
+
   /* Square icon-only button. Always paired with an aria-label. */
   .btn-icon {
     min-height: 0;
@@ -828,6 +857,20 @@
 }
 
 /* ── 7. Keyframes ─────────────────────────────────────────────────────────── */
+/*
+ * A ghost button's label sits inside its padding, so where the button starts
+ * or ends a line it reads as indented from the text around it. These pull it
+ * out by exactly that padding (see .btn-ghost), so the words line up with the
+ * column's edge. Utilities, so a breakpoint can apply them: `max-sm:…`.
+ */
+@utility ghost-flush-start {
+  margin-inline-start: -0.75rem;
+}
+
+@utility ghost-flush-end {
+  margin-inline-end: -0.75rem;
+}
+
 @keyframes rise {
   from {
     opacity: 0;

@@ -72,7 +72,7 @@ function QuestionShell({
     <article className="border border-border bg-surface p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-72">
-          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-subtle">
+          <p className="meta-line text-sm text-subtle">
             <span className="font-mono font-medium text-muted">Q{number}</span>
             {meta}
           </p>
@@ -102,13 +102,10 @@ export function QuestionBreakdown({
       number={question.orderIndex}
       text={question.text}
       meta={
-        <>
-          <span aria-hidden>·</span>
-          <span>
-            {formatNumber(question.totalAnswers)} of{" "}
-            {countLabel(participantCount, "player", "players")} answered
-          </span>
-        </>
+        <span>
+          {formatNumber(question.totalAnswers)} of{" "}
+          {countLabel(participantCount, "player", "players")} answered
+        </span>
       }
       action={
         onEditScoring && (
@@ -154,27 +151,36 @@ function stateFor(
   return correct ? "missed" : undefined;
 }
 
+/**
+ * How an answer went, in a word. Only an exact match is correct, but a pick
+ * of some right answers can still score; calling that "Incorrect" beside
+ * "+10 pts" would contradict itself.
+ */
+function verdict(question: MyQuestionResult) {
+  if (question.selectedOptionIds.length === 0)
+    return { label: "No answer", tone: "neutral" } as const;
+  if (question.isCorrect) return { label: "Correct", tone: "success" } as const;
+  return question.pointsEarned > 0
+    ? ({ label: "Partly right", tone: "warning" } as const)
+    : ({ label: "Incorrect", tone: "danger" } as const);
+}
+
 /** One question as a player answered it: their picks against the key. */
 export function MyQuestionBreakdown({
   question,
 }: {
   question: MyQuestionResult;
 }) {
-  const answered = question.selectedOptionIds.length > 0;
+  const { label, tone } = verdict(question);
   return (
     <QuestionShell
       number={question.orderIndex}
       text={question.questionText}
       meta={
         <>
-          <span aria-hidden>·</span>
-          {answered ? (
-            <Badge tone={question.isCorrect ? "success" : "danger"}>
-              {question.isCorrect ? "Correct" : "Incorrect"}
-            </Badge>
-          ) : (
-            <Badge>No answer</Badge>
-          )}
+          <span>
+            <Badge tone={tone}>{label}</Badge>
+          </span>
           <span className="font-mono text-foreground">
             {formatPoints(question.pointsEarned)} pts
           </span>

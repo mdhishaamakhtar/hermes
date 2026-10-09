@@ -49,7 +49,7 @@ export function ResourceRow({
       <div className="min-w-0 flex-1">
         <Link
           href={href}
-          className="block truncate text-base font-semibold text-foreground after:absolute after:inset-0 focus-visible:outline-none"
+          className="line-clamp-2 text-base font-semibold break-words text-foreground after:absolute after:inset-0 focus-visible:outline-none sm:line-clamp-1"
         >
           {title}
         </Link>

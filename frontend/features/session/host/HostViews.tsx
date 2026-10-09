@@ -157,7 +157,7 @@ export function HostStage({ session }: { session: HostSession }) {
 
   const phase =
     lifecycle === "DISPLAYED"
-      ? "Players can read the question. Answers open when you start the timer."
+      ? "Answers open when you start the timer."
       : lifecycle === "TIMED"
         ? displayMode === "CODE_DISPLAY"
           ? "Answering now. Responses stay hidden until time is up."
@@ -341,12 +341,15 @@ export function HostStage({ session }: { session: HostSession }) {
         </aside>
       </main>
 
+      {/* On a phone the dock stacks: what is happening, then the controls
+          across the full width of the content, the next step filling the
+          rest of the row under the host's thumb. */}
       <div className="chrome dock-inset sticky bottom-0 z-[var(--z-dock)] border-t border-border">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-6">
           <p
             role="status"
             aria-live="polite"
-            className="min-w-0 flex-1 basis-64 text-sm text-muted"
+            className="min-w-0 text-sm text-muted sm:flex-1"
           >
             {controlError ? (
               <span className="text-danger">{controlError}</span>
@@ -358,7 +361,7 @@ export function HostStage({ session }: { session: HostSession }) {
             <Button
               variant="ghost"
               onClick={() => setConfirmEnd(true)}
-              className="hover:text-danger"
+              className="shrink-0 hover:text-danger max-sm:ghost-flush-start"
             >
               End session
             </Button>
@@ -368,6 +371,7 @@ export function HostStage({ session }: { session: HostSession }) {
                 icon="stop"
                 onClick={controls.endTimer}
                 pending={pending === "end-timer"}
+                className="max-sm:flex-1"
               >
                 {pending === "end-timer" ? "Stopping…" : "End timer now"}
               </Button>
@@ -382,11 +386,17 @@ export function HostStage({ session }: { session: HostSession }) {
                 onClick={primary.run}
                 pending={pending === primary.control}
                 title="Shortcut: → or Page Down"
+                className="max-sm:flex-1"
               >
                 {primary.label}
               </Button>
             ) : (
-              <Button variant="primary" size="lg" pending>
+              <Button
+                variant="primary"
+                size="lg"
+                pending
+                className="max-sm:flex-1"
+              >
                 Grading…
               </Button>
             )}
@@ -428,7 +438,9 @@ function StageQuestionBlock({
   const total = stats.totalAnswered;
   return (
     <div className="py-4 first:pt-2">
-      <div className="flex items-start justify-between gap-4">
+      {/* Beside the question on a wide stage; under it on a phone, where it
+          would squeeze the question to a word a line. */}
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <h2
           className={`display text-foreground ${
             compact
@@ -524,7 +536,6 @@ export function HostEnded({ session }: { session: HostSession }) {
             {results && (
               <ButtonLink
                 href={`/events/${results.eventId}/quizzes/${results.quizId}`}
-                variant="ghost"
               >
                 Back to the quiz
               </ButtonLink>

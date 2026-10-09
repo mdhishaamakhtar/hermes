@@ -58,7 +58,13 @@ export function OrganiserShell({ children }: { children: ReactNode }) {
             {organiser.displayName}
           </span>
         )}
-        <Button variant="ghost" size="sm" icon="sign-out" onClick={signOut}>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="sign-out"
+          onClick={signOut}
+          className="ghost-flush-end"
+        >
           Sign out
         </Button>
       </TopBar>

@@ -82,7 +82,7 @@ export function PlayLobby({
           variant="ghost"
           size="sm"
           icon="sign-out"
-          className="mt-4 self-start"
+          className="mt-4 self-start ghost-flush-start"
           onClick={() => setConfirmLeave(true)}
         >
           Leave session

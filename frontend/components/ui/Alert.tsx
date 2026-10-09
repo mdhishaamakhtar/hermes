@@ -26,15 +26,20 @@ export function Alert({
   return (
     <div
       role={tone === "danger" ? "alert" : "status"}
-      className={`flex flex-wrap items-start gap-x-3 gap-y-2 border px-4 py-3 text-sm text-foreground ${style.box} ${className}`}
+      className={`flex items-start gap-3 border px-4 py-3 text-sm text-foreground ${style.box} ${className}`}
     >
       <Icon
         name={tone === "info" ? "info" : "alert"}
         size={16}
         className={`mt-0.5 shrink-0 ${style.icon}`}
       />
-      <div className="min-w-0 flex-1">{children}</div>
-      {action && <div className="shrink-0">{action}</div>}
+      {/* Where the message and its action don't both fit, the action drops
+          below the message, lined up with it, rather than squeezing it into
+          a column a word wide. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2.5">
+        <div className="min-w-0 flex-1 basis-56">{children}</div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
     </div>
   );
 }

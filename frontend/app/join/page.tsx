@@ -11,7 +11,12 @@ export default async function JoinPage({
   return (
     <>
       <TopBar>
-        <ButtonLink href="/auth/login" variant="ghost" size="sm">
+        <ButtonLink
+          href="/auth/login"
+          variant="ghost"
+          size="sm"
+          className="ghost-flush-end"
+        >
           Host sign in
         </ButtonLink>
       </TopBar>

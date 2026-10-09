@@ -130,34 +130,26 @@ export function QuestionBlock({
         passage ? "py-5" : "border border-border bg-surface p-5 sm:p-6"
       }
     >
+      {/* The actions share the facts' row, so the question itself gets the
+          card's full width instead of a column beside them. */}
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-subtle">
-            <span className="font-mono font-medium text-muted">Q{number}</span>
-            <span aria-hidden>·</span>
-            <span>{questionTypeLabel(question.questionType)}</span>
-            {ownTimer && !missingTimer && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="font-mono">
-                  {question.timeLimitSeconds} sec
-                </span>
-              </>
-            )}
-            {question.displayModeOverride && (
-              <>
-                <span aria-hidden>·</span>
-                <span>
-                  {displayModeLabel(question.displayModeOverride)} display
-                </span>
-              </>
-            )}
-            {missingTimer && <Badge tone="warning">Needs a timer</Badge>}
-          </p>
-          <h3 className="mt-2 text-lg leading-snug font-semibold whitespace-pre-wrap text-foreground">
-            {question.text}
-          </h3>
-        </div>
+        <p className="meta-line min-w-0 pt-2 text-sm text-subtle">
+          <span className="font-mono font-medium text-muted">Q{number}</span>
+          <span>{questionTypeLabel(question.questionType)}</span>
+          {ownTimer && !missingTimer && (
+            <span className="font-mono">{question.timeLimitSeconds} sec</span>
+          )}
+          {question.displayModeOverride && (
+            <span>
+              {displayModeLabel(question.displayModeOverride)} display
+            </span>
+          )}
+          {missingTimer && (
+            <span>
+              <Badge tone="warning">Needs a timer</Badge>
+            </span>
+          )}
+        </p>
         <BlockActionsBar
           label={`question ${number}`}
           locked={actions.locked}
@@ -167,6 +159,9 @@ export function QuestionBlock({
           }
         />
       </div>
+      <h3 className="mt-1 text-lg leading-snug font-semibold whitespace-pre-wrap text-foreground">
+        {question.text}
+      </h3>
 
       <ul className="mt-4 grid gap-2 sm:grid-cols-2">
         {byOrderIndex(question.options).map((option, index) => (
@@ -245,14 +240,12 @@ export function PassageBlock({
     >
       <div className="border-b border-border p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-subtle">
+          <p className="meta-line min-w-0 pt-2 text-sm text-subtle">
             <span className="font-medium text-muted">Passage</span>
-            <span aria-hidden>·</span>
             <span className="font-mono">
               Q{firstNumber}
               {lastNumber > firstNumber && `–Q${lastNumber}`}
             </span>
-            <span aria-hidden>·</span>
             <span>
               {passage.timerMode === "ENTIRE_PASSAGE"
                 ? `All together, ${passage.timeLimitSeconds ?? 0} sec`

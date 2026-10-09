@@ -17,6 +17,12 @@ const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
+const thisYearDateTimeFormat = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 export function formatNumber(value: number): string {
   return numberFormat.format(value);
@@ -63,11 +69,17 @@ export function formatDate(iso: string | null | undefined): string | null {
 }
 
 /**
- * "Sep 26, 2026, 7:05 PM", for things that happen more than once a day, like
- * the same quiz run for three classes.
+ * "Sep 26, 7:05 PM", for things that happen more than once a day, like the
+ * same quiz run for three classes. The year is said only when it isn't this
+ * one: "Sep 26, 2025, 7:05 PM".
  */
 export function formatDateTime(iso: string | null | undefined): string | null {
-  return formatTimestamp(iso, dateTimeFormat);
+  if (!iso) return null;
+  const thisYear = new Date(iso).getFullYear() === new Date().getFullYear();
+  return formatTimestamp(
+    iso,
+    thisYear ? thisYearDateTimeFormat : dateTimeFormat,
+  );
 }
 
 function formatTimestamp(
