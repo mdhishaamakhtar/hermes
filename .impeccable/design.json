@@ -1,254 +1,783 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-07T00:00:00.000Z",
+  "generatedAt": "2026-10-09T00:00:00.000Z",
   "title": "Design System: Hermes",
   "extensions": {
     "colorMeta": {
-      "midnight-stage": {
+      "background": {
         "role": "neutral",
-        "displayName": "Midnight Stage",
-        "canonical": "#0a0a0f",
-        "tonalRamp": ["#050507", "#0a0a0f", "#15151b", "#24242b", "#3d3d45", "#62626b", "#85858e", "#f0f0f2"]
+        "displayName": "Video Black (code 16)",
+        "canonical": "#101010",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235). Also the 'ink' text colour on every lit lamp."
       },
-      "booth-charcoal": {
+      "surface": {
         "role": "neutral",
-        "displayName": "Booth Charcoal",
-        "canonical": "#0f1117",
-        "tonalRamp": ["#07080b", "#0f1117", "#191c24", "#292d38", "#464b58", "#696f7c", "#8f949f", "#f1f2f4"]
+        "displayName": "Desk (code 22)",
+        "canonical": "#161616",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235)."
       },
-      "rule-line": {
+      "raised": {
         "role": "neutral",
-        "displayName": "Rule Line",
-        "canonical": "#1a1f2e",
-        "tonalRamp": ["#0d1017", "#1a1f2e", "#252c3f", "#384258", "#566176", "#788398", "#9ca5b6", "#f2f4f7"]
+        "displayName": "Raised Desk (code 28)",
+        "canonical": "#1c1c1c",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235)."
       },
-      "overlay-graphite": {
+      "border": {
         "role": "neutral",
-        "displayName": "Overlay Graphite",
-        "canonical": "#252b3b",
-        "tonalRamp": ["#12151d", "#252b3b", "#343d52", "#4a556d", "#68748b", "#8993a6", "#abb3c2", "#f4f5f7"]
+        "displayName": "Hairline (code 38)",
+        "canonical": "#262626",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235)."
       },
-      "signal-white": {
+      "border-strong": {
         "role": "neutral",
-        "displayName": "Signal White",
-        "canonical": "#f8fafc",
-        "tonalRamp": ["#17191c", "#303337", "#4c5055", "#6c7178", "#8d9299", "#b1b5ba", "#d5d8dc", "#f8fafc"]
+        "displayName": "Control Outline (code 56)",
+        "canonical": "#383838",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235)."
       },
-      "quiet-slate": {
+      "foreground": {
         "role": "neutral",
-        "displayName": "Quiet Slate",
-        "canonical": "#94a3b8",
-        "tonalRamp": ["#151a22", "#2b3543", "#445161", "#5e6d80", "#78889d", "#94a3b8", "#b8c3d0", "#f2f5f8"]
+        "displayName": "Legal White (code 235)",
+        "canonical": "#ebebeb",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235).",
+        "contrast": "16.0:1 on stage, 14.3:1 on raised"
       },
-      "shadow-slate": {
+      "muted": {
         "role": "neutral",
-        "displayName": "Shadow Slate",
-        "canonical": "#4b5563",
-        "tonalRamp": ["#0c0e11", "#171b20", "#242a31", "#323a44", "#4b5563", "#66717f", "#89929d", "#e9ecef"]
+        "displayName": "Grey 168",
+        "canonical": "#a8a8a8",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235).",
+        "contrast": "8.0:1 on stage, 7.2:1 on raised"
       },
-      "broadcast-blue": {
+      "subtle": {
+        "role": "neutral",
+        "displayName": "Grey 132",
+        "canonical": "#848484",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235).",
+        "contrast": "5.1:1 on stage, 4.6:1 on raised (WCAG AA floor)"
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Grey 84",
+        "canonical": "#545454",
+        "tonalRamp": [
+          "#101010",
+          "#161616",
+          "#1c1c1c",
+          "#262626",
+          "#383838",
+          "#545454",
+          "#848484",
+          "#ebebeb"
+        ],
+        "note": "Ramp is the project's own video-level grey scale (codes 16, 22, 28, 38, 56, 84, 132, 235).",
+        "contrast": "2.5:1 on stage; disabled only"
+      },
+      "on-primary": {
         "role": "primary",
-        "displayName": "Broadcast Blue",
-        "canonical": "#2563eb",
-        "tonalRamp": ["#06122e", "#0b2458", "#103783", "#1749ae", "#2563eb", "#5284f0", "#86aaf6", "#e8effe"]
+        "displayName": "Legal White on Key",
+        "canonical": "#ebebeb",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ],
+        "contrast": "5.0:1 on key blue, 4.7:1 on danger-solid"
       },
-      "deep-broadcast-blue": {
+      "on-primary-muted": {
         "role": "primary",
-        "displayName": "Deep Broadcast Blue",
-        "canonical": "#1d4ed8",
-        "tonalRamp": ["#050f27", "#091d4a", "#0e2e72", "#153fa5", "#1d4ed8", "#4b7ae3", "#7d9eed", "#e6ecfc"]
+        "displayName": "Key Mist",
+        "canonical": "#dce9fc",
+        "tonalRamp": [
+          "#070b12",
+          "#20252e",
+          "#3c424d",
+          "#5a626e",
+          "#7a8391",
+          "#9ba6b6",
+          "#becadc",
+          "#e3f0ff"
+        ],
+        "oklch": "oklch(0.93 0.03 258)",
+        "contrast": "4.8:1 on key blue (white at 80% would fail)"
       },
-      "on-air-sky": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Chroma-Key Blue",
+        "canonical": "#005fd0",
+        "tonalRamp": [
+          "#000048",
+          "#001471",
+          "#00389c",
+          "#005ac9",
+          "#347feb",
+          "#5fa4ff",
+          "#89caff",
+          "#b3f1ff"
+        ],
+        "gainAndSlot": "hero, C 0.19, slot 255",
+        "oklch": "oklch(0.51 0.19 258)",
+        "contrast": "3.2:1 off the stage; on-primary text 5.0:1"
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Deep Key",
+        "canonical": "#0250ae",
+        "tonalRamp": [
+          "#000042",
+          "#001a69",
+          "#003b93",
+          "#1a5dba",
+          "#4581da",
+          "#6ca6fa",
+          "#95cbff",
+          "#bef1ff"
+        ],
+        "oklch": "oklch(0.45 0.165 258)"
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Key Light",
+        "canonical": "#92c1fd",
+        "tonalRamp": [
+          "#000a24",
+          "#0b2545",
+          "#254369",
+          "#40638e",
+          "#5e85b6",
+          "#7ca8e0",
+          "#9ecdff",
+          "#c6f2ff"
+        ],
+        "gainAndSlot": "key's own light, C 0.10, slot 255",
+        "oklch": "oklch(0.80 0.10 255)"
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Key Glow",
+        "canonical": "#c0dafc",
+        "tonalRamp": [
+          "#040b18",
+          "#1a2636",
+          "#344356",
+          "#516379",
+          "#70849e",
+          "#91a7c4",
+          "#b2cbec",
+          "#d8f1ff"
+        ],
+        "oklch": "oklch(0.88 0.055 255)"
+      },
+      "tally": {
         "role": "secondary",
-        "displayName": "On-Air Sky",
-        "canonical": "#38bdf8",
-        "tonalRamp": ["#071d2b", "#0c3b58", "#125a82", "#1d88bd", "#38bdf8", "#67cdf9", "#9ae0fb", "#e8f9ff"]
+        "displayName": "Tally Red",
+        "canonical": "#ec5542",
+        "tonalRamp": [
+          "#300000",
+          "#580000",
+          "#820000",
+          "#ae281a",
+          "#db4937",
+          "#ff715c",
+          "#ff9b85",
+          "#ffc5af"
+        ],
+        "gainAndSlot": "hero, C 0.19, slot 30",
+        "oklch": "oklch(0.65 0.19 30)",
+        "note": "Also the danger token: red means now and fault in one hue.",
+        "contrast": "ink text 5.4:1"
       },
-      "sky-glow": {
+      "danger-solid": {
         "role": "secondary",
-        "displayName": "Sky Glow",
-        "canonical": "#7dd3fc",
-        "tonalRamp": ["#10242d", "#1d4a5d", "#2d718d", "#4a9fbe", "#7dd3fc", "#9bdefd", "#bdeafd", "#f2fcff"]
+        "displayName": "Tally Solid",
+        "canonical": "#c13425",
+        "tonalRamp": [
+          "#310000",
+          "#5a0000",
+          "#830000",
+          "#af2618",
+          "#d64f3e",
+          "#f97966",
+          "#ffa28f",
+          "#ffcbb8"
+        ],
+        "oklch": "oklch(0.54 0.18 30)",
+        "contrast": "on-primary text 4.7:1"
       },
-      "go-green": {
+      "danger-solid-hover": {
+        "role": "secondary",
+        "displayName": "Tally Deep",
+        "canonical": "#a82418",
+        "tonalRamp": [
+          "#310000",
+          "#590000",
+          "#820000",
+          "#ac2a1e",
+          "#cf5646",
+          "#f27f6d",
+          "#ffa795",
+          "#ffcfbe"
+        ],
+        "oklch": "oklch(0.48 0.17 30)"
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Standby Amber",
+        "canonical": "#ffa746",
+        "tonalRamp": [
+          "#220000",
+          "#441400",
+          "#693100",
+          "#8f4f00",
+          "#b86f0d",
+          "#e29032",
+          "#ffb357",
+          "#ffdb88"
+        ],
+        "gainAndSlot": "shared, C 0.15, slot 65",
+        "oklch": "oklch(0.80 0.15 65)"
+      },
+      "success": {
         "role": "tertiary",
         "displayName": "Go Green",
-        "canonical": "#22c55e",
-        "tonalRamp": ["#061b0e", "#0b3b1b", "#0e5b29", "#16813c", "#22c55e", "#50d47e", "#88e5a5", "#e7faed"]
+        "canonical": "#6dd17f",
+        "tonalRamp": [
+          "#001300",
+          "#003100",
+          "#00511a",
+          "#217335",
+          "#3f9852",
+          "#5ebd6f",
+          "#83e393",
+          "#aeffbb"
+        ],
+        "gainAndSlot": "shared, C 0.15, slot 148",
+        "oklch": "oklch(0.78 0.15 148)"
       },
-      "amber-edit": {
+      "option-a": {
         "role": "tertiary",
-        "displayName": "Amber Edit",
-        "canonical": "#d97706",
-        "tonalRamp": ["#211003", "#472205", "#713607", "#a04e08", "#d97706", "#e79a43", "#f1bd7d", "#fff3e1"]
+        "displayName": "Bar Yellow",
+        "canonical": "#e0d653",
+        "tonalRamp": [
+          "#120a00",
+          "#2d2600",
+          "#4b4400",
+          "#6c6400",
+          "#8e8607",
+          "#b2a92f",
+          "#d8ce4d",
+          "#fdf47c"
+        ],
+        "gainAndSlot": "shared, C 0.15, slot 105",
+        "oklch": "oklch(0.86 0.15 105)",
+        "note": "Colour bar, bar order A-D on a descending lightness staircase (L .86/.80/.73/.64). CVD worst all-pairs dE (OKLab x100): 10.5 deutan, 15.6 normal. Deliberately above the dark dataviz lightness band: doubles as text and as a lit chip under ink; always paired with its letter.",
+        "contrast": "ink text 12.6:1 (and reversed on stage)"
       },
-      "deep-amber-edit": {
+      "option-b": {
         "role": "tertiary",
-        "displayName": "Deep Amber Edit",
-        "canonical": "#b45309",
-        "tonalRamp": ["#1b0c02", "#3a1803", "#5d2705", "#853a07", "#b45309", "#cc7a35", "#e0a16d", "#fdf0e2"]
+        "displayName": "Bar Cyan",
+        "canonical": "#0fd8da",
+        "tonalRamp": [
+          "#001316",
+          "#003133",
+          "#005153",
+          "#007376",
+          "#00979a",
+          "#00bdbf",
+          "#38e3e5",
+          "#7bffff"
+        ],
+        "gainAndSlot": "shared, C 0.135 (gamut-limited), slot 196",
+        "oklch": "oklch(0.80 0.135 196)",
+        "note": "Colour bar, bar order A-D on a descending lightness staircase (L .86/.80/.73/.64). CVD worst all-pairs dE (OKLab x100): 10.5 deutan, 15.6 normal. Deliberately above the dark dataviz lightness band: doubles as text and as a lit chip under ink; always paired with its letter.",
+        "contrast": "ink text between 5.2:1 and 12.6:1, reversed also >= 4.5:1"
       },
-      "alert-red": {
+      "option-c": {
         "role": "tertiary",
-        "displayName": "Alert Red",
-        "canonical": "#ef4444",
-        "tonalRamp": ["#2a0707", "#5a0d0d", "#8d1515", "#c32828", "#ef4444", "#f36e6e", "#f89d9d", "#ffeaea"]
+        "displayName": "Bar Violet",
+        "canonical": "#bc8ef4",
+        "tonalRamp": [
+          "#15002b",
+          "#31104e",
+          "#502d74",
+          "#714b9c",
+          "#946bc5",
+          "#b98bf1",
+          "#ddb2ff",
+          "#ffd9ff"
+        ],
+        "gainAndSlot": "shared, C 0.15, slot 304",
+        "oklch": "oklch(0.73 0.15 304)",
+        "note": "Colour bar, bar order A-D on a descending lightness staircase (L .86/.80/.73/.64). CVD worst all-pairs dE (OKLab x100): 10.5 deutan, 15.6 normal. Deliberately above the dark dataviz lightness band: doubles as text and as a lit chip under ink; always paired with its letter.",
+        "contrast": "ink text between 5.2:1 and 12.6:1, reversed also >= 4.5:1"
       },
-      "deep-alert-red": {
+      "option-d": {
         "role": "tertiary",
-        "displayName": "Deep Alert Red",
-        "canonical": "#dc2626",
-        "tonalRamp": ["#250505", "#4e0a0a", "#7d1010", "#ac1b1b", "#dc2626", "#e45c5c", "#ee9292", "#ffe6e6"]
-      },
-      "option-a-blue": {
-        "role": "tertiary",
-        "displayName": "Option A Blue",
-        "canonical": "#2563eb",
-        "tonalRamp": ["#06122e", "#0b2458", "#103783", "#1749ae", "#2563eb", "#5284f0", "#86aaf6", "#e8effe"]
-      },
-      "option-b-violet": {
-        "role": "tertiary",
-        "displayName": "Option B Violet",
-        "canonical": "#7c3aed",
-        "tonalRamp": ["#18082e", "#32105c", "#4e188d", "#6526bd", "#7c3aed", "#9d6af0", "#bfa0f6", "#f1eafd"]
-      },
-      "option-c-amber": {
-        "role": "tertiary",
-        "displayName": "Option C Amber",
-        "canonical": "#d97706",
-        "tonalRamp": ["#211003", "#472205", "#713607", "#a04e08", "#d97706", "#e79a43", "#f1bd7d", "#fff3e1"]
-      },
-      "option-d-rose": {
-        "role": "tertiary",
-        "displayName": "Option D Rose",
-        "canonical": "#e11d48",
-        "tonalRamp": ["#2b050f", "#5b0a20", "#8c1030", "#b9153b", "#e11d48", "#e95975", "#f48ea1", "#ffe7ec"]
+        "displayName": "Bar Magenta",
+        "canonical": "#cf6192",
+        "tonalRamp": [
+          "#26000e",
+          "#4a0029",
+          "#711c46",
+          "#993a66",
+          "#c35888",
+          "#e87dab",
+          "#ffa4cf",
+          "#ffcdf4"
+        ],
+        "gainAndSlot": "shared, C 0.15, slot 354",
+        "oklch": "oklch(0.64 0.15 354)",
+        "note": "Colour bar, bar order A-D on a descending lightness staircase (L .86/.80/.73/.64). CVD worst all-pairs dE (OKLab x100): 10.5 deutan, 15.6 normal. Deliberately above the dark dataviz lightness band: doubles as text and as a lit chip under ink; always paired with its letter.",
+        "contrast": "ink text 5.2:1 (and reversed on stage)"
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Large live numerals, join codes, timers, and final scores." },
-      "headline": { "displayName": "Headline", "purpose": "Question prompts and major result headings." },
-      "label": { "displayName": "Tracked Label", "purpose": "Eyebrows, status chips, metadata, and CTAs." },
-      "mono": { "displayName": "Field Mono", "purpose": "Typed identifiers, form content, codes, and scoring values only." }
+      "display": {
+        "displayName": "Display (Archivo, 72% width)",
+        "purpose": "Slate segment numbers, landing and end-of-session headlines. Class pair .display .display-tight. Archivo Narrow 700 stands in on the social image."
+      },
+      "headline": {
+        "displayName": "Headline (Archivo, 84% width)",
+        "purpose": "The question as the room reads it; phones run clamp(1.625rem, 6.2vw, 2.25rem)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel headings such as Standings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading copy, option text, inputs (16px floor)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase tracked section names, status and metadata; never a kicker above a heading."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Uppercase control labels; 12px small, 14px large."
+      },
+      "tally": {
+        "displayName": "Tally",
+        "purpose": "The tally lamp only."
+      },
+      "data": {
+        "displayName": "Data (Azeret Mono)",
+        "purpose": "Join codes, station clock, countdown, scores, ranks, counts, rundown numbers; always tabular-nums."
+      }
     },
     "shadows": [
-      { "name": "dropdown-separation", "value": "0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)", "purpose": "Separates an open CustomSelect list from nearby content." },
-      { "name": "drawer-separation", "value": "shadow-2xl", "purpose": "Separates the fixed ScoringDrawer from the page while it is open." }
+      {
+        "name": "shadow-float",
+        "value": "0 24px 48px -12px rgb(0 0 0 / 0.6), 0 8px 16px -8px rgb(0 0 0 / 0.5)",
+        "purpose": "Layers that float over the page: dialogs, the drawer (over an rgb(16 16 16 / 0.82) scrim), and toasts. Nothing else."
+      }
     ],
     "motion": [
-      { "name": "duration-instant", "value": "50ms", "purpose": "Immediate hover and border feedback." },
-      { "name": "duration-fast", "value": "100ms", "purpose": "Micro-interactions and exits." },
-      { "name": "duration-base", "value": "150ms", "purpose": "Standard UI transitions." },
-      { "name": "duration-enter", "value": "200ms", "purpose": "New surfaces entering the stage." },
-      { "name": "duration-slow", "value": "250ms", "purpose": "Page-level entrances and complex changes." },
-      { "name": "pending-sweep", "value": "1.35s linear infinite", "purpose": "Shows that lock-in is still in flight." }
+      {
+        "name": "duration-instant",
+        "value": "100ms",
+        "purpose": "Press and hover feedback; stamp exit."
+      },
+      {
+        "name": "duration-base",
+        "value": "160ms",
+        "purpose": "Routine state changes and every exit."
+      },
+      {
+        "name": "duration-enter",
+        "value": "240ms",
+        "purpose": "Surfaces arriving: dialogs, panels, toasts; tally colour change; dimmed tile fade."
+      },
+      {
+        "name": "duration-sheet",
+        "value": "320ms",
+        "purpose": "Surfaces that travel a long way: the drawer, the slate coming down."
+      },
+      {
+        "name": "duration-stage",
+        "value": "480ms",
+        "purpose": "Authored live moments: the stage cut, a podium place landing."
+      },
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Anything arriving or responding; the slate rolling down."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.65, 0, 0.35, 1)",
+        "purpose": "Moves between two on-screen states; the slate lifting. CSS --ease-in-out mirrors ease.inOut."
+      },
+      {
+        "name": "duration-lift",
+        "value": "520ms",
+        "purpose": "The slate lifting off the question: the one exit slower than its entrance (motion.ts only)."
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "Surfaces travelling in from an edge: the drawer, over duration-sheet."
+      },
+      {
+        "name": "spring-bar",
+        "value": "spring stiffness 260, damping 30",
+        "purpose": "Values that grow to a quantity: the 22% response fills, the answered bar."
+      },
+      {
+        "name": "spring-slot",
+        "value": "spring stiffness 480, damping 38",
+        "purpose": "Things moving to a new slot: reordered leaderboard rows."
+      },
+      {
+        "name": "spring-stamp",
+        "value": "spring duration 0.32s, bounce 0.3",
+        "purpose": "A mark pressed onto a surface: lock on commit, tick or cross on reveal, from 60% scale."
+      },
+      {
+        "name": "stage-cut",
+        "value": "clip-path inset(0 0 100% 0) to inset(0), 480ms expo-out",
+        "purpose": "A new question wiping in top-down."
+      },
+      {
+        "name": "slate-blind",
+        "value": "down 320ms (sheet) expo-out, hold 1150ms, up 520ms (lift) in-out",
+        "purpose": "The key-blue slate; lifts at once when the timer starts; opacity only under reduced motion."
+      },
+      {
+        "name": "reveal-dim-delay",
+        "value": "140ms",
+        "purpose": "Dimmed tiles fall back after the correct answer lights."
+      },
+      {
+        "name": "stagger",
+        "value": "35ms per row, max 280ms",
+        "purpose": "Revealing lists (leaderboards, results) only."
+      },
+      {
+        "name": "spring-tick",
+        "value": "spring stiffness 600, damping 22",
+        "purpose": "The countdown punching in from 112% scale on each of its last five ticks."
+      },
+      {
+        "name": "haptic-select",
+        "value": "vibrate 6ms",
+        "purpose": "Answer picked or unpicked."
+      },
+      {
+        "name": "haptic-commit",
+        "value": "vibrate 14ms",
+        "purpose": "Answers locked in."
+      },
+      {
+        "name": "haptic-result",
+        "value": "vibrate [12, 60, 18] scored / 32ms none",
+        "purpose": "A verdict landing."
+      },
+      {
+        "name": "waiting-pulse",
+        "value": "opacity .35 and scale .8 at 50%, 1.6s ease-in-out loop",
+        "purpose": "The square waiting light only (lobby waiting, session loading); states are shown steady."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "travel removed, colour and opacity kept",
+        "purpose": "Entrances fade in place, dialogs and drawer appear without sliding, moving loops stop."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "640px", "purpose": "Two-column answer options and wider touch layouts." },
-      { "name": "md", "value": "768px", "purpose": "Larger page headings and editor layouts." },
-      { "name": "lg", "value": "1024px", "purpose": "Expanded page padding and desktop spacing." },
-      { "name": "xl", "value": "1280px", "purpose": "Session stage/sidebar composition." }
-    ]
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ],
+    "layers": [
+      {
+        "name": "raised",
+        "value": 10
+      },
+      {
+        "name": "dropdown",
+        "value": 100
+      },
+      {
+        "name": "sticky",
+        "value": 200
+      },
+      {
+        "name": "dock",
+        "value": 250
+      },
+      {
+        "name": "toast",
+        "value": 500
+      }
+    ],
+    "chrome": {
+      "value": "background color-mix(in srgb, #101010 78%, transparent); backdrop-filter blur(16px) saturate(160%)",
+      "purpose": "Sticky top bar, player sub-bar and bottom dock; solid #101010 under prefers-reduced-transparency."
+    }
   },
   "components": [
     {
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The single most important action on a surface.",
-      "html": "<button class=\"ds-btn-primary\">HOST A QUIZ</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; background: var(--color-primary); color: var(--color-foreground); padding: 1rem 2rem; border: 0; border-radius: 0; font: 600 0.75rem/1rem var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-primary:hover { background: var(--color-primary-hover); } .ds-btn-primary:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); } .ds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }"
+      "description": "The session's one decisive action: start, lock in, next question.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Start the quiz <svg class=\"ds-trail\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M2 7h9V5h2v2h1v2h-1v2h-2V9H2z\"/></svg></button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:0 20px;border:1px solid transparent;border-radius:0;font-family:var(--font-sans,'Schibsted Grotesk',sans-serif);font-size:13px;font-weight:600;line-height:1;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background-color 100ms ease,border-color 100ms ease,color 100ms ease,transform 100ms cubic-bezier(.16,1,.3,1)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #92c1fd;outline-offset:2px}.ds-trail{transition:translate 160ms cubic-bezier(.16,1,.3,1)}.ds-btn:hover .ds-trail{translate:3px 0}.ds-btn-primary{background:#005fd0;color:#ebebeb}.ds-btn-primary:hover{background:#0250ae}"
     },
     {
-      "name": "Ghost Button",
+      "name": "Secondary Button",
       "kind": "button",
-      "refersTo": "button-ghost",
-      "description": "A secondary action that keeps the stage quiet.",
-      "html": "<button class=\"ds-btn-ghost\">JOIN A SESSION</button>",
-      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--color-muted); padding: 1rem 2rem; border: 1px solid var(--color-border); border-radius: 0; font: 600 0.75rem/1rem var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: border-color 150ms ease, color 150ms ease; } .ds-btn-ghost:hover { border-color: color-mix(in srgb, var(--color-primary) 50%, transparent); color: var(--color-accent); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); }"
+      "refersTo": "button-secondary",
+      "description": "Outlined alternative action.",
+      "html": "<button class=\"ds-btn2\">End session</button>",
+      "css": ".ds-btn2{display:inline-flex;align-items:center;min-height:44px;padding:0 20px;background:transparent;color:#ebebeb;border:1px solid #383838;border-radius:0;font-family:var(--font-sans,'Schibsted Grotesk',sans-serif);font-size:13px;font-weight:600;line-height:1;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background-color 100ms ease,border-color 100ms ease}.ds-btn2:hover{border-color:color-mix(in srgb,#92c1fd 55%,transparent);background:#1c1c1c}.ds-btn2:active{transform:translateY(1px)}.ds-btn2:focus-visible{outline:2px solid #92c1fd;outline-offset:2px}"
     },
     {
-      "name": "Input Field",
+      "name": "Input",
       "kind": "input",
-      "refersTo": "input-field",
-      "description": "The standard sharp-edged field for typed content.",
-      "html": "<label class=\"ds-field-label\">Join code<input class=\"ds-input\" value=\"HERMES\" /></label>",
-      "css": ".ds-field-label { display: grid; gap: 0.25rem; color: var(--color-muted); font: 500 0.8125rem/1.25rem var(--font-sans); } .ds-input { width: 100%; background: var(--color-surface); color: var(--color-foreground); padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: 0; font: 400 1rem/1.4 var(--font-mono); outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-input::placeholder { color: color-mix(in srgb, var(--color-muted) 30%, transparent); } .ds-input:focus { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+      "refersTo": "input",
+      "description": "A darker well with a strong outline; 16px text so iOS never zooms.",
+      "html": "<input class=\"ds-input\" placeholder=\"Your name\" />",
+      "css": ".ds-input{display:block;width:100%;min-height:44px;padding:10px 14px;background:#101010;color:#ebebeb;border:1px solid #383838;border-radius:0;font-family:var(--font-sans,'Schibsted Grotesk',sans-serif);font-size:16px;line-height:1.5;transition:border-color 160ms ease,box-shadow 160ms ease}.ds-input::placeholder{color:#848484}.ds-input:hover:not(:focus){border-color:color-mix(in srgb,#383838 50%,#a8a8a8)}.ds-input:focus{outline:none;border-color:#005fd0;box-shadow:inset 0 0 0 1px #005fd0}"
     },
     {
-      "name": "Navigation",
-      "kind": "nav",
-      "refersTo": "label-eyebrow",
-      "description": "A sticky account or session header with a restrained live surface.",
-      "html": "<nav class=\"ds-nav\"><strong class=\"ds-wordmark\">HERMES</strong><button class=\"ds-nav-action\">SIGN OUT</button></nav>",
-      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; height: 3.5rem; padding: 0 1.5rem; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-background) 80%, transparent); backdrop-filter: blur(4px); } .ds-wordmark { color: var(--color-foreground); font: 900 1rem/1 var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; } .ds-nav-action { padding: 0.75rem 0; border: 0; background: transparent; color: var(--color-muted); font: 600 0.75rem/1rem var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; } .ds-nav-action:hover { color: var(--color-foreground); } .ds-nav-action:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); }"
+      "name": "Tally",
+      "kind": "chip",
+      "refersTo": "tally-on-air",
+      "description": "The lamp over the camera: standby, on air, off air. Steady, never blinking.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-tally\" data-tally=\"standby\">Standby</span><span class=\"ds-tally\" data-tally=\"on-air\">On air</span><span class=\"ds-tally\" data-tally=\"off-air\">Off air</span></div>",
+      "css": ".ds-row{display:flex;gap:12px;flex-wrap:wrap}.ds-tally{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 9px;border:1px solid currentColor;font-family:var(--font-display,Archivo,sans-serif);font-size:12px;font-stretch:80%;font-weight:800;letter-spacing:.14em;line-height:1;text-transform:uppercase;white-space:nowrap;transition:background-color 240ms ease,color 240ms ease,border-color 240ms ease}.ds-tally::before{content:'';width:7px;height:7px;background:currentColor}.ds-tally[data-tally=on-air]{border-color:#ec5542;background:#ec5542;color:#101010}.ds-tally[data-tally=standby]{color:#ffa746;background:color-mix(in srgb,#ffa746 10%,transparent)}.ds-tally[data-tally=off-air]{color:#848484;border-color:#383838}.ds-tally[data-tally=off-air]::before{background:transparent;box-shadow:inset 0 0 0 1px currentColor}"
     },
     {
-      "name": "Resource Row",
+      "name": "Slate",
       "kind": "custom",
-      "refersTo": "resource-row",
-      "description": "A full-row resource link with a separate destructive action.",
-      "html": "<div class=\"ds-resource-row\"><a href=\"#\" class=\"ds-resource-link\"><strong>Spring assessment</strong><span>12 questions</span></a><button class=\"ds-delete\">DELETE</button></div>",
-      "css": ".ds-resource-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.5rem; border: 1px solid var(--color-border); background: var(--color-surface); } .ds-resource-link { display: grid; gap: 0.25rem; color: var(--color-foreground); text-decoration: none; } .ds-resource-link span { color: var(--color-muted); font-size: 0.875rem; } .ds-resource-row:hover { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); background: color-mix(in srgb, var(--color-surface) 80%, transparent); } .ds-delete { position: relative; padding: 0.75rem 0; border: 0; background: transparent; color: var(--color-muted); font: 600 0.75rem/1rem var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; } .ds-delete:hover, .ds-delete:focus-visible { color: var(--color-danger); } .ds-delete:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-danger); }"
+      "refersTo": "slate",
+      "description": "Key-blue blind over the question area before the timer starts: segment, total, what it asks.",
+      "html": "<div class=\"ds-slate\"><p class=\"ds-slate-num\">Q04</p><p class=\"ds-slate-meta\"><span>of 12</span><span class=\"ds-slash\">/</span><span>One answer</span></p></div>",
+      "css": ".ds-slate{display:flex;flex-direction:column;justify-content:center;min-height:220px;padding:20px 24px;background:#005fd0;color:#ebebeb;animation:ds-blind 320ms cubic-bezier(.16,1,.3,1) both}.ds-slate-num{margin:0;font-family:var(--font-display,Archivo,sans-serif);font-stretch:72%;font-weight:800;letter-spacing:-.02em;line-height:.82;font-size:clamp(4.5rem,11vw,8.5rem)}.ds-slate-meta{margin:12px 0 0;display:flex;gap:12px;font-family:var(--font-mono,'Azeret Mono',monospace);font-weight:500;font-size:16px;text-transform:uppercase;color:#dce9fc}.ds-slash{color:#dce9fc}@keyframes ds-blind{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}@media (prefers-reduced-motion:reduce){.ds-slate{animation:none}}"
     },
     {
       "name": "Answer Option",
       "kind": "custom",
-      "refersTo": "answer-option",
-      "description": "A letter-coded response control with a protected option identity.",
-      "html": "<button class=\"ds-option ds-option-a\"><span class=\"ds-option-marker\">A</span><span>Mercury</span></button>",
-      "css": ".ds-option { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 0; background: var(--color-background); color: var(--color-foreground); text-align: left; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease; } .ds-option-a:hover, .ds-option-a:focus-visible { border-color: #2563eb; background: color-mix(in srgb, #2563eb 14%, var(--color-background)); } .ds-option:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); } .ds-option-marker { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border: 1px solid #2563eb; color: #2563eb; font: 700 0.6875rem/1 var(--font-sans); letter-spacing: 0.1em; }"
+      "refersTo": "option-tile",
+      "description": "One tile everywhere; letter carries identity, data-state carries meaning, the letter stamps to lock/tick/cross.",
+      "html": "<div class=\"ds-opts\"><button class=\"ds-opt\" style=\"--option:#e0d653\"><span class=\"ds-fill\" style=\"transform:scaleX(.25)\"></span><span class=\"ds-letter\">A</span><span>Mercury</span><span class=\"ds-aside\">12</span></button><button class=\"ds-opt\" data-state=\"selected\" data-locked style=\"--option:#0fd8da\"><span class=\"ds-letter\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M5 7V4h1V3h4v1h1v3h1v7H4V7zm2 0h2V5H7z\"/></svg></span><span>Venus</span><span class=\"ds-aside\">31</span></button><div class=\"ds-opt\" data-state=\"correct\" style=\"--option:#bc8ef4\"><span class=\"ds-letter\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M13 4h2v2h-1v1h-1v1h-1v1h-1v1h-1v1H9v1H7v-1H6v-1H5V9H4V8H3V7h2v1h1v1h1v1h2V9h1V8h1V7h1V6h1z\"/></svg></span><span>Mars</span><span class=\"ds-aside\">44</span></div><div class=\"ds-opt\" data-state=\"dimmed\" style=\"--option:#cf6192\"><span class=\"ds-letter\">D</span><span>Jupiter</span><span class=\"ds-aside\">9</span></div></div>",
+      "css": ".ds-opts{display:grid;gap:8px}.ds-opt{--tone:var(--option,#383838);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:14px;padding:14px 16px;background:#101010;border:1px solid #262626;border-radius:0;color:#ebebeb;font:inherit;font-size:16px;text-align:left;transition:background-color 160ms ease,border-color 160ms ease,opacity 160ms ease,scale 100ms cubic-bezier(.16,1,.3,1)}button.ds-opt{cursor:pointer}button.ds-opt:hover{border-color:color-mix(in srgb,var(--tone) 70%,transparent)}button.ds-opt:active{scale:.97}button.ds-opt:focus-visible{outline:2px solid #92c1fd;outline-offset:2px}.ds-letter{display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid color-mix(in srgb,var(--tone) 60%,transparent);color:var(--tone);font-family:var(--font-mono,'Azeret Mono',monospace);font-size:12px;font-weight:600}.ds-opt[data-state=selected]{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 14%,#101010)}.ds-fill{position:absolute;inset:0;transform-origin:left;background:color-mix(in srgb,var(--tone) 22%,transparent)}.ds-opt{position:relative;overflow:hidden}.ds-opt>span:not(.ds-fill){position:relative}.ds-opt[data-locked][data-state=selected]{background:color-mix(in srgb,var(--tone) 22%,#101010)}.ds-opt[data-state=correct]{--tone:#6dd17f;border-color:var(--tone);background:color-mix(in srgb,var(--tone) 12%,#101010)}.ds-opt[data-state=dimmed]{opacity:.5;transition-delay:0s,0s,140ms,0s}.ds-opt[data-state=selected]>.ds-letter,.ds-opt[data-state=correct]>.ds-letter{background:var(--tone);border-color:var(--tone);color:#101010}.ds-aside{font-family:var(--font-mono,'Azeret Mono',monospace);font-size:14px;color:#a8a8a8;font-variant-numeric:tabular-nums}"
     },
     {
-      "name": "Leaderboard Row",
+      "name": "Rundown",
       "kind": "custom",
-      "refersTo": "leaderboard-row",
-      "description": "A ranked result row with stable live numerals.",
-      "html": "<div class=\"ds-leaderboard-row\"><span class=\"ds-rank\">01</span><span>Alex</span><strong>1240</strong></div>",
-      "css": ".ds-leaderboard-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: 0; background: var(--color-surface); color: var(--color-foreground); } .ds-rank { width: 1.5rem; color: var(--color-muted); font-weight: 700; font-variant-numeric: tabular-nums; } .ds-leaderboard-row strong { color: var(--color-success); font-variant-numeric: tabular-nums; }"
+      "refersTo": "rundown-cell-live",
+      "description": "Host running order: done filled, on stage in tally (lit while timed), upcoming outlined.",
+      "html": "<section class=\"ds-rundown\"><div class=\"ds-rd-head\"><h2 class=\"ds-label\">Rundown</h2><p class=\"ds-rd-count\"><span>04</span> / 08</p></div><ol class=\"ds-rd\"><li class=\"done\">01</li><li class=\"done\">02</li><li class=\"done\">03</li><li class=\"live\">04</li><li>05</li><li>06</li><li>07</li><li>08</li></ol></section>",
+      "css": ".ds-rundown{width:300px;padding:20px;background:#161616;border:1px solid #262626}.ds-rd-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}.ds-label{margin:0;font-size:12px;line-height:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#a8a8a8}.ds-rd-count{margin:0;font-family:var(--font-mono,'Azeret Mono',monospace);font-size:14px;color:#a8a8a8;font-variant-numeric:tabular-nums}.ds-rd-count span{color:#ebebeb}.ds-rd{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,1fr));gap:4px}.ds-rd li{display:flex;height:32px;align-items:center;justify-content:center;border:1px solid #262626;color:#848484;font-family:var(--font-mono,'Azeret Mono',monospace);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;transition:background-color 240ms ease,color 240ms ease,border-color 240ms ease}.ds-rd li.done{background:#262626}.ds-rd li.live{border-color:#ec5542;background:#ec5542;color:#101010}"
     },
     {
-      "name": "Live Participant Count",
-      "kind": "custom",
-      "refersTo": "label-eyebrow",
-      "description": "An accent count that makes live audience scale immediately legible.",
-      "html": "<div class=\"ds-live-count\" role=\"status\"><strong>48</strong><span>PARTICIPANTS</span></div>",
-      "css": ".ds-live-count { display: inline-flex; align-items: baseline; gap: 0.5rem; color: var(--color-accent); } .ds-live-count strong { font: 900 1.5rem/1 var(--font-sans); font-variant-numeric: tabular-nums; } .ds-live-count span { color: var(--color-muted); font: 600 0.75rem/1rem var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; }"
+      "name": "Session Top Bar",
+      "kind": "nav",
+      "refersTo": "tally-on-air",
+      "description": "Translucent sticky chrome: mark left, station clock, player count and tally right.",
+      "html": "<header class=\"ds-bar\"><span class=\"ds-mark\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 32 32\"><rect x=\"8\" y=\"18\" width=\"16\" height=\"4\" fill=\"#005fd0\"/><rect x=\"10\" y=\"14\" width=\"12\" height=\"4\" fill=\"#005fd0\"/><rect x=\"12\" y=\"10\" width=\"8\" height=\"4\" fill=\"#005fd0\"/><path d=\"M22 12 L28 8 L26 14 Z\" fill=\"#92c1fd\"/><path d=\"M10 12 L4 8 L6 14 Z\" fill=\"#92c1fd\"/><rect x=\"10\" y=\"22\" width=\"4\" height=\"8\" fill=\"#383838\"/><rect x=\"18\" y=\"22\" width=\"4\" height=\"8\" fill=\"#383838\"/></svg>Hermes</span><span class=\"ds-right\"><span class=\"ds-clock\">19:42:07</span><span class=\"ds-count\">24 players</span><span class=\"ds-tally2\">On air</span></span></header>",
+      "css": ".ds-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;height:56px;padding:0 24px;background:color-mix(in srgb,#101010 78%,transparent);backdrop-filter:blur(16px) saturate(160%);border-bottom:1px solid #262626}.ds-mark{display:flex;align-items:center;gap:10px;color:#ebebeb;font-weight:600}.ds-right{display:flex;align-items:center;gap:12px}.ds-clock{font-family:var(--font-mono,'Azeret Mono',monospace);font-size:14px;color:#a8a8a8;font-variant-numeric:tabular-nums}.ds-count{font-size:14px;color:#a8a8a8}.ds-tally2{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 9px;background:#ec5542;color:#101010;font-family:var(--font-display,Archivo,sans-serif);font-size:12px;font-stretch:80%;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.ds-tally2::before{content:'';width:7px;height:7px;background:currentColor}"
     }
   ],
   "narrative": {
-    "northStar": "Stage Lights, Dark Room",
-    "overview": "Hermes is a live broadcast staged in a near-black room. The surround stays flat and quiet so the question, timer, answer state, or leaderboard delta can take the spotlight. The atmosphere is theatrical and precise at once: terminal clarity carrying broadcaster stakes. Colour is scarce by design, so an active state reads immediately under time pressure.\n\nThe implementation is a dark, sharp-edged system built from semantic CSS tokens and a small set of shared utility patterns. The terminal influence appears in uppercase tracked labels, hairline rules, monospace typed content, and deliberate status feedback, not in CRT effects or retro decoration. Surfaces are mostly flat tonal layers, with localized depth where an open dropdown or drawer needs separation.",
+    "northStar": "The Gallery",
+    "overview": "Hermes is the production gallery of a live broadcast: a flat video-black stage, hairline rules, and a handful of real instruments that each report true session state. The tally lamp says whether the session is in standby, on air, or off air. The key-blue slate drops over the question area to announce the next segment. The rundown shows where the room is in the running order. The station clock keeps the time. None of these is costume; delete the session state behind any of them and the instrument has nothing to say. If a new element cannot name the state it encodes, it does not belong in the gallery.\n\nThe palette is built the way a broadcast signal is, not picked from a swatch book. Neutrals are true greys named by their 8-bit video code value, from video black (code 16) to legal white (code 235); nothing is pure black or pure white, which a broadcast chain would clip. Colour is one system with three rules, so no colour is picked on its own. Levels: neutrals are video levels. Gain: two hero lights, key blue and tally red, run at full gain (OKLCH C 0.19); every other lamp (standby, go, the four answers) shares one gain, C 0.15, and the accent sits on key blue's own hue at lower chroma, so they read as a set rather than a collection. Spacing: every hue holds its own slot on the wheel, at least about 40° from any other, so no two lamps are near-twins: tally 30 · standby 65 · A 105 · go 148 · B 196 · key and accent 255 · C 304 · D 354. The four answer colours are the colour bars' yellow, cyan, violet and magenta.\n\nDensity is that of a control desk: one stage column, one side rail, a sticky top bar and a sticky dock, everything on hairline-separated flat panels. Energy comes from three lit lamps against video black and from choreographed state changes (the blind rolling down, a stamp landing on an answer letter, ranks sliding), never from gradients, glow, or decoration. Display type is Archivo pulled narrow on its width axis, the voice of on-screen graphics; interface copy is a quiet grotesk; every number a person reads live is monospace with tabular figures. The world is dark only, square-cornered throughout, and flat; it rejects scanlines, CRT effects, terminal costume, the bright-primaries-on-white quiz look, and confetti.",
     "keyCharacteristics": [
-      "Flat near-black canvas and charcoal surfaces with a compact neutral range.",
-      "Sharp rectangular controls and 1px borders as the default geometry.",
-      "Geist Sans for interface text and live numerals; Geist Mono for typed identifiers and scoring fields.",
-      "Broadcast blue for action, sky blue for liveness, and a protected A/B/C/D option palette.",
-      "Motion is state communication: fade for content appearing in place, rise for surfaces that genuinely arrive, spring for response bars."
+      "Neutrals are video levels: video black stage, legal white text, true greys between, no pure #000 or #fff.",
+      "Two gains: hero lights (key, tally) at OKLCH C 0.19; standby, go and the answers at C 0.15.",
+      "Fixed hue slots at least ~40° apart: tally 30, standby 65, A 105, go 148, B 196, key 255, C 304, D 354.",
+      "Three lamps carry the show: key blue (house, slate, primary action), tally red (on air, the last five seconds, a fault), standby amber (the lobby, the last ten seconds).",
+      "Answers are the colour bars' yellow, cyan, violet, magenta on a descending lightness staircase, always paired with their A to D letter.",
+      "Every corner is square, status dots included; every surface is a flat fill separated by 1px rules.",
+      "Display type narrowed to 84% / 72% width so a long question fits a projector line.",
+      "Live digits are always Azeret Mono with tabular figures.",
+      "Motion encodes the live moments: blind, stage cut, stamp, slot, tick, drain."
     ],
     "rules": [
-      { "name": "The Spotlight Rule", "body": "Let one saturated color act at a time. Keep surrounding controls neutral or muted so the active state wins without visual noise.", "section": "colors" },
-      { "name": "The Option Palette Is Sacred", "body": "A/B/C/D colors mean answer choice. Do not reuse them for chrome, navigation, generic icons, or unrelated status.", "section": "colors" },
-      { "name": "The Tabular Digit Rule", "body": "Timers, scores, ranks, counts, and response totals use tabular-nums so live updates do not move the surrounding layout.", "section": "typography" },
-      { "name": "The Mono Stays in the Field Rule", "body": "Geist Mono belongs in inputs, identifiers, codes, and scoring fields. It does not belong in headings, display numerals, or general labels.", "section": "typography" },
-      { "name": "The Movement Must Tell the Truth Rule", "body": "Use fade when cached or existing content appears in place. Reserve travel for something that genuinely arrived, such as a drawer, dropdown, or next question.", "section": "elevation" }
+      {
+        "name": "The Legal Levels Rule",
+        "body": "Neutrals are true greys between video black (#101010) and legal white (#ebebeb). Never pure #000 or #fff as a fill, text or stroke, on screen, in icons, in manifests, or in the social image. (Shadows on floating layers are the one place black appears, as alpha.)",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Gains Rule",
+        "body": "Only the two hero lights, key blue and tally red, run at full gain (OKLCH C 0.19). Every other lamp (standby, go, the four answers) shares C 0.15. The accent family (key light, key glow, key mist) is the key's own light on its hue slot, deliberately lower (C 0.10 and below). A new colour that needs more chroma to read is the wrong colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Hue Slot Rule",
+        "body": "Every hue holds a fixed slot at least about 40° from any other: tally 30, standby 65, A 105, go 148, B 196, key and accent 255, C 304, D 354. A new lamp needs a free slot or an existing meaning; never a near-twin of a slot already taken.",
+        "section": "colors"
+      },
+      {
+        "name": "The Lamps Mean Something Rule",
+        "body": "Key blue is the house and the action; tally red is now and fault; amber is standby and warning. Never use any of them for decoration, and never use amber outside standby, warning, or the ten-second clock.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour Bars Rule",
+        "body": "Option colours mean \"answer A/B/C/D\" and nothing else: no charts, categories, avatars, or accents. They reach components only through the `--option` variable set from the option's position, keep their bar order, hue slots and lightness staircase, and always appear with their letter.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink On Lit Rule",
+        "body": "A lit lamp (tally on air, a filled answer letter, a live rundown cell) takes video-black ink text, never white. Text on key blue and tally solid uses on-primary; secondary text on key blue uses on-primary-muted, never a faded white.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Token Rule",
+        "body": "Components use the semantic tokens (background, surface, primary, on-primary, tally, option-a...), never the palette values or raw hex. Satori-rendered images, which cannot read CSS variables, mirror the palette by value.",
+        "section": "colors"
+      },
+      {
+        "name": "The Narrow Voice Rule",
+        "body": "Display width tightens as type grows: 84% for questions and headings, 72% for the largest slate and hero type. Body text never uses the display face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Digits Rule",
+        "body": "Any digit that changes while someone watches (clock, countdown, score, rank, count) is Azeret Mono with tabular-nums, so nothing jitters as it ticks.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Kicker Rule",
+        "body": "The uppercase label names a section, status, or datum. It is never placed as a kicker above a heading; the heading carries its own weight.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Stage Rule",
+        "body": "Page and panel backgrounds are flat solid fills. No radial blooms, linear gradients, or vignettes on any surface. (The only gradients in the build are transient light sweeps across a busy button and a loading skeleton.)",
+        "section": "elevation"
+      },
+      {
+        "name": "The Floating Only Rule",
+        "body": "A shadow means the layer floats over the page and will leave. Panels, tiles and frames on the page never cast one.",
+        "section": "elevation"
+      }
     ],
     "dos": [
-      "Do keep page backgrounds in the Midnight Stage family and use semantic tokens instead of raw component colors.",
-      "Do reserve A/B/C/D colors for answer options.",
-      "Do use hairline rule borders as the default structural device.",
-      "Do apply tabular-nums to values that update live.",
-      "Do use Geist Mono only for typed identifiers, form content, and scoring inputs.",
-      "Do keep loading twins geometrically coupled to their rendered components.",
-      "Do use motion to explain arrival, change, locking, or reveal, and honor reduced-motion preferences."
+      "**Do** give every instrument a true session state: tally from session status, slate from question arrival before the timer, rundown from position, clock from the wall.",
+      "**Do** keep neutrals on the video-level greys, from video black (#101010) to legal white (#ebebeb); run only key blue and tally at C 0.19 and standby, go and the answers at C 0.15, each in its own hue slot.",
+      "**Do** put video-black ink on every lit lamp (tally 5.4:1, colour bars 5.2:1 to 12.6:1); use on-primary on key blue (5.0:1) and tally solid (4.7:1), and on-primary-muted for secondary text on key (4.8:1).",
+      "**Do** keep text on the four tiers: foreground 16.0:1, muted 8.0:1, subtle 5.1:1 (4.6:1 on raised), faint 2.5:1 for disabled only.",
+      "**Do** keep the colour bars in bar order (yellow, cyan, violet, magenta) with their lightness staircase (0.86, 0.80, 0.73, 0.64), and always show the A to D letter beside the colour.",
+      "**Do** set every live digit in Azeret Mono with tabular-nums.",
+      "**Do** keep inputs at 16px text and controls at 44px minimum height.",
+      "**Do** draw durations from the tokens (100 / 160 / 240 / 320 / 480ms, plus the 520ms slate lift) and the springs in the motion vocabulary, mirroring changes between the stylesheet and the motion module.",
+      "**Do** keep hover styles behind (hover: hover) and (pointer: fine), so a phone tap never leaves a tile looking picked."
     ],
     "donts": [
-      "Don't introduce light surfaces, rounded SaaS cards, confetti, CRT scanlines, fake noise, or gradient text.",
-      "Don't reuse the answer palette for navigation, chrome, or unrelated status.",
-      "Don't use shadows as the default card treatment; reserve them for localized overlay separation like the dropdown and scoring drawer.",
-      "Don't use Geist Mono for display numerals or headings.",
-      "Don't animate decoration that does not communicate a state change.",
-      "Don't hand-copy skeleton geometry when the source component can expose its layout shell."
+      "**Don't** use pure #000 or #fff as a fill, text or stroke, or fade white with alpha for text on key blue.",
+      "**Don't** use option colours for anything but answers A to D, or reorder them.",
+      "**Don't** use tally red, amber or key blue as decoration, or add a lamp that crowds an existing hue slot.",
+      "**Don't** put gradients, blooms or vignettes on any page or panel background.",
+      "**Don't** add scanlines, CRT glow, or terminal costume.",
+      "**Don't** round corners on any surface, control, lamp, or dot.",
+      "**Don't** blink the tally or a badge dot; pulsing is for waiting signals only.",
+      "**Don't** let the slate cover the header, clock or dock, take a click, or run after the timer has started.",
+      "**Don't** use white text on a lit lamp.",
+      "**Don't** cast shadows from anything that does not float over the page; floating layers use --shadow-float.",
+      "**Don't** place an uppercase label as a kicker above a heading."
     ]
   }
 }

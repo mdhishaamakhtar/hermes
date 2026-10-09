@@ -24,7 +24,7 @@ export function TopBar({
   children?: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-background/85 backdrop-blur-md">
+    <header className="chrome sticky top-0 z-[var(--z-sticky)] border-b border-border pt-[env(safe-area-inset-top,0px)]">
       <div
         className={`mx-auto flex h-14 items-center justify-between gap-4 px-4 sm:px-6 ${WIDTHS[width]}`}
       >

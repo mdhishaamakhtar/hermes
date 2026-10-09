@@ -133,6 +133,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
             invalid={Boolean(errors.code)}
             aria-describedby={errors.code ? `${codeId}-error` : undefined}
             autoFocus={!initialCode}
+            enterKeyHint="next"
           />
         </Field>
         <TextField
@@ -145,6 +146,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
           onChange={(event) => setName(event.target.value.slice(0, NAME_MAX))}
           error={errors.name}
           autoFocus={Boolean(initialCode)}
+          enterKeyHint="go"
         />
         {errors.form && <Alert>{errors.form}</Alert>}
         <Button

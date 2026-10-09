@@ -18,7 +18,13 @@ export const duration = {
   instant: 0.1,
   base: 0.16,
   enter: 0.24,
+  sheet: 0.32,
   stage: 0.48,
+  /**
+   * The slate lifting off the question: the one exit slower than its
+   * entrance, because it uncovers what the room is about to read.
+   */
+  lift: 0.52,
 } as const;
 
 type Bezier = [number, number, number, number];
@@ -26,7 +32,7 @@ type Bezier = [number, number, number, number];
 export const ease = {
   /** Expo-out: fast start, gentle settle. Anything arriving. */
   out: [0.16, 1, 0.3, 1] as Bezier,
-  /** Symmetric, for moves between two on-screen states. */
+  /** Symmetric, for moves between two on-screen states. Mirrors --ease-in-out. */
   inOut: [0.65, 0, 0.35, 1] as Bezier,
 } as const;
 
@@ -35,6 +41,10 @@ export const spring = {
   bar: { type: "spring", stiffness: 260, damping: 30 },
   /** Things that move to a new slot: reordered rows, a tab indicator. */
   slot: { type: "spring", stiffness: 480, damping: 38 },
+  /** A mark pressed onto a surface: a lock on commit, a tick on reveal. */
+  stamp: { type: "spring", duration: 0.32, bounce: 0.3 },
+  /** The clock's last five seconds, punching in on every tick. */
+  tick: { type: "spring", stiffness: 600, damping: 22 },
 } as const;
 
 export const fade = {

@@ -1,15 +1,44 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { RollingNumber } from "@/components/ui/AnimatedNumber";
+import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatNumber } from "@/lib/format";
 import { duration, ease, spring, stagger } from "@/lib/motion";
 import type { LeaderboardEntry } from "../session-types";
 
+type Climbs = Record<number, number>;
+
+/**
+ * Places each player gained in the latest reshuffle. Held until the order
+ * next changes, so a repeated update with the same ranks keeps the marks.
+ */
+function useClimbs(entries: LeaderboardEntry[]): Climbs {
+  const [seen, setSeen] = useState({ entries, climbs: {} as Climbs });
+  if (seen.entries !== entries) {
+    const before = new Map(
+      seen.entries.map((entry) => [entry.participantId, entry.rank]),
+    );
+    const climbs: Climbs = {};
+    let reshuffled = false;
+    for (const entry of entries) {
+      const was = before.get(entry.participantId);
+      if (was === undefined || was === entry.rank) continue;
+      reshuffled = true;
+      if (was > entry.rank) climbs[entry.participantId] = was - entry.rank;
+    }
+    setSeen({ entries, climbs: reshuffled ? climbs : seen.climbs });
+  }
+  return seen.climbs;
+}
+
 /**
  * Standings as they move. Rows are keyed by player, so when a question is
  * graded and the order changes, each player slides to their new rank
- * instead of the list redrawing in place.
+ * instead of the list redrawing in place, scores roll to their new totals,
+ * and anyone who climbed carries a mark saying how far.
  */
 export function Leaderboard({
   entries,
@@ -23,6 +52,7 @@ export function Leaderboard({
   limit?: number;
   emptyText?: string;
 }) {
+  const climbs = useClimbs(entries);
   const sorted = entries.toSorted((a, b) => a.rank - b.rank);
   const shown = limit ? sorted.slice(0, limit) : sorted;
   const me =
@@ -45,20 +75,37 @@ export function Leaderboard({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <Row entry={entry} me={entry.participantId === meId} />
+            <Row
+              entry={entry}
+              me={entry.participantId === meId}
+              climb={climbs[entry.participantId]}
+              live
+            />
           </motion.li>
         ))}
       </AnimatePresence>
       {meHidden && (
         <li className="mt-2 border-t border-dashed border-border-strong pt-3">
-          <Row entry={me} me />
+          <Row entry={me} me climb={climbs[me.participantId]} live />
         </li>
       )}
     </ol>
   );
 }
 
-function Row({ entry, me }: { entry: LeaderboardEntry; me: boolean }) {
+function Row({
+  entry,
+  me,
+  climb,
+  live = false,
+}: {
+  entry: LeaderboardEntry;
+  me: boolean;
+  /** Places gained in the latest reshuffle. */
+  climb?: number;
+  /** Scores roll to new totals; final standings just state them. */
+  live?: boolean;
+}) {
   return (
     <div
       className={`flex items-center gap-3 border px-3.5 py-2.5 ${
@@ -78,9 +125,32 @@ function Row({ entry, me }: { entry: LeaderboardEntry; me: boolean }) {
           <span className="ml-2 text-xs font-semibold text-accent">You</span>
         )}
       </span>
-      <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
-        {formatNumber(entry.score)}
-      </span>
+      <AnimatePresence initial={false}>
+        {climb && (
+          <motion.span
+            key={`${entry.rank}-${climb}`}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: duration.enter, ease: ease.out }}
+            className="flex shrink-0 items-center gap-0.5 font-mono text-xs font-semibold text-success tabular-nums"
+          >
+            <Icon name="arrow-up" size={12} />
+            <span className="sr-only">Up </span>
+            {climb}
+          </motion.span>
+        )}
+      </AnimatePresence>
+      {live ? (
+        <RollingNumber
+          value={entry.score}
+          className="font-mono text-sm font-semibold text-foreground"
+        />
+      ) : (
+        <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+          {formatNumber(entry.score)}
+        </span>
+      )}
     </div>
   );
 }

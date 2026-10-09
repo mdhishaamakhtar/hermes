@@ -6,31 +6,42 @@ import { getSiteUrl, siteConfig } from "@/lib/site";
 export const socialImageSize = { width: 1200, height: 630 } as const;
 export const socialImageAlt = siteConfig.ogImageAlt;
 
-// Satori reads WOFF but not the WOFF2 that next/font serves, so the social
-// image loads the static instances @fontsource ships.
+// Satori reads WOFF but not the WOFF2 that next/font serves, and it cannot
+// drive a variable width axis, so the social image loads static instances
+// from @fontsource. Archivo Narrow stands in for the app's narrowed Archivo.
 function font(pkg: string, file: string) {
   return readFile(
     join(process.cwd(), "node_modules/@fontsource", pkg, "files", file),
   );
 }
 
-const INK = {
-  stage: "#0a0a0f",
-  surface: "#0f1117",
-  rule: "#2a3144",
-  text: "#f8fafc",
-  muted: "#94a3b8",
-  blue: "#2563eb",
-  sky: "#38bdf8",
+/*
+ * Satori cannot read CSS variables, so these mirror the palette in
+ * app/globals.css by value. Change one, change the other.
+ */
+const PALETTE = {
+  black: "#101010", // video black
+  surface: "#161616",
+  rule: "#383838",
+  white: "#ebebeb", // legal white
+  muted: "#a8a8a8",
+  key: "#005fd0",
+  keyLight: "#92c1fd",
+  tally: "#ec5542",
+  bars: ["#e0d653", "#0fd8da", "#bc8ef4", "#cf6192"],
 };
 
 const SAMPLE_CODE = "K7Q2XM";
 
-/** The card link previews show: the promise, and the join code that keeps it. */
+/**
+ * The card link previews show, framed like the app's own stage: the tally
+ * lit, the promise in the on-screen graphics voice, and the two things a
+ * player meets first: a join code, and four lettered answers.
+ */
 export async function createSocialImage() {
-  const [sans, sansBold, mono] = await Promise.all([
+  const [sans, narrow, mono] = await Promise.all([
     font("schibsted-grotesk", "schibsted-grotesk-latin-400-normal.woff"),
-    font("schibsted-grotesk", "schibsted-grotesk-latin-800-normal.woff"),
+    font("archivo-narrow", "archivo-narrow-latin-700-normal.woff"),
     font("azeret-mono", "azeret-mono-latin-600-normal.woff"),
   ]);
   const host = new URL(getSiteUrl()).host;
@@ -43,9 +54,9 @@ export async function createSocialImage() {
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        padding: "64px 72px",
-        background: INK.stage,
-        color: INK.text,
+        padding: "60px 72px",
+        background: PALETTE.black,
+        color: PALETTE.white,
         fontFamily: "Schibsted Grotesk",
       }}
     >
@@ -58,39 +69,40 @@ export async function createSocialImage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <svg width="40" height="40" viewBox="0 0 32 32" fill="none">
-            <rect x="8" y="18" width="16" height="4" fill={INK.blue} />
-            <rect x="10" y="14" width="12" height="4" fill={INK.blue} />
-            <rect x="12" y="10" width="8" height="4" fill={INK.blue} />
-            <path d="M22 12 L28 8 L26 14 Z" fill={INK.sky} />
-            <path d="M10 12 L4 8 L6 14 Z" fill={INK.sky} />
-            <rect x="10" y="22" width="4" height="8" fill={INK.rule} />
-            <rect x="18" y="22" width="4" height="8" fill={INK.rule} />
+            <rect x="8" y="18" width="16" height="4" fill={PALETTE.key} />
+            <rect x="10" y="14" width="12" height="4" fill={PALETTE.key} />
+            <rect x="12" y="10" width="8" height="4" fill={PALETTE.key} />
+            <path d="M22 12 L28 8 L26 14 Z" fill={PALETTE.keyLight} />
+            <path d="M10 12 L4 8 L6 14 Z" fill={PALETTE.keyLight} />
+            <rect x="10" y="22" width="4" height="8" fill={PALETTE.rule} />
+            <rect x="18" y="22" width="4" height="8" fill={PALETTE.rule} />
           </svg>
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: 5 }}>
+          <div
+            style={{
+              fontFamily: "Archivo Narrow",
+              fontSize: 30,
+              letterSpacing: 6,
+            }}
+          >
             HERMES
           </div>
         </div>
+        {/* The tally, lit: a steady square lamp, ink on red. */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 10,
-            padding: "8px 14px",
-            border: `1px solid ${INK.sky}66`,
-            color: INK.sky,
-            fontSize: 18,
-            letterSpacing: 3,
+            gap: 12,
+            padding: "10px 16px",
+            background: PALETTE.tally,
+            color: PALETTE.black,
+            fontFamily: "Archivo Narrow",
+            fontSize: 24,
+            letterSpacing: 4,
           }}
         >
-          <div
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: 9,
-              background: INK.sky,
-            }}
-          />
-          LIVE
+          <div style={{ width: 11, height: 11, background: PALETTE.black }} />
+          ON AIR
         </div>
       </div>
 
@@ -98,10 +110,10 @@ export async function createSocialImage() {
         style={{
           display: "flex",
           flexDirection: "column",
-          fontSize: 92,
-          fontWeight: 800,
-          lineHeight: 0.98,
-          letterSpacing: -2.5,
+          fontFamily: "Archivo Narrow",
+          fontSize: 132,
+          lineHeight: 0.88,
+          letterSpacing: -3,
         }}
       >
         <span>Live quizzes,</span>
@@ -111,30 +123,52 @@ export async function createSocialImage() {
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", gap: 10 }}>
-          {SAMPLE_CODE.split("").map((character, index) => (
-            <div
-              key={index}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 64,
-                height: 76,
-                background: INK.surface,
-                border: `1px solid ${INK.rule}`,
-                fontFamily: "Azeret Mono",
-                fontSize: 40,
-                fontWeight: 600,
-              }}
-            >
-              {character}
-            </div>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {SAMPLE_CODE.split("").map((character, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 58,
+                  height: 70,
+                  background: PALETTE.surface,
+                  border: `1px solid ${PALETTE.rule}`,
+                  fontFamily: "Azeret Mono",
+                  fontSize: 36,
+                }}
+              >
+                {character}
+              </div>
+            ))}
+          </div>
+          {/* The four answer lamps, lettered, in colour-bar order. */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {PALETTE.bars.map((colour, index) => (
+              <div
+                key={colour}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 44,
+                  height: 44,
+                  background: colour,
+                  color: PALETTE.black,
+                  fontFamily: "Azeret Mono",
+                  fontSize: 22,
+                }}
+              >
+                {"ABCD"[index]}
+              </div>
+            ))}
+          </div>
         </div>
         <div
           style={{
@@ -143,12 +177,16 @@ export async function createSocialImage() {
             alignItems: "flex-end",
             gap: 8,
             fontSize: 24,
-            color: INK.muted,
+            color: PALETTE.muted,
           }}
         >
           <span>Players join from any phone.</span>
           <span
-            style={{ fontFamily: "Azeret Mono", fontSize: 20, color: INK.sky }}
+            style={{
+              fontFamily: "Azeret Mono",
+              fontSize: 20,
+              color: PALETTE.keyLight,
+            }}
           >
             {host}
           </span>
@@ -160,10 +198,10 @@ export async function createSocialImage() {
       fonts: [
         { name: "Schibsted Grotesk", data: sans, style: "normal", weight: 400 },
         {
-          name: "Schibsted Grotesk",
-          data: sansBold,
+          name: "Archivo Narrow",
+          data: narrow,
           style: "normal",
-          weight: 800,
+          weight: 700,
         },
         { name: "Azeret Mono", data: mono, style: "normal", weight: 600 },
       ],

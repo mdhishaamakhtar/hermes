@@ -8,25 +8,35 @@ import { Badge } from "@/components/ui/Badge";
 import { Icon } from "@/components/ui/Icon";
 import { countNoun } from "@/lib/format";
 import { fade } from "@/lib/motion";
+import { StationClock, Tally, type TallyState } from "./OnAir";
 
 /**
- * The header every live screen shares. The mark does not link home: one
- * stray tap must not pull a host or a player out of a running session.
+ * The header every live screen shares: the tally says where the session
+ * is, the station clock runs on the host's screen. The mark does not link
+ * home: one stray tap must not pull a host or a player out of a running
+ * session.
  */
 export function SessionTopBar({
   connected,
   participantCount,
+  tally,
+  clock = false,
   children,
 }: {
   connected: boolean;
   participantCount: number;
+  tally: TallyState;
+  /** The station clock, for the screen the room watches. */
+  clock?: boolean;
   children?: ReactNode;
 }) {
   return (
     <TopBar home={null} width="stage">
       <ConnectionStatus connected={connected} />
       {children}
+      {clock && <StationClock className="hidden md:inline" />}
       <PlayerCount count={participantCount} />
+      <Tally state={tally} />
     </TopBar>
   );
 }

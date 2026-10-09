@@ -4,18 +4,19 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RollingNumber } from "@/components/ui/AnimatedNumber";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { displayModeLabel } from "@/features/quizzes/editor-model";
 import { countLabel, countNoun, formatNumber, percent } from "@/lib/format";
-import { rise, stageCut } from "@/lib/motion";
+import { rise, spring, stageCut } from "@/lib/motion";
 import { AnswerOption } from "../components/AnswerOption";
 import { CountdownBar, CountdownClock } from "../components/Countdown";
 import { JoinCodeDisplay, JoinInstructions } from "../components/JoinCode";
 import { Leaderboard } from "../components/Leaderboard";
 import { ScoringDrawer, type ScoringTarget } from "../components/ScoringDrawer";
+import { Rundown } from "../components/Rundown";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
+import { QuestionSlate, slateDetail } from "../components/Slate";
 import { WrapUp } from "../components/WrapUp";
 import { emptyStats } from "../session-state";
 import type { QuestionStats } from "../session-types";
@@ -32,11 +33,9 @@ export function HostLobby({ session }: { session: HostSession }) {
       <SessionTopBar
         connected={session.connected}
         participantCount={participantCount}
-      >
-        <Badge tone="warning" dot>
-          Lobby open
-        </Badge>
-      </SessionTopBar>
+        tally="standby"
+        clock
+      />
       <main
         id="main"
         className="mx-auto flex w-full max-w-4xl flex-1 animate-rise flex-col items-center justify-center gap-14 px-4 py-12 sm:px-6"
@@ -187,10 +186,9 @@ export function HostStage({ session }: { session: HostSession }) {
       <SessionTopBar
         connected={session.connected}
         participantCount={participantCount}
+        tally="on-air"
+        clock
       >
-        <Badge tone="live" dot>
-          Live
-        </Badge>
         <span className="hidden items-center gap-2 text-sm text-muted md:flex">
           Code
           <span className="font-mono text-foreground">{joinCode}</span>
@@ -234,45 +232,58 @@ export function HostStage({ session }: { session: HostSession }) {
               />
             </div>
 
-            {/* The next question starts from the top, not wherever the last
+            <div className="relative">
+              {first && last && (
+                <QuestionSlate
+                  key={questions.map((q) => q.id).join("-")}
+                  lifecycle={lifecycle}
+                  first={first.number}
+                  last={last.number}
+                  total={totalQuestions}
+                  detail={slateDetail(questions)}
+                />
+              )}
+
+              {/* The next question starts from the top, not wherever the last
                 one was scrolled to. */}
-            <AnimatePresence
-              mode="wait"
-              initial={false}
-              onExitComplete={() => window.scrollTo(0, 0)}
-            >
-              <motion.div
-                key={questions.map((q) => q.id).join("-")}
-                {...stageCut}
-                className="divide-y divide-border px-5 pt-4 pb-6 sm:px-8 sm:pb-8"
+              <AnimatePresence
+                mode="wait"
+                initial={false}
+                onExitComplete={() => window.scrollTo(0, 0)}
               >
-                {questions.length === 0 ? (
-                  <p className="py-10 text-center text-muted">
-                    The next question is on its way…
-                  </p>
-                ) : (
-                  questions.map((question) => (
-                    <StageQuestionBlock
-                      key={question.id}
-                      question={question}
-                      stats={stats[question.id] ?? emptyStats()}
-                      compact={questions.length > 1}
-                      countsVisible={
-                        displayMode === "LIVE"
-                          ? lifecycle !== "DISPLAYED"
-                          : Boolean(stats[question.id]?.revealed)
-                      }
-                      onEditScoring={
-                        lifecycle === "REVIEWING" &&
-                        stats[question.id]?.reviewed
-                          ? () => openScoring(question)
-                          : undefined
-                      }
-                    />
-                  ))
-                )}
-              </motion.div>
-            </AnimatePresence>
+                <motion.div
+                  key={questions.map((q) => q.id).join("-")}
+                  {...stageCut}
+                  className="divide-y divide-border px-5 pt-4 pb-6 sm:px-8 sm:pb-8"
+                >
+                  {questions.length === 0 ? (
+                    <p className="py-10 text-center text-muted">
+                      The next question is on its way…
+                    </p>
+                  ) : (
+                    questions.map((question) => (
+                      <StageQuestionBlock
+                        key={question.id}
+                        question={question}
+                        stats={stats[question.id] ?? emptyStats()}
+                        compact={questions.length > 1}
+                        countsVisible={
+                          displayMode === "LIVE"
+                            ? lifecycle !== "DISPLAYED"
+                            : Boolean(stats[question.id]?.revealed)
+                        }
+                        onEditScoring={
+                          lifecycle === "REVIEWING" &&
+                          stats[question.id]?.reviewed
+                            ? () => openScoring(question)
+                            : undefined
+                        }
+                      />
+                    ))
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
 
             {lifecycle !== "DISPLAYED" && displayMode !== "CODE_DISPLAY" && (
               <div className="border-t border-border px-5 py-4 sm:px-8">
@@ -287,12 +298,15 @@ export function HostStage({ session }: { session: HostSession }) {
                     {formatNumber(lockedIn)} locked in
                   </span>
                 </div>
-                <div aria-hidden className="h-1 bg-border">
-                  <div
-                    className="h-full origin-left bg-accent transition-transform duration-500"
-                    style={{
-                      transform: `scaleX(${expected > 0 ? Math.min(1, answered / expected) : 0})`,
+                <div aria-hidden className="h-1 overflow-hidden bg-border">
+                  <motion.div
+                    className="h-full origin-left bg-accent"
+                    initial={false}
+                    animate={{
+                      scaleX:
+                        expected > 0 ? Math.min(1, answered / expected) : 0,
                     }}
+                    transition={spring.bar}
                   />
                 </div>
               </div>
@@ -300,7 +314,15 @@ export function HostStage({ session }: { session: HostSession }) {
           </div>
         </section>
 
-        <aside className="xl:sticky xl:top-20 xl:self-start">
+        <aside className="flex flex-col gap-4 xl:sticky xl:top-20 xl:self-start">
+          {first && last && (
+            <Rundown
+              total={totalQuestions}
+              first={first.number}
+              last={last.number}
+              lifecycle={lifecycle}
+            />
+          )}
           <section
             aria-labelledby="standings-heading"
             className="border border-border bg-surface p-5"
@@ -316,7 +338,7 @@ export function HostStage({ session }: { session: HostSession }) {
         </aside>
       </main>
 
-      <div className="sticky bottom-0 z-[var(--z-dock)] border-t border-border bg-background/90 backdrop-blur-md">
+      <div className="chrome dock-inset sticky bottom-0 z-[var(--z-dock)] border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
           <p
             role="status"
@@ -405,10 +427,10 @@ function StageQuestionBlock({
     <div className="py-4 first:pt-2">
       <div className="flex items-start justify-between gap-4">
         <h2
-          className={`leading-tight font-bold text-foreground ${
+          className={`display text-foreground ${
             compact
-              ? "text-xl sm:text-2xl"
-              : "text-[clamp(1.625rem,3.2vw,2.625rem)]"
+              ? "text-xl leading-tight sm:text-2xl"
+              : "text-[clamp(1.875rem,4.2vw,4.5rem)] leading-[1.04] tracking-[-0.022em]"
           }`}
         >
           {compact && (
@@ -437,7 +459,7 @@ function StageQuestionBlock({
               <AnswerOption
                 index={index}
                 text={option.text}
-                size={compact ? "md" : "lg"}
+                size={compact ? "md" : "xl"}
                 state={
                   stats.reviewed
                     ? stats.correctOptionIds.includes(option.id)
@@ -475,16 +497,18 @@ export function HostEnded({ session }: { session: HostSession }) {
   const { results, participantCount } = session;
   return (
     <>
-      <SessionTopBar connected participantCount={participantCount}>
-        <Badge>Ended</Badge>
-      </SessionTopBar>
+      <SessionTopBar
+        connected
+        participantCount={participantCount}
+        tally="off-air"
+      />
       <main
         id="main"
         className="mx-auto w-full max-w-7xl flex-1 px-4 pt-10 pb-24 sm:px-6"
       >
         <header className="mb-10 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <h1 className="text-[clamp(2.25rem,5vw,3.5rem)] leading-none font-bold tracking-tight text-foreground">
+            <h1 className="display display-tight text-[clamp(2.75rem,6vw,4.5rem)] leading-[0.92] text-foreground">
               That&apos;s a wrap
             </h1>
             <p className="mt-3 text-muted">

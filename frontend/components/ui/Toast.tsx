@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { duration, ease } from "@/lib/motion";
@@ -57,7 +57,29 @@ function push(tone: Tone, message: string) {
   // Three at most: a burst of failures should not wallpaper the screen.
   items = [...items.slice(-2), { id, tone, message }];
   emit();
-  window.setTimeout(() => dismiss(id), LIFETIME_MS[tone]);
+}
+
+function subscribeVisibility(listener: () => void) {
+  document.addEventListener("visibilitychange", listener);
+  return () => document.removeEventListener("visibilitychange", listener);
+}
+
+/**
+ * Counts down a toast's life only while someone could be reading it: the
+ * clock stops while the tab is hidden or the pointer rests on the stack,
+ * and picks up where it left off.
+ */
+function useLifetime(item: ToastItem, paused: boolean) {
+  const remaining = useRef(LIFETIME_MS[item.tone]);
+  useEffect(() => {
+    if (paused) return;
+    const started = Date.now();
+    const timer = window.setTimeout(() => dismiss(item.id), remaining.current);
+    return () => {
+      window.clearTimeout(timer);
+      remaining.current -= Date.now() - started;
+    };
+  }, [item.id, paused]);
 }
 
 export const toast = {
@@ -72,44 +94,79 @@ export function Toaster() {
     () => items,
     () => EMPTY,
   );
+  const hidden = useSyncExternalStore(
+    subscribeVisibility,
+    () => document.hidden,
+    () => false,
+  );
+  const [hovered, setHovered] = useState(false);
 
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-16 z-[var(--z-toast)] flex flex-col items-center gap-2 px-4"
+      className="pointer-events-none fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top,0px))] z-[var(--z-toast)] flex flex-col items-center gap-2 px-4"
     >
       <AnimatePresence initial={false}>
-        {list.map((item) => {
-          const icon = ICONS[item.tone];
-          return (
-            <motion.div
-              key={item.id}
-              layout
-              role={item.tone === "error" ? "alert" : "status"}
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, transition: { duration: duration.base } }}
-              transition={{ duration: duration.enter, ease: ease.out }}
-              className="pointer-events-auto flex w-full max-w-md items-start gap-3 border border-border-strong bg-raised py-3 pr-2 pl-4 text-sm text-foreground shadow-[0_12px_32px_-12px_rgb(0_0_0/0.7)]"
-            >
-              <Icon
-                name={icon.name}
-                size={16}
-                className={`mt-0.5 shrink-0 ${icon.className}`}
-              />
-              <p className="min-w-0 flex-1 py-px">{item.message}</p>
-              <button
-                type="button"
-                onClick={() => dismiss(item.id)}
-                aria-label="Dismiss"
-                className="-my-1 flex size-7 shrink-0 items-center justify-center text-subtle transition-colors hover:text-foreground"
-              >
-                <Icon name="close" size={14} />
-              </button>
-            </motion.div>
-          );
-        })}
+        {list.map((item) => (
+          <ToastCard
+            key={item.id}
+            item={item}
+            paused={hidden || hovered}
+            onHover={setHovered}
+          />
+        ))}
       </AnimatePresence>
     </div>
+  );
+}
+
+function ToastCard({
+  item,
+  paused,
+  onHover,
+}: {
+  item: ToastItem;
+  paused: boolean;
+  onHover: (hovered: boolean) => void;
+}) {
+  useLifetime(item, paused);
+  // A card evicted from under the pointer never sees pointerleave; without
+  // this the stack would stay paused for good.
+  useEffect(() => () => onHover(false), [onHover]);
+  const icon = ICONS[item.tone];
+
+  // Leaves the way it arrived: up, toward the edge it dropped from.
+  return (
+    <motion.div
+      layout
+      role={item.tone === "error" ? "alert" : "status"}
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8, transition: { duration: duration.base } }}
+      transition={{ duration: duration.enter, ease: ease.out }}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse") onHover(true);
+      }}
+      onPointerLeave={() => onHover(false)}
+      className="pointer-events-auto flex w-full max-w-md items-start gap-3 border border-border-strong bg-raised py-3 pr-2 pl-4 text-sm text-foreground shadow-float"
+    >
+      <Icon
+        name={icon.name}
+        size={16}
+        className={`mt-0.5 shrink-0 ${icon.className}`}
+      />
+      <p className="min-w-0 flex-1 py-px">{item.message}</p>
+      <button
+        type="button"
+        onClick={() => {
+          onHover(false);
+          dismiss(item.id);
+        }}
+        aria-label="Dismiss"
+        className="-my-1 flex size-7 shrink-0 items-center justify-center text-subtle transition-colors hover:text-foreground"
+      >
+        <Icon name="close" size={14} />
+      </button>
+    </motion.div>
   );
 }

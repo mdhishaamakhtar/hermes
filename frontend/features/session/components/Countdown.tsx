@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { formatClock } from "@/lib/format";
+import { spring } from "@/lib/motion";
 import type { Countdown as CountdownState } from "../session-state";
 import type { QuestionLifecycle } from "../session-types";
 
@@ -10,14 +11,14 @@ const NOT_STARTED = "–:––";
 
 function urgency(countdown: CountdownState, running: boolean) {
   if (!running) return "text-subtle";
-  if (countdown.left <= 5) return "text-danger";
+  if (countdown.left <= 5) return "text-tally";
   if (countdown.left <= 10) return "text-warning";
   return "text-foreground";
 }
 
 /**
- * The question clock. Digits tick each second; in the last five they turn
- * red and punch in on every tick, the one place the stage raises its voice.
+ * The question clock. Digits tick each second; in the last five they take
+ * the tally's red and punch in on every tick, the one place the stage raises its voice.
  */
 export function CountdownClock({
   countdown,
@@ -41,14 +42,14 @@ export function CountdownClock({
     <span
       role="timer"
       aria-label={label}
-      className={`inline-block font-mono leading-none font-semibold tabular-nums transition-colors duration-300 ${urgency(countdown, running)} ${className}`}
+      className={`inline-block font-mono leading-none font-semibold tabular-nums transition-colors duration-(--duration-enter) ${urgency(countdown, running)} ${className}`}
     >
       <motion.span
         key={final ? countdown.left : "steady"}
         className="inline-block"
         initial={final ? { scale: 1.12 } : false}
         animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 600, damping: 22 }}
+        transition={spring.tick}
       >
         {lifecycle === "DISPLAYED" ? NOT_STARTED : formatClock(countdown.left)}
       </motion.span>
@@ -74,7 +75,7 @@ export function CountdownBar({
   const running = lifecycle === "TIMED" && countdown.limit > 0;
   const tone =
     countdown.left <= 5
-      ? "bg-danger"
+      ? "bg-tally"
       : countdown.left <= 10
         ? "bg-warning"
         : "bg-accent";
@@ -93,7 +94,7 @@ export function CountdownBar({
         ) : (
           <div
             key={countdown.run}
-            className={`h-full origin-left transition-colors duration-500 ${tone}`}
+            className={`h-full origin-left transition-colors duration-(--duration-enter) ${tone}`}
             style={
               {
                 "--drain-from": countdown.startLeft / countdown.limit,
