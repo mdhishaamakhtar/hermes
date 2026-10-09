@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Providers } from "@/components/Providers";
 import { absoluteUrl, getSiteUrl, siteConfig } from "@/lib/site";
-import { mono, sans } from "./fonts";
+import { display, mono, sans } from "./fonts";
 import "./globals.css";
 
 const defaultTitle = `${siteConfig.name} | ${siteConfig.tagline}`;
@@ -57,8 +57,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0f",
+  themeColor: "#101010",
   colorScheme: "dark",
+  // Paint edge to edge; the bars pad themselves out of the notch and the
+  // home indicator with env(safe-area-inset-*).
+  viewportFit: "cover",
+  // Android's keyboard shrinks the layout, as iOS does, so docks stay above it.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
@@ -67,11 +72,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${display.variable} ${mono.variable}`}
+    >
       <body className="flex min-h-dvh flex-col">
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[var(--z-toast)] focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[var(--z-toast)] focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-on-primary"
         >
           Skip to content
         </a>

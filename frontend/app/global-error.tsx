@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { CrashScreen } from "@/components/CrashScreen";
-import { mono, sans } from "./fonts";
+import { display, mono, sans } from "./fonts";
 import "./globals.css";
 
 /*
@@ -22,7 +22,10 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${display.variable} ${mono.variable}`}
+    >
       <body className="flex min-h-dvh flex-col">
         <title>Something broke | Hermes</title>
         <main id="main" className="flex flex-1 flex-col">

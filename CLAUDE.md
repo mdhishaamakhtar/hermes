@@ -121,6 +121,7 @@ Anyone, anywhere: teachers running classroom assessments, facilitators running t
 - **Dark mode only.** Deep navy/near-black backgrounds. No light mode.
 - **Terminal as a soul, not a costume.** Sharp corners are foundational identity — not decoration. Terminal structure: monospace type, uppercase labels, pixel-precise borders. No scanlines.
 - **Flat backgrounds, no gradients.** Page and surface backgrounds are flat solid colours — no radial blooms, no linear gradients, no vignettes.
+- **Control room, not costume.** The broadcast lives in real instruments that each say something true: the tally (standby / on air / off air), the station clock, the slate before each question, the host's rundown. No colour bars, CRT glow, or glitch effects.
 - **Energetic, not garish.** Dark backgrounds make colour pop. Use the established palette with confidence.
 - **Not like Kahoot.** No bright primaries on white, no confetti-for-confetti's-sake. Energy comes from motion, density, and contrast — not noise.
 - **Unique.** No direct design references. Hermes should look like nothing else in the category.
@@ -134,10 +135,13 @@ Anyone, anywhere: teachers running classroom assessments, facilitators running t
 
 ### Color System
 Always use semantic tokens from `app/globals.css` — never raw hex values in components. The option colours are CSS variables too; `lib/options.ts` maps an option's position to its letter and colour.
-- Background: `--color-background` (#0a0a0f), Surface: `--color-surface` (#0f1117), Border: `--color-border` (#1a1f2e)
-- Primary: `--color-primary` (#2563eb), Accent: `--color-accent` (#38bdf8)
-- Options A–D: blue / violet / amber / rose (defined as `--color-option-a` through `--color-option-d`)
+- Neutrals are broadcast video levels, true greys named by 8-bit code: stage `--color-background` (#101010, video black), `--color-surface` (#161616), `--color-border` (#262626), text up to legal white (#ebebeb). No pure #000/#fff
+- Key blue `--color-primary` (#005fd0, chroma-key): primary actions, the slate. Text on it uses `--color-on-primary` / `--color-on-primary-muted`, never raw white. Key light `--color-accent` (#92c1fd): focus, highlights
+- Lamps: `--color-tally` (#ec5542) means on air, the last seconds, and faults; `--color-warning` (#ffa746) is standby
+- Options A–D are the SMPTE colour bars in bar order: yellow / cyan / violet / magenta, stepping down in lightness (that staircase is what keeps them apart for colour-blind players; re-validate with the dataviz validator if you change one). Lit lamps take ink text (`--color-ink`), never white
+- Three rules keep it coherent: two hero lights (key blue, tally) at full gain OKLCH C 0.19, every other lamp at one shared gain C 0.15; every hue holds its own wheel slot ≥ ~40° from the rest (tally 30 · standby 65 · A 105 · go 148 · B 196 · key/accent 255 · C 304 · D 354). A new colour must fit those rules, not just look right alone
 
-Full design context: `.impeccable.md` in project root.
+### Typography
+Archivo on its width axis (`.display`, `.display-tight`) for questions, slates and headlines; Schibsted Grotesk for the interface; Azeret Mono for data (codes, clocks, scores).
 
-@.impeccable.md
+Full design context: `PRODUCT.md` and `DESIGN.md` in the project root.

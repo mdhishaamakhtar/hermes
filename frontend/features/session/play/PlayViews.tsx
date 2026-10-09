@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { TopBar } from "@/components/TopBar";
@@ -11,12 +11,14 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
 import { StatusScreen } from "@/components/ui/StatusScreen";
 import { countNoun, ordinal } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 import { fade, rise, stageCut } from "@/lib/motion";
 import { getStoredDisplayName } from "@/lib/session-storage";
 import { AnswerOption, type OptionState } from "../components/AnswerOption";
 import { CountdownBar, CountdownClock } from "../components/Countdown";
 import { Leaderboard } from "../components/Leaderboard";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
+import { QuestionSlate, slateDetail } from "../components/Slate";
 import type { QuestionLifecycle } from "../session-types";
 import type { PlayQuestion } from "./play-state";
 import type { PlaySession } from "./usePlaySession";
@@ -40,15 +42,16 @@ export function PlayLobby({
       <SessionTopBar
         connected={session.connected}
         participantCount={session.participantCount}
+        tally="standby"
       />
       <main
         id="main"
         className="mx-auto flex w-full max-w-xl flex-1 animate-rise flex-col justify-center px-4 py-12 sm:px-6"
       >
-        <Badge tone="live" dot className="self-start">
+        <Badge tone="success" dot className="self-start">
           You&apos;re in
         </Badge>
-        <h1 className="mt-6 text-[clamp(2.25rem,8vw,3.5rem)] leading-[1.05] font-bold tracking-tight text-foreground">
+        <h1 className="display display-tight mt-6 text-[clamp(2.75rem,11vw,4.5rem)] leading-[0.95] text-foreground">
           {name ? `Nice to see you, ${name}.` : "You're in."}
         </h1>
         {session.title && (
@@ -152,8 +155,9 @@ export function PlayStage({ session }: { session: PlaySession }) {
       <SessionTopBar
         connected={session.connected}
         participantCount={session.participantCount}
+        tally="on-air"
       />
-      <div className="sticky top-14 z-[var(--z-raised)] border-b border-border bg-background/90 backdrop-blur-md">
+      <div className="chrome sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-[var(--z-raised)] border-b border-border">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
           <p className="text-sm text-muted">
             <span className="font-mono text-foreground">
@@ -178,38 +182,55 @@ export function PlayStage({ session }: { session: PlaySession }) {
       >
         {passage && <PassagePanel text={passage.text} />}
 
-        {/* The next question starts from the top, not wherever the last one
+        <div className="relative">
+          {first && last && (
+            <QuestionSlate
+              key={questions.map((question) => question.id).join("-")}
+              lifecycle={lifecycle}
+              first={first.number}
+              last={last.number}
+              total={totalQuestions}
+              detail={slateDetail(questions)}
+              size="compact"
+            />
+          )}
+
+          {/* The next question starts from the top, not wherever the last one
             was scrolled to. */}
-        <AnimatePresence
-          mode="wait"
-          initial={false}
-          onExitComplete={() => window.scrollTo(0, 0)}
-        >
-          <motion.div
-            key={questions.map((question) => question.id).join("-")}
-            {...stageCut}
-            className="flex flex-col gap-10"
+          {/* popLayout, not wait: the new question mounts at once, so the
+              area under the slate reaches its final height in the slate's
+              first frame instead of resizing mid-drop and jolting it. */}
+          <AnimatePresence
+            mode="popLayout"
+            initial={false}
+            onExitComplete={() => window.scrollTo(0, 0)}
           >
-            {questions.length === 0 ? (
-              <p className="py-16 text-center text-muted">
-                The next question is on its way…
-              </p>
-            ) : (
-              questions.map((question) => (
-                <PlayQuestionBlock
-                  key={question.id}
-                  question={question}
-                  lifecycle={lifecycle}
-                  showNumber={questions.length > 1}
-                  pending={Boolean(lockPending[question.id])}
-                  onToggle={(optionId) =>
-                    session.toggleOption(question.id, optionId)
-                  }
-                />
-              ))
-            )}
-          </motion.div>
-        </AnimatePresence>
+            <motion.div
+              key={questions.map((question) => question.id).join("-")}
+              {...stageCut}
+              className="flex flex-col gap-10"
+            >
+              {questions.length === 0 ? (
+                <p className="py-16 text-center text-muted">
+                  The next question is on its way…
+                </p>
+              ) : (
+                questions.map((question) => (
+                  <PlayQuestionBlock
+                    key={question.id}
+                    question={question}
+                    lifecycle={lifecycle}
+                    showNumber={questions.length > 1}
+                    pending={Boolean(lockPending[question.id])}
+                    onToggle={(optionId) =>
+                      session.toggleOption(question.id, optionId)
+                    }
+                  />
+                ))
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {reviewed && leaderboard.length > 0 && (
           <motion.section
@@ -239,7 +260,7 @@ export function PlayStage({ session }: { session: PlaySession }) {
         )}
       </main>
 
-      <div className="sticky bottom-0 z-[var(--z-dock)] border-t border-border bg-background/90 backdrop-blur-md">
+      <div className="chrome dock-inset sticky bottom-0 z-[var(--z-dock)] border-t border-border">
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-4 py-3 sm:px-6">
           {sync.status !== "idle" && sync.message && (
             <p
@@ -255,7 +276,10 @@ export function PlayStage({ session }: { session: PlaySession }) {
             lockableCount={lockable.length}
             multiple={questions.length > 1}
             pending={anyPending}
-            onLockIn={() => session.lockAll()}
+            onLockIn={() => {
+              haptics.commit();
+              session.lockAll();
+            }}
           />
         </div>
       </div>
@@ -342,7 +366,7 @@ function PlayQuestionBlock({
 
   return (
     <section aria-label={`Question ${question.number}`}>
-      <h2 className="text-[clamp(1.5rem,5.5vw,2rem)] leading-tight font-bold text-foreground">
+      <h2 className="display text-[clamp(1.625rem,6.2vw,2.25rem)] leading-[1.1] text-foreground">
         {showNumber && (
           <span className="mr-2 font-mono text-base font-medium text-subtle">
             Q{question.number}
@@ -372,7 +396,11 @@ function PlayQuestionBlock({
             size="lg"
             state={optionState(question, option.id)}
             role={multi ? "checkbox" : "radio"}
-            onPress={() => onToggle(option.id)}
+            locked={question.lockedIn && !reviewed}
+            onPress={() => {
+              haptics.select();
+              onToggle(option.id);
+            }}
             disabled={!interactive}
           />
         ))}
@@ -392,6 +420,11 @@ function PlayQuestionBlock({
 function ResultBanner({ question }: { question: PlayQuestion }) {
   const earned = earnedPoints(question);
   const answered = question.selected.length > 0;
+
+  // The verdict lands in the hand on the same frame it lands on screen.
+  useEffect(() => {
+    if (answered) haptics.result(earned > 0);
+  }, [answered, earned]);
   const tone = !answered
     ? "border-border-strong bg-surface"
     : earned > 0
@@ -440,7 +473,7 @@ export function PlayEnded() {
           role="status"
           className="flex animate-fade flex-col items-center gap-4 text-center"
         >
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="display text-4xl text-foreground">
             That&apos;s the end of the quiz
           </h1>
           <p className="flex items-center gap-2.5 text-muted">

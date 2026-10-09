@@ -18,16 +18,18 @@ Hermes is the god of speed. The interface should feel like something is always h
 
 ### Aesthetic Direction
 
-- **Dark mode only.** Deep navy/near-black backgrounds (#0a0a0f to #1a1f2e). No light mode.
+- **Dark mode only.** The stage is video black (#101010) with true-grey surfaces built on broadcast video levels. No light mode.
 - **Terminal as a soul, not a costume.** Sharp corners are foundational — don't add retro kitsch. The terminal aesthetic is the underlying structure: monospace type, uppercase labels, pixel-precise borders, phosphor-green-adjacent accent moments. No scanlines.
 - **Flat backgrounds, no gradients.** Page and surface backgrounds are flat solid colours — no radial blooms, no linear gradients, no vignettes. Colour contrast and typography carry the weight; gradients dilute that.
-- **Energetic, not garish.** The brand colours (blue primary, sky accent, distinct A/B/C/D option colours) are already well-chosen. Lean into them with confidence. Keep backgrounds dark so colour pops.
+- **Control room, not costume.** Hermes is the gallery of a live broadcast. Its identity lives in real instruments that each encode true session state: the tally lamp (standby, on air, off air), the station clock, the key-blue slate before each question, and the host's rundown. No colour bars, CRT glow, or glitch effects.
+- **Energetic, not garish.** Three lights carry the show: key blue (the house colour), tally red (on air, right now), standby amber. Keep backgrounds dark so colour pops.
 - **Not like Kahoot.** No bright primaries on white, no confetti-for-confetti's-sake. Energy comes from motion, density, and contrast — not noise.
 - **Unique.** No direct design references. Hermes should look like nothing else in the category.
 
 ### Typography
 
-- **Schibsted Grotesk** carries the interface voice: headings, labels, controls, and body copy. Its clear, compact shapes keep the broadcast stage easy to scan under time pressure.
+- **Archivo**, narrowed on its width axis, is the on-screen graphics voice: questions, slates, headlines, the tally. Semi-condensed, a long question fits a projector line at a size the back row can read.
+- **Schibsted Grotesk** carries the interface voice: labels, controls, and body copy.
 - **Azeret Mono** carries data: join codes, clocks, scores, point values, rank and response totals, plus anything a person types. Its slashed zero keeps `0` and `O` distinct in projected join codes. Use `tabular-nums` (`font-variant-numeric: tabular-nums`) wherever digits update live to prevent layout shift.
 - Uppercase + tracked text for section labels, status chips, and CTAs (already established).
 - Large, bold weights for question text and scores — players read under time pressure.
@@ -37,6 +39,7 @@ Hermes is the god of speed. The interface should feel like something is always h
 - Motion (`motion/react`) is in the stack — use it intentionally. Its shared vocabulary lives in `lib/motion.ts`.
 - Transitions communicate state: new question arriving, answer locked in, results revealing, timer counting down.
 - Enter animations: `fade` for content appearing in place, `rise` for surfaces that arrive, `stageCut` for a new question on the live stage.
+- The slate is the one authored moment: a key-blue blind over the question area that rolls down, holds, and rolls back up the way it came. It never covers the header or dock, and lifts the moment the timer starts.
 - Never animate for decoration alone. Every motion should tell the user something changed.
 - Respect `prefers-reduced-motion` (already implemented in globals.css).
 
@@ -46,14 +49,19 @@ All semantic tokens, option colours included, are defined in `globals.css` (`@th
 
 | Token | Value | Use |
 |---|---|---|
-| `--color-background` | #0a0a0f | Page background |
-| `--color-surface` | #0f1117 | Cards, panels (one step above background) |
-| `--color-primary` | #2563eb | CTAs, active states |
-| `--color-accent` | #38bdf8 | Highlights, live indicators |
-| `--color-option-a` | #2563eb | Answer choice A |
-| `--color-option-b` | #7c3aed | Answer choice B |
-| `--color-option-c` | #d97706 | Answer choice C |
-| `--color-option-d` | #e11d48 | Answer choice D |
+| `--color-background` | #101010 | Page background (video black, code 16) |
+| `--color-surface` | #161616 | Cards, panels (one step above background) |
+| `--color-foreground` | #ebebeb | Primary text (legal white, code 235) |
+| `--color-primary` | #005fd0 | Key blue: CTAs, the slate, the mark |
+| `--color-accent` | #92c1fd | Key light: focus, highlights |
+| `--color-tally` | #ec5542 | On air; the last seconds on the clock; faults |
+| `--color-warning` | #ffa746 | Standby: the lobby, warming up |
+| `--color-option-a` | #e0d653 | Answer choice A (bar yellow) |
+| `--color-option-b` | #0fd8da | Answer choice B (bar cyan) |
+| `--color-option-c` | #bc8ef4 | Answer choice C (bar violet) |
+| `--color-option-d` | #cf6192 | Answer choice D (bar magenta) |
+
+The palette is one system, not a collection: neutrals on broadcast video levels; two hero lights (key blue, tally red) at full gain and every other lamp at one shared, lower gain; and every hue in its own slot on the wheel, at least ~40° from the rest, so no two colours are near-twins. Answers are the colour bars' yellow, cyan, violet and magenta, stepping down in lightness so colour-blind players can tell them apart. Lit lamps (the tally, a filled answer letter) take ink text, never white.
 
 Never use raw hex values in components — always reference semantic tokens.
 

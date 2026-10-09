@@ -1,15 +1,39 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   HERMES DESIGN SYSTEM
-   A flat near-black stage, hairline rules, one saturated signal at a time.
+   HERMES DESIGN SYSTEM: CONTROL ROOM
+   Hermes is the gallery of a live broadcast: a flat stage, hairline rules,
+   and lamps that mean something. The palette is one system with three
+   rules, so no colour is picked on its own:
+
+     levels     neutrals are video levels. The stage is video black (code
+                16), text tops out at legal white (code 235); nothing is
+                pure #000 or #fff, which a broadcast chain would clip.
+     gain       two hero lights run at full gain (OKLCH C 0.19): key blue,
+                the house colour, and tally red, on air. Every other lamp
+                (standby, go, the four answers) shares one gain, C 0.15, so
+                they read as a set rather than a collection; cyan sits at
+                0.135, the most sRGB can show at its lightness. Key blue's
+                own light (the accent, glow, mist) steps down from it in
+                chroma as it rises in lightness, like a lamp's spill.
+     spacing    every hue holds its own slot on the wheel, at least ~40deg
+                from any other, so no two lamps are near-twins:
+                tally 30 · standby 65 · A 105 · go 148 · B 196 · key 255 ·
+                C 304 · D 354. The accent is key blue's own hue.
+
+   The answers, A-D, are the colour bars' yellow, cyan, violet and magenta.
+   They step down in lightness (0.86, 0.80, 0.73, 0.64), which is what keeps
+   them apart for colour-blind players: worst pair dE 10.5 deutan, 15.6 in
+   normal vision (OKLab x100, dataviz validator). They always carry their
+   letter, so colour is never the only cue.
 
      1. Palette       raw values; only semantic tokens reference them
      2. Theme         semantic tokens exposed to Tailwind (bg-*, text-*, …)
      3. Motion        durations and easings, mirrored by lib/motion.ts
      4. Layers        z-index scale
      5. Base          document defaults, focus, selection
-     6. Components    label, input, buttons, option tiles, dialog, skeleton
+     6. Components    label, input, buttons, option tiles, dialog, skeleton,
+                      tally, slate
      7. Keyframes
      8. Reduced motion
 
@@ -18,81 +42,103 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── 1. Palette ───────────────────────────────────────────────────────────── */
+/* Neutrals are named by their 8-bit video code value. Colours are given as
+   sRGB hex with the OKLCH they were derived from. */
 :root {
   color-scheme: dark;
 
-  --palette-ink-950: #0a0a0f;
-  --palette-ink-900: #0f1117;
-  --palette-ink-850: #151a26;
-  --palette-ink-800: #1a1f2e;
-  --palette-ink-700: #2a3144;
-  --palette-slate-600: #4b5563;
-  --palette-slate-500: #718096;
-  --palette-slate-400: #94a3b8;
-  --palette-slate-50: #f8fafc;
+  --palette-video-16: #101010; /* video black */
+  --palette-video-22: #161616;
+  --palette-video-28: #1c1c1c;
+  --palette-video-38: #262626;
+  --palette-video-56: #383838;
+  --palette-video-84: #545454;
+  --palette-video-132: #848484;
+  --palette-video-168: #a8a8a8;
+  --palette-video-235: #ebebeb; /* legal white */
 
-  --palette-blue-700: #1d4ed8;
-  --palette-blue-600: #2563eb;
-  --palette-sky-400: #38bdf8;
-  --palette-sky-300: #7dd3fc;
-  --palette-green-500: #22c55e;
-  --palette-amber-500: #f59e0b;
-  --palette-red-500: #ef4444;
-  --palette-red-600: #dc2626;
-  --palette-red-700: #b91c1c;
+  /* Hero lights, full gain. */
+  --palette-key: #005fd0; /* oklch 0.51 0.19 258 */
+  --palette-key-deep: #0250ae; /* oklch 0.45 0.165 258 */
+  --palette-tally: #ec5542; /* oklch 0.65 0.19 30 */
+  --palette-tally-solid: #c13425; /* oklch 0.54 0.18 30 */
+  --palette-tally-deep: #a82418; /* oklch 0.48 0.17 30 */
 
-  --palette-option-blue: #2563eb;
-  --palette-option-violet: #7c3aed;
-  --palette-option-amber: #d97706;
-  --palette-option-rose: #e11d48;
+  /* Key blue's light: the accent, and text that sits on key blue. */
+  --palette-key-light: #92c1fd; /* oklch 0.80 0.10 255 */
+  --palette-key-glow: #c0dafc; /* oklch 0.88 0.055 255 */
+  --palette-key-mist: #dce9fc; /* oklch 0.93 0.03 258 */
+
+  /* Shared gain, C 0.15. */
+  --palette-standby: #ffa746; /* oklch 0.80 0.15 65 */
+  --palette-go: #6dd17f; /* oklch 0.78 0.15 148 */
+  --palette-bar-yellow: #e0d653; /* oklch 0.86 0.15 105 */
+  --palette-bar-cyan: #0fd8da; /* oklch 0.80 0.135 196, gamut-limited */
+  --palette-bar-violet: #bc8ef4; /* oklch 0.73 0.15 304 */
+  --palette-bar-magenta: #cf6192; /* oklch 0.64 0.15 354 */
 }
 
 /* ── 2. Theme ─────────────────────────────────────────────────────────────── */
 /*
- * Text tiers, each measured against the stage (#0a0a0f):
- *   foreground  19.3:1  primary reading text
- *   muted        7.8:1  secondary text, labels
- *   subtle       4.9:1  metadata, placeholders (the WCAG AA floor)
- *   faint        2.6:1  disabled only, never information
+ * Text tiers, measured on the stage (video 16) and on raised (video 28):
+ *   foreground  16.0:1  14.3:1  primary reading text
+ *   muted        8.0:1   7.2:1  secondary text, labels
+ *   subtle       5.1:1   4.6:1  metadata, placeholders (the WCAG AA floor)
+ *   faint        2.5:1          disabled only, never information
  *
  * border is the hairline between surfaces; border-strong outlines controls
  * (inputs, secondary buttons) so a field stays findable on any surface.
  *
- * Filled danger buttons use danger-solid: white on #ef4444 is 3.8:1 and
- * fails for button text, white on #dc2626 passes at 4.8:1.
- *
- * The option colours mean "answer A/B/C/D" and nothing else. Never use them
- * for chrome, navigation, or status.
+ * on-primary is legal white: 5.0:1 on key blue, 4.7:1 on danger-solid.
+ * Secondary text on key blue is tinted from the blue, not faded white:
+ * on-primary-muted is 4.8:1 there (white at 80% would fail). Key blue
+ * stands 3.2:1 off the stage, so a filled button is a shape before it is a
+ * label. Lit lamps (the tally, a filled answer letter) take ink text, never
+ * white: ink on tally is 5.4:1, on the answers 5.2:1 (magenta) to 12.6:1
+ * (yellow). The same pairs hold the other way round, so an answer colour
+ * used as text on the stage also clears 4.5:1.
  */
 @theme {
-  --color-background: var(--palette-ink-950);
-  --color-surface: var(--palette-ink-900);
-  --color-raised: var(--palette-ink-850);
-  --color-border: var(--palette-ink-800);
-  --color-border-strong: var(--palette-ink-700);
+  --color-background: var(--palette-video-16);
+  --color-surface: var(--palette-video-22);
+  --color-raised: var(--palette-video-28);
+  --color-border: var(--palette-video-38);
+  --color-border-strong: var(--palette-video-56);
 
-  --color-foreground: var(--palette-slate-50);
-  --color-muted: var(--palette-slate-400);
-  --color-subtle: var(--palette-slate-500);
-  --color-faint: var(--palette-slate-600);
+  --color-foreground: var(--palette-video-235);
+  --color-muted: var(--palette-video-168);
+  --color-subtle: var(--palette-video-132);
+  --color-faint: var(--palette-video-84);
+  --color-ink: var(--palette-video-16);
+  --color-on-primary: var(--palette-video-235);
+  --color-on-primary-muted: var(--palette-key-mist);
 
-  --color-primary: var(--palette-blue-600);
-  --color-primary-hover: var(--palette-blue-700);
-  --color-accent: var(--palette-sky-400);
-  --color-accent-hover: var(--palette-sky-300);
+  --color-primary: var(--palette-key);
+  --color-primary-hover: var(--palette-key-deep);
+  --color-accent: var(--palette-key-light);
+  --color-accent-hover: var(--palette-key-glow);
 
-  --color-success: var(--palette-green-500);
-  --color-warning: var(--palette-amber-500);
-  --color-danger: var(--palette-red-500);
-  --color-danger-solid: var(--palette-red-600);
-  --color-danger-solid-hover: var(--palette-red-700);
+  /* Red means "now" and "fault" in one hue, as a tally lamp does. */
+  --color-tally: var(--palette-tally);
+  --color-danger: var(--palette-tally);
+  --color-danger-solid: var(--palette-tally-solid);
+  --color-danger-solid-hover: var(--palette-tally-deep);
+  --color-success: var(--palette-go);
+  --color-warning: var(--palette-standby);
 
-  --color-option-a: var(--palette-option-blue);
-  --color-option-b: var(--palette-option-violet);
-  --color-option-c: var(--palette-option-amber);
-  --color-option-d: var(--palette-option-rose);
+  --color-option-a: var(--palette-bar-yellow);
+  --color-option-b: var(--palette-bar-cyan);
+  --color-option-c: var(--palette-bar-violet);
+  --color-option-d: var(--palette-bar-magenta);
+
+  /* The stage is flat. Only layers that float over it cast a shadow: the
+     dialog, and a toast. */
+  --shadow-float:
+    0 24px 48px -12px rgb(0 0 0 / 0.6), 0 8px 16px -8px rgb(0 0 0 / 0.5);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --animate-rise: rise var(--duration-enter) var(--ease-out-expo) both;
   --animate-fade: fade var(--duration-enter) var(--ease-out-expo) both;
@@ -101,22 +147,31 @@
 /* Font variables are set on <html> by next/font, so resolve them in place. */
 @theme inline {
   --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-schibsted), sans-serif;
   --font-mono: var(--font-azeret), ui-monospace, monospace;
 }
 
 /* ── 3. Motion ────────────────────────────────────────────────────────────── */
 /*
+ * Curves: --ease-out-expo for anything arriving or responding; --ease-in-out
+ * for something moving between two on-screen states (the slate lifting);
+ * --ease-drawer (the iOS sheet curve) for surfaces that travel from an edge.
+ *
  *   instant  100ms  press and hover feedback
  *   base     160ms  routine state changes
- *   enter    240ms  surfaces arriving: dialogs, drawers, panels
+ *   enter    240ms  surfaces arriving: dialogs, panels; a lamp changing
+ *   sheet    320ms  surfaces that travel a long way: the drawer, the slate
  *   stage    480ms  authored live moments: a question cutting in, a reveal
  *
- * Exits run at `base`: leaving is quicker than arriving.
+ * Exits run a step faster than their entrance: leaving is quicker than
+ * arriving. The one exception is the slate, which uncovers the question
+ * rather than snatching it away (see Slate.tsx).
  */
 :root {
   --duration-instant: 100ms;
   --duration-base: 160ms;
   --duration-enter: 240ms;
+  --duration-sheet: 320ms;
   --duration-stage: 480ms;
 }
 
@@ -131,10 +186,14 @@
 
 /* ── 5. Base ──────────────────────────────────────────────────────────────── */
 @layer base {
+  /* Pull-to-refresh mid-question reloads a player out of the round, so the
+     page never rubber-bands or chains scroll into the browser. */
   html {
     background-color: var(--color-background);
     scrollbar-gutter: stable;
+    overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 
   /* A modal dialog owns the screen; the page behind it stops scrolling. */
@@ -142,7 +201,11 @@
     overflow: hidden;
   }
 
+  /* viewport-fit=cover paints under the notch; keep content out of it in
+     landscape. Top and bottom insets belong to the bars that touch them. */
   body {
+    padding-inline: env(safe-area-inset-left, 0px)
+      env(safe-area-inset-right, 0px);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     line-height: 1.6;
@@ -159,6 +222,21 @@
 
   p {
     text-wrap: pretty;
+  }
+
+  /* Controls fire on tap without waiting out a double-tap zoom, and a long
+     press on one never selects its label or opens the link callout. */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   /* Tailwind v4 resets buttons to the default cursor. */
@@ -183,8 +261,136 @@
 /*
  * Plain classes in the components layer, so any Tailwind utility on the same
  * element overrides them without !important.
+ *
+ * Every :hover here sits behind (hover: hover) and (pointer: fine), as
+ * Tailwind's hover: variant does. A phone fakes hover on tap and keeps it,
+ * which would leave a second answer tile looking picked.
  */
 @layer components {
+  /* Translucent chrome: sticky bars that content scrolls beneath. Solid
+     when the viewer asks for less transparency. */
+  .chrome {
+    background-color: color-mix(
+      in srgb,
+      var(--color-background) 78%,
+      transparent
+    );
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+
+    @media (prefers-reduced-transparency: reduce) {
+      background-color: var(--color-background);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  /* Fixed to the bottom edge: clear the home indicator. */
+  .dock-inset {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ── Display ────────────────────────────────────────────────────────── */
+  /* Archivo, narrowed: the voice of on-screen graphics. Questions, slates
+     and headlines run semi-condensed, so a long question still fits a
+     projector line at a size the back row can read. Tracking tightens as
+     the type grows; body text never uses this. */
+  .display {
+    font-family: var(--font-display);
+    font-stretch: 84%;
+    font-weight: 750;
+    letter-spacing: -0.012em;
+    font-optical-sizing: auto;
+  }
+
+  .display-tight {
+    font-stretch: 72%;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Tally ──────────────────────────────────────────────────────────── */
+  /* The lamp over a live camera. Steady, never blinking: on air is a
+     state, not an alarm. Lit lamps take ink text; dark ones are outlines. */
+  .tally {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.4375rem;
+    height: 1.625rem;
+    padding: 0 0.5625rem;
+    border: 1px solid currentColor;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-stretch: 80%;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition:
+      background-color var(--duration-enter) ease,
+      color var(--duration-enter) ease,
+      border-color var(--duration-enter) ease;
+
+    &::before {
+      content: "";
+      width: 0.4375rem;
+      height: 0.4375rem;
+      background-color: currentColor;
+    }
+
+    &[data-tally="on-air"] {
+      border-color: var(--color-tally);
+      background-color: var(--color-tally);
+      color: var(--color-ink);
+    }
+
+    &[data-tally="standby"] {
+      color: var(--color-warning);
+      background-color: color-mix(
+        in srgb,
+        var(--color-warning) 10%,
+        transparent
+      );
+    }
+
+    &[data-tally="off-air"] {
+      color: var(--color-subtle);
+      border-color: var(--color-border-strong);
+    }
+
+    &[data-tally="off-air"]::before {
+      background-color: transparent;
+      box-shadow: inset 0 0 0 1px currentColor;
+    }
+  }
+
+  /* ── Slate ──────────────────────────────────────────────────────────── */
+  /* The key-blue panel that drops over the question area before each
+     question (motion in Slate.tsx). The frame clips it to that area, so the
+     panel can travel on a transform, which the compositor moves with
+     sub-pixel smoothness and no repaint, instead of an animated clip edge
+     that snaps to whole pixels. Nothing here takes a click. */
+  .slate-frame {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-raised);
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .slate {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1.25rem 1.5rem;
+    background-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
   /* Uppercase tracked label: section names, status, metadata. Never a
      kicker above a heading; the heading carries its own weight. */
   .label {
@@ -217,12 +423,14 @@
       color: var(--color-subtle);
     }
 
-    &:hover:not(:disabled, :focus) {
-      border-color: color-mix(
-        in srgb,
-        var(--color-border-strong) 50%,
-        var(--color-muted)
-      );
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled, :focus) {
+        border-color: color-mix(
+          in srgb,
+          var(--color-border-strong) 50%,
+          var(--color-muted)
+        );
+      }
     }
 
     &:focus {
@@ -272,8 +480,9 @@
       background-color var(--duration-instant) ease,
       border-color var(--duration-instant) ease,
       color var(--duration-instant) ease,
-      transform var(--duration-instant) ease;
+      transform var(--duration-instant) var(--ease-out-expo);
 
+    /* Seats on press, the instant the finger lands. */
     &:active:not(:disabled, [aria-busy="true"]) {
       transform: translateY(1px);
     }
@@ -310,8 +519,10 @@
     transition: translate var(--duration-base) var(--ease-out-expo);
   }
 
-  .btn:hover:not(:disabled, [aria-busy="true"]) .btn-trail {
-    translate: 3px 0;
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled, [aria-busy="true"]) .btn-trail {
+      translate: 3px 0;
+    }
   }
 
   .btn-sm {
@@ -329,10 +540,12 @@
 
   .btn-primary {
     background-color: var(--color-primary);
-    color: #fff;
+    color: var(--color-on-primary);
 
-    &:hover:not(:disabled) {
-      background-color: var(--color-primary-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled) {
+        background-color: var(--color-primary-hover);
+      }
     }
   }
 
@@ -340,18 +553,22 @@
     border-color: var(--color-border-strong);
     color: var(--color-foreground);
 
-    &:hover:not(:disabled) {
-      border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
-      background-color: var(--color-raised);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+        background-color: var(--color-raised);
+      }
     }
   }
 
   .btn-danger {
     background-color: var(--color-danger-solid);
-    color: #fff;
+    color: var(--color-on-primary);
 
-    &:hover:not(:disabled) {
-      background-color: var(--color-danger-solid-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled) {
+        background-color: var(--color-danger-solid-hover);
+      }
     }
   }
 
@@ -359,9 +576,11 @@
     padding-inline: 0.75rem;
     color: var(--color-muted);
 
-    &:hover:not(:disabled) {
-      color: var(--color-foreground);
-      background-color: var(--color-raised);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled) {
+        color: var(--color-foreground);
+        background-color: var(--color-raised);
+      }
     }
   }
 
@@ -390,7 +609,8 @@
     transition:
       background-color var(--duration-base) ease,
       border-color var(--duration-base) ease,
-      opacity var(--duration-base) ease;
+      opacity var(--duration-base) ease,
+      scale var(--duration-instant) var(--ease-out-expo);
 
     &[data-state="selected"] {
       border-color: var(--tone);
@@ -427,13 +647,43 @@
       );
     }
 
+    /* On a reveal the right answer lights first and the rest fall back a
+       beat later, so the eye lands on the answer before the room dims. */
     &[data-state="dimmed"] {
       opacity: 0.5;
+      transition-delay: 0s, 0s, 140ms, 0s;
+      transition-duration:
+        var(--duration-base), var(--duration-base), var(--duration-enter),
+        var(--duration-instant);
+    }
+
+    &[data-state="correct"],
+    &[data-state="wrong"],
+    &[data-state="missed"] {
+      transition-duration:
+        var(--duration-enter), var(--duration-enter), var(--duration-base),
+        var(--duration-instant);
     }
   }
 
-  button.option-tile:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--tone) 70%, transparent);
+  /* The tile is the biggest target on a phone: it gives under the thumb. */
+  button.option-tile:active:not(:disabled) {
+    scale: 0.97;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button.option-tile:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--tone) 70%, transparent);
+    }
+  }
+
+  /* Locked in: the pick stops being a choice and becomes a commitment. */
+  .option-tile[data-locked][data-state="selected"] {
+    background-color: color-mix(
+      in srgb,
+      var(--tone) 22%,
+      var(--color-background)
+    );
   }
 
   .option-letter {
@@ -454,7 +704,7 @@
     [data-state="correct"] > & {
       background-color: var(--tone);
       border-color: var(--tone);
-      color: #fff;
+      color: var(--color-ink);
     }
   }
 
@@ -469,9 +719,7 @@
     background-color: var(--color-surface);
     color: var(--color-foreground);
     border: 1px solid var(--color-border-strong);
-    box-shadow:
-      0 24px 48px -12px rgb(0 0 0 / 0.6),
-      0 8px 16px -8px rgb(0 0 0 / 0.5);
+    box-shadow: var(--shadow-float);
     opacity: 0;
     translate: 0 8px;
     transition:
@@ -488,7 +736,7 @@
     }
 
     &::backdrop {
-      background-color: rgb(10 10 15 / 0);
+      background-color: rgb(16 16 16 / 0);
       transition:
         background-color var(--duration-base) ease,
         overlay var(--duration-base) allow-discrete,
@@ -496,7 +744,7 @@
     }
 
     &[open]::backdrop {
-      background-color: rgb(10 10 15 / 0.82);
+      background-color: rgb(16 16 16 / 0.82);
     }
   }
 
@@ -507,27 +755,33 @@
     }
 
     .dialog[open]::backdrop {
-      background-color: rgb(10 10 15 / 0);
+      background-color: rgb(16 16 16 / 0);
     }
   }
 
-  /* The drawer variant docks to the right edge and slides in from it. */
+  /* The drawer variant docks to the right edge and travels the whole way
+     in from it, and back out the same way, on the iOS sheet curve. */
   .dialog.drawer {
     margin: 0 0 0 auto;
     width: min(34rem, 100vw);
     height: 100dvh;
     max-height: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     border-width: 0 0 0 1px;
-    translate: 24px 0;
+    opacity: 1;
+    translate: 100% 0;
+    transition-timing-function: var(--ease-drawer);
 
     &[open] {
       translate: 0 0;
+      transition-duration: var(--duration-sheet);
+      transition-timing-function: var(--ease-drawer);
     }
   }
 
   @starting-style {
     .dialog.drawer[open] {
-      translate: 24px 0;
+      translate: 100% 0;
     }
   }
 
@@ -561,12 +815,13 @@
     animation: blink 1.06s steps(1) infinite;
   }
 
-  /* Pulsing status dot for live and reconnecting signals. */
+  /* Pulsing status light for waiting signals: a lobby filling, a socket
+     reconnecting. Square, like the tally's lamp; unlike the tally it
+     pulses, because waiting is a process and on air is a state. */
   .live-dot {
     display: inline-block;
     width: 0.5rem;
     height: 0.5rem;
-    border-radius: 9999px;
     background-color: currentColor;
     animation: pulse-dot 1.6s ease-in-out infinite;
   }
@@ -623,14 +878,58 @@
 }
 
 /* ── 8. Reduced motion ────────────────────────────────────────────────────── */
-/* Framer animations follow MotionConfig reducedMotion="user" in Providers. */
+/*
+ * Reduced motion is gentler motion, not none. Travel goes: entrances fade in
+ * place, surfaces appear without sliding, loops that move stop. Colour and
+ * opacity changes stay, because they are how a tile says "picked",
+ * "correct", or "wrong". Framer animations follow MotionConfig
+ * reducedMotion="user" in Providers.
+ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes pulse-dot {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .dialog,
+  .dialog[open],
+  .dialog.drawer,
+  .dialog.drawer[open] {
+    translate: none;
+  }
+
+  @starting-style {
+    .dialog[open],
+    .dialog.drawer[open] {
+      translate: none;
+    }
+  }
+
+  .dialog.drawer {
+    opacity: 0;
+  }
+
+  .dialog.drawer[open] {
+    opacity: 1;
+  }
+
+  .btn[aria-busy="true"]::after,
+  .skeleton::after {
+    animation: none;
+  }
+
+  .btn-trail {
+    transition: none;
   }
 }

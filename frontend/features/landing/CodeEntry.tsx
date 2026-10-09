@@ -33,6 +33,7 @@ export function CodeEntry() {
           onChange={setCode}
           size="md"
           className="min-w-0 flex-1"
+          enterKeyHint="go"
         />
         <Button
           type="submit"

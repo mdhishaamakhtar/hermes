@@ -2,13 +2,14 @@
 
 import { useEffect, useReducer, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Badge } from "@/components/ui/Badge";
 import { AnswerOption } from "@/features/session/components/AnswerOption";
 import {
   CountdownBar,
   CountdownClock,
 } from "@/features/session/components/Countdown";
 import { Leaderboard } from "@/features/session/components/Leaderboard";
+import { StationClock, Tally } from "@/features/session/components/OnAir";
+import { QuestionSlate } from "@/features/session/components/Slate";
 import type { Countdown } from "@/features/session/session-state";
 import type {
   LeaderboardEntry,
@@ -45,7 +46,7 @@ const ROUNDS = [
 const PLAYERS = ["Priya", "Marcus", "Wen", "Adaeze", "Sofia", "Luca"];
 const ROOM = 24;
 const TIMER = 8;
-const PAUSE_MS = { displayed: 1100, frozen: 800, reviewing: 3600 };
+const PAUSE_MS = { displayed: 1700, frozen: 800, reviewing: 3600 };
 
 interface DemoState {
   round: number;
@@ -234,16 +235,14 @@ export function DemoRound() {
         players&apos; phones, the correct answer revealed, and the standings
         updating.
       </figcaption>
-      <div
-        aria-hidden
-        className="border border-border-strong bg-surface shadow-[0_32px_64px_-32px_rgb(0_0_0/0.8)]"
-      >
+      <div aria-hidden className="border border-border-strong bg-surface">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 sm:px-5">
-          <Badge tone="live" dot>
-            Live
-          </Badge>
-          <span className="text-sm text-muted">
-            Code <span className="font-mono text-foreground">K7Q2XM</span>
+          <Tally state="on-air" />
+          <span className="flex items-center gap-4 text-sm text-muted">
+            <StationClock className="hidden sm:inline" />
+            <span>
+              Code <span className="font-mono text-foreground">K7Q2XM</span>
+            </span>
           </span>
         </div>
         <CountdownBar countdown={state.countdown} lifecycle={state.lifecycle} />
@@ -261,35 +260,47 @@ export function DemoRound() {
               className="text-2xl"
             />
           </div>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={state.round} {...stageCut}>
-              <p className="mt-3 text-xl leading-snug font-bold text-foreground sm:text-2xl">
-                {round.text}
-              </p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {round.options.map((option, index) => (
-                  <AnswerOption
-                    key={option}
-                    index={index}
-                    text={option}
-                    state={
-                      reviewed
-                        ? index === round.correct
-                          ? "correct"
-                          : "dimmed"
-                        : undefined
-                    }
-                    share={answered > 0 ? state.counts[index] / answered : 0}
-                    aside={
-                      <span className="text-foreground">
-                        {formatNumber(state.counts[index])}
-                      </span>
-                    }
-                  />
-                ))}
-              </div>
-            </motion.div>
-          </AnimatePresence>
+          <div className="relative mt-3">
+            <QuestionSlate
+              key={state.round}
+              size="compact"
+              lifecycle={state.lifecycle}
+              first={state.round + 1}
+              last={state.round + 1}
+              total={ROUNDS.length}
+              detail="One answer"
+            />
+            {/* popLayout keeps the area's height settled under the slate. */}
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div key={state.round} {...stageCut}>
+                <p className="display text-[1.625rem] leading-[1.1] text-foreground sm:text-3xl">
+                  {round.text}
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {round.options.map((option, index) => (
+                    <AnswerOption
+                      key={option}
+                      index={index}
+                      text={option}
+                      state={
+                        reviewed
+                          ? index === round.correct
+                            ? "correct"
+                            : "dimmed"
+                          : undefined
+                      }
+                      share={answered > 0 ? state.counts[index] / answered : 0}
+                      aside={
+                        <span className="text-foreground">
+                          {formatNumber(state.counts[index])}
+                        </span>
+                      }
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
           <p className="mt-3 text-sm text-subtle">
             <span className="font-mono text-muted">{answered}</span> of {ROOM}{" "}
             answered

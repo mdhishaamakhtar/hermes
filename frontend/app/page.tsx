@@ -36,7 +36,14 @@ export default function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
       <TopBar width="stage">
-        <ButtonLink href="/join" variant="ghost" size="sm">
+        {/* On a phone the code field is right below; the header keeps one
+            action so it never runs past the screen edge. */}
+        <ButtonLink
+          href="/join"
+          variant="ghost"
+          size="sm"
+          className="hidden sm:inline-flex"
+        >
           Join a session
         </ButtonLink>
         <ButtonLink href="/auth/login" size="sm">
@@ -47,7 +54,7 @@ export default function LandingPage() {
       <main id="main" className="flex-1">
         <section className="mx-auto grid w-full max-w-7xl items-center gap-14 px-4 pt-14 pb-20 sm:px-6 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-14 xl:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] xl:gap-20 lg:pt-24 lg:pb-28">
           <div className="animate-rise">
-            <h1 className="max-w-[15ch] text-[clamp(2.5rem,5.2vw,5.25rem)] leading-[0.98] font-extrabold tracking-[-0.03em] text-foreground">
+            <h1 className="display display-tight max-w-[13ch] text-[clamp(3.25rem,7vw,7rem)] leading-[0.86] tracking-[-0.025em] text-foreground">
               Live quizzes, run like a broadcast.
             </h1>
             <p className="mt-6 max-w-[34rem] text-lg text-muted sm:text-xl sm:leading-relaxed">

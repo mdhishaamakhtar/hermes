@@ -1,15 +1,57 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { RollingNumber } from "@/components/ui/AnimatedNumber";
+import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatNumber } from "@/lib/format";
 import { duration, ease, spring, stagger } from "@/lib/motion";
 import type { LeaderboardEntry } from "../session-types";
 
+type Climbs = Record<number, number>;
+
+/*
+ * A reshuffle is told in order, cause then effect, the way a broadcast
+ * scoreboard does it: the points land first (scores roll in place), then
+ * the order follows (rows travel to their new slots), then the climb marks
+ * say who moved. Each beat starts as the last one is mostly done, so the
+ * whole thing reads as one move, not three things at once.
+ */
+const REORDER_DELAY = 0.22;
+const CLIMB_DELAY = 0.5;
+
+/** A row that climbed into view rises from below; one that fell out sinks. */
+const ROW_TRAVEL = 14;
+
+/**
+ * Places each player gained in the latest reshuffle. Held until the order
+ * next changes, so a repeated update with the same ranks keeps the marks.
+ */
+function useClimbs(entries: LeaderboardEntry[]): Climbs {
+  const [seen, setSeen] = useState({ entries, climbs: {} as Climbs });
+  if (seen.entries !== entries) {
+    const before = new Map(
+      seen.entries.map((entry) => [entry.participantId, entry.rank]),
+    );
+    const climbs: Climbs = {};
+    let reshuffled = false;
+    for (const entry of entries) {
+      const was = before.get(entry.participantId);
+      if (was === undefined || was === entry.rank) continue;
+      reshuffled = true;
+      if (was > entry.rank) climbs[entry.participantId] = was - entry.rank;
+    }
+    setSeen({ entries, climbs: reshuffled ? climbs : seen.climbs });
+  }
+  return seen.climbs;
+}
+
 /**
  * Standings as they move. Rows are keyed by player, so when a question is
  * graded and the order changes, each player slides to their new rank
- * instead of the list redrawing in place.
+ * instead of the list redrawing in place, scores roll to their new totals,
+ * and anyone who climbed carries a mark saying how far.
  */
 export function Leaderboard({
   entries,
@@ -23,6 +65,7 @@ export function Leaderboard({
   limit?: number;
   emptyText?: string;
 }) {
+  const climbs = useClimbs(entries);
   const sorted = entries.toSorted((a, b) => a.rank - b.rank);
   const shown = limit ? sorted.slice(0, limit) : sorted;
   const me =
@@ -34,31 +77,66 @@ export function Leaderboard({
   }
 
   return (
-    <ol className="flex flex-col gap-1.5">
-      <AnimatePresence initial={false}>
+    // popLayout lifts a leaving row out of the flow at once, so the rows
+    // that stay travel straight to their final slot in a single move instead
+    // of being shoved past it and snapping back.
+    <ol className="relative flex flex-col gap-1.5">
+      <AnimatePresence initial={false} mode="popLayout">
         {shown.map((entry) => (
           <motion.li
             key={entry.participantId}
             layout="position"
-            transition={spring.slot}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: ROW_TRAVEL }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{
+              opacity: 0,
+              y: ROW_TRAVEL,
+              transition: {
+                duration: duration.base,
+                ease: ease.out,
+                delay: REORDER_DELAY,
+              },
+            }}
+            transition={{
+              layout: { ...spring.slot, delay: REORDER_DELAY },
+              default: {
+                duration: duration.enter,
+                ease: ease.out,
+                delay: REORDER_DELAY,
+              },
+            }}
           >
-            <Row entry={entry} me={entry.participantId === meId} />
+            <Row
+              entry={entry}
+              me={entry.participantId === meId}
+              climb={climbs[entry.participantId]}
+              live
+            />
           </motion.li>
         ))}
       </AnimatePresence>
       {meHidden && (
         <li className="mt-2 border-t border-dashed border-border-strong pt-3">
-          <Row entry={me} me />
+          <Row entry={me} me climb={climbs[me.participantId]} live />
         </li>
       )}
     </ol>
   );
 }
 
-function Row({ entry, me }: { entry: LeaderboardEntry; me: boolean }) {
+function Row({
+  entry,
+  me,
+  climb,
+  live = false,
+}: {
+  entry: LeaderboardEntry;
+  me: boolean;
+  /** Places gained in the latest reshuffle. */
+  climb?: number;
+  /** Scores roll to new totals; final standings just state them. */
+  live?: boolean;
+}) {
   return (
     <div
       className={`flex items-center gap-3 border px-3.5 py-2.5 ${
@@ -78,9 +156,37 @@ function Row({ entry, me }: { entry: LeaderboardEntry; me: boolean }) {
           <span className="ml-2 text-xs font-semibold text-accent">You</span>
         )}
       </span>
-      <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
-        {formatNumber(entry.score)}
-      </span>
+      {/* Lands once the row has arrived, rising the way the row moved. */}
+      <AnimatePresence>
+        {climb && (
+          <motion.span
+            key={`${entry.rank}-${climb}`}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, transition: { duration: duration.base } }}
+            transition={{
+              duration: duration.enter,
+              ease: ease.out,
+              delay: CLIMB_DELAY,
+            }}
+            className="flex shrink-0 items-center gap-0.5 font-mono text-xs font-semibold text-success tabular-nums"
+          >
+            <Icon name="arrow-up" size={12} />
+            <span className="sr-only">Up </span>
+            {climb}
+          </motion.span>
+        )}
+      </AnimatePresence>
+      {live ? (
+        <RollingNumber
+          value={entry.score}
+          className="font-mono text-sm font-semibold text-foreground"
+        />
+      ) : (
+        <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+          {formatNumber(entry.score)}
+        </span>
+      )}
     </div>
   );
 }
