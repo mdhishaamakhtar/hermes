@@ -4,11 +4,12 @@ import { useEffect, useEffectEvent, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { describeError, errorStatus, HermesError } from "@/lib/api";
 import { forgetPlayer } from "@/lib/session-storage";
+import { createLiveSync } from "../live-sync";
 import { numberKeyed } from "../session-state";
 import { sessionsApi } from "../session-api";
 import type { AnswerAckMsg, SessionMessage } from "../session-types";
 import { useStompClient } from "../useStompClient";
-import { initialPlayState, playReducer } from "./play-state";
+import { initialPlayState, playReducer, type PlayAction } from "./play-state";
 
 /**
  * How long to wait for the realtime acknowledgement of an answer before
@@ -33,7 +34,9 @@ const selectionKey = (ids: number[]) => ids.toSorted((a, b) => a - b).join(",");
  * A player's live session. Answers go out over STOMP and wait for an
  * acknowledgement; if none arrives they are resent over HTTP. A newer
  * selection supersedes one still in flight, so rapid taps settle on the last
- * choice rather than racing each other.
+ * choice rather than racing each other. A snapshot that left before the
+ * server had a pick never overwrites it: a player who taps the moment they
+ * return to the tab keeps what they tapped.
  */
 export function usePlaySession(sessionId: string, rejoinToken: string) {
   const router = useRouter();
@@ -50,70 +53,58 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
   const acks = useRef(
     new Map<string, { resolve: (ack: Ack) => void; timeout: number }>(),
   );
+  /** Questions whose lock-in is sent and not yet confirmed. */
+  const locking = useRef(new Set<number>());
+  /** Counts every local change to a pick or a lock. */
+  const edits = useRef(0);
+  /** The edit count at each question's latest local change. */
+  const touched = useRef(new Map<number, number>());
   const redirected = useRef(false);
 
-  const loadContext = async () => {
-    try {
-      dispatch({
-        type: "REJOINED",
-        response: await sessionsApi.rejoin(sessionId, rejoinToken),
-      });
-      setLoadError(null);
-    } catch (err) {
-      // Every refusal is a 404: the server no longer knows this player here
-      // (the session was discarded, or the token expired). That is final.
-      if (errorStatus(err) === 404) {
-        forgetPlayer(sessionId);
-        dispatch({ type: "MISSING" });
-        return;
+  const [live] = useState(() =>
+    createLiveSync<PlayAction>(dispatch, async () => {
+      const since = edits.current;
+      const unconfirmed = () => [...syncing.current.keys(), ...locking.current];
+      const keep = new Set(unconfirmed());
+      try {
+        const response = await sessionsApi.rejoin(sessionId, rejoinToken);
+        // The snapshot may have been read before the server had a pick that
+        // was unconfirmed when this request left, is unconfirmed still, or
+        // was made since. Those stay as the player has them.
+        unconfirmed().forEach((questionId) => keep.add(questionId));
+        touched.current.forEach((at, questionId) => {
+          if (at > since) keep.add(questionId);
+        });
+        dispatch({ type: "REJOINED", response, keep: [...keep] });
+        setLoadError(null);
+        return true;
+      } catch (err) {
+        // Every refusal is a 404: the server no longer knows this player here
+        // (the session was discarded, or the token expired). That is final.
+        if (errorStatus(err) === 404) {
+          forgetPlayer(sessionId);
+          dispatch({ type: "MISSING" });
+          return false;
+        }
+        // Anything else is the connection; the next reconnect tries again.
+        setLoadError(err);
+        return false;
       }
-      // Anything else is the connection; the next reconnect tries again.
-      setLoadError(err);
-    }
+    }),
+  );
+
+  const touch = (questionId: number) => {
+    edits.current += 1;
+    touched.current.set(questionId, edits.current);
   };
 
   const { subscribe, unsubscribe, publish, connected } = useStompClient({
-    onConnect: () => void loadContext(),
+    onConnect: () => void live.resync(),
   });
 
   const onMessage = useEffectEvent((message: SessionMessage) => {
-    switch (message.event) {
-      case "QUESTION_DISPLAYED":
-        return dispatch({ type: "QUESTION_DISPLAYED", message });
-      case "PASSAGE_DISPLAYED":
-        return dispatch({ type: "PASSAGE_DISPLAYED", message });
-      case "TIMER_START":
-        return dispatch({
-          type: "TIMER_START",
-          seconds: message.timeLimitSeconds,
-        });
-      case "QUESTION_FROZEN":
-        return dispatch({ type: "FROZEN", questionId: message.questionId });
-      case "PASSAGE_FROZEN":
-        return dispatch({ type: "FROZEN", questionId: null });
-      case "QUESTION_REVIEWED":
-      case "SCORING_CORRECTED":
-        return dispatch({
-          type: "REVIEWED",
-          questionId: Number(message.questionId),
-          correctOptionIds: (message.correctOptionIds ?? []).map(Number),
-          optionPoints: numberKeyed(message.optionPoints),
-          correction: message.event === "SCORING_CORRECTED",
-        });
-      case "PARTICIPANT_LEADERBOARD":
-        return dispatch({
-          type: "LEADERBOARD",
-          leaderboard: message.leaderboard,
-          totalParticipants: message.totalParticipants,
-        });
-      case "PARTICIPANT_JOINED":
-        return dispatch({ type: "PARTICIPANTS", count: message.count });
-      case "ANSWER_UPDATE":
-      case "ANSWER_REVEAL":
-        return dispatch({ type: "ANSWERS", message });
-      case "SESSION_END":
-        return dispatch({ type: "ENDED" });
-    }
+    const action = toAction(message);
+    if (action) live.event(action);
   });
 
   const onAck = useEffectEvent((ack: AnswerAckMsg) => {
@@ -164,7 +155,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
 
   // Mobile browsers suspend sockets in the background; resync over REST the
   // moment the player returns, before STOMP has even reconnected.
-  const resync = useEffectEvent(() => void loadContext());
+  const resync = useEffectEvent(() => void live.resync());
   useEffect(() => {
     resync();
     const onVisible = () => {
@@ -195,7 +186,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
 
   const fail = (message: string) => {
     dispatch({ type: "SYNC", status: "error", message });
-    void loadContext();
+    void live.resync();
   };
 
   /** Push the wanted selection for a question until the server holds it. */
@@ -285,6 +276,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
       selected = [optionId];
     }
 
+    touch(questionId);
     dispatch({ type: "SELECT", questionId, selected });
     wanted.current.set(questionId, selected);
     supersede.current.get(questionId)?.();
@@ -310,6 +302,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
     }
 
     setLockPending((current) => ({ ...current, [questionId]: true }));
+    locking.current.add(questionId);
     try {
       // Make sure the server holds this exact selection before freezing it.
       wanted.current.set(questionId, question.selected);
@@ -323,6 +316,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
         clientRequestId: requestId,
       });
       // Optimistic: the answer reads as locked while the ack is in flight.
+      touch(questionId);
       dispatch({ type: "LOCKED", questionId, lockedIn: true });
       dispatch({ type: "SYNC", status: "idle" });
       clearLockPending(questionId);
@@ -352,6 +346,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
           }
         }
       }
+      touch(questionId);
       dispatch({ type: "LOCKED", questionId, lockedIn: false });
       fail(
         result.timedOut
@@ -359,6 +354,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
           : (result.message ?? "Couldn't lock in your answer."),
       );
     } finally {
+      locking.current.delete(questionId);
       clearLockPending(questionId);
     }
   };
@@ -374,7 +370,7 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
     ...state,
     connected,
     loadError: state.hydrated ? null : loadError,
-    retry: () => void loadContext(),
+    retry: () => void live.resync(),
     lockPending,
     lockable,
     toggleOption,
@@ -385,3 +381,43 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
 }
 
 export type PlaySession = ReturnType<typeof usePlaySession>;
+
+/** The reducer action a live message stands for, if it changes anything. */
+function toAction(message: SessionMessage): PlayAction | null {
+  switch (message.event) {
+    case "QUESTION_DISPLAYED":
+      return { type: "QUESTION_DISPLAYED", message };
+    case "PASSAGE_DISPLAYED":
+      return { type: "PASSAGE_DISPLAYED", message };
+    case "TIMER_START":
+      return { type: "TIMER_START", seconds: message.timeLimitSeconds };
+    case "QUESTION_FROZEN":
+      return { type: "FROZEN", questionId: message.questionId };
+    case "PASSAGE_FROZEN":
+      return { type: "FROZEN", questionId: null };
+    case "QUESTION_REVIEWED":
+    case "SCORING_CORRECTED":
+      return {
+        type: "REVIEWED",
+        questionId: Number(message.questionId),
+        correctOptionIds: (message.correctOptionIds ?? []).map(Number),
+        optionPoints: numberKeyed(message.optionPoints),
+        correction: message.event === "SCORING_CORRECTED",
+      };
+    case "PARTICIPANT_LEADERBOARD":
+      return {
+        type: "LEADERBOARD",
+        leaderboard: message.leaderboard,
+        totalParticipants: message.totalParticipants,
+      };
+    case "PARTICIPANT_JOINED":
+      return { type: "PARTICIPANTS", count: message.count };
+    case "ANSWER_UPDATE":
+    case "ANSWER_REVEAL":
+      return { type: "ANSWERS", message };
+    case "SESSION_END":
+      return { type: "ENDED" };
+    default:
+      return null;
+  }
+}

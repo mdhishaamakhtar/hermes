@@ -62,7 +62,15 @@ export interface PlayState {
 }
 
 export type PlayAction =
-  | { type: "REJOINED"; response: RejoinResponse }
+  | {
+      type: "REJOINED";
+      response: RejoinResponse;
+      /**
+       * Questions whose pick or lock the server may not have yet; they keep
+       * what the player has on screen.
+       */
+      keep?: number[];
+    }
   | { type: "MISSING" }
   | { type: "QUESTION_DISPLAYED"; message: QuestionDisplayedMsg }
   | { type: "PASSAGE_DISPLAYED"; message: PassageDisplayedMsg }
@@ -143,6 +151,30 @@ function fromRejoin(
   };
 }
 
+/** The snapshot's questions, with the player's unconfirmed picks kept. */
+function withKept(
+  snapshot: PlayQuestion[],
+  current: PlayQuestion[],
+  keep: number[] = [],
+): PlayQuestion[] {
+  if (keep.length === 0) return snapshot;
+  const mine = new Map(
+    current
+      .filter((question) => keep.includes(question.id))
+      .map((question) => [question.id, question]),
+  );
+  return snapshot.map((question) => {
+    const local = mine.get(question.id);
+    return local
+      ? {
+          ...question,
+          selected: local.selected,
+          lockedIn: question.lockedIn || local.lockedIn,
+        }
+      : question;
+  });
+}
+
 function updateQuestion(
   questions: PlayQuestion[],
   questionId: number,
@@ -173,13 +205,17 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
         title: response.sessionTitle,
         participantId: response.participantId,
         participantCount: response.participantCount,
-        questions: block
-          ? block.subQuestions.map((question, index) =>
-              fromRejoin(question, block.questionIndex + index, stats),
-            )
-          : single
-            ? [fromRejoin(single, single.orderIndex, stats)]
-            : [],
+        questions: withKept(
+          block
+            ? block.subQuestions.map((question, index) =>
+                fromRejoin(question, block.questionIndex + index, stats),
+              )
+            : single
+              ? [fromRejoin(single, single.orderIndex, stats)]
+              : [],
+          state.questions,
+          action.keep,
+        ),
         passage: block
           ? { id: block.id, text: block.text, timerMode: block.timerMode }
           : (single?.passage ?? null),

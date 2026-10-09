@@ -72,7 +72,6 @@ export type HostAction =
   | { type: "SYNC"; sync: HostSessionSync }
   | { type: "LOBBY"; lobby: LobbySnapshot }
   | { type: "STATUS"; status: SessionStatus }
-  | { type: "HYDRATED" }
   | { type: "RESULTS"; results: SessionResults }
   | { type: "QUESTION_DISPLAYED"; message: QuestionDisplayedMsg }
   | { type: "PASSAGE_DISPLAYED"; message: PassageDisplayedMsg }
@@ -90,7 +89,6 @@ export type HostAction =
   | { type: "ANSWERS"; message: AnswerUpdateMsg | AnswerRevealMsg }
   | { type: "LEADERBOARD"; leaderboard: LeaderboardEntry[] }
   | { type: "PARTICIPANTS"; count: number }
-  | { type: "STARTED" }
   | { type: "ENDED"; leaderboard?: LeaderboardEntry[] };
 
 export function initialHostState(joinCode: string): HostState {
@@ -194,9 +192,6 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
 
     case "STATUS":
       return { ...state, hydrated: true, status: action.status };
-
-    case "HYDRATED":
-      return { ...state, hydrated: true };
 
     case "RESULTS":
       return {
@@ -313,9 +308,6 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
 
     case "PARTICIPANTS":
       return { ...state, participantCount: action.count };
-
-    case "STARTED":
-      return { ...state, status: "ACTIVE" };
 
     case "ENDED":
       return {

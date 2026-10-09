@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { TopBar } from "@/components/TopBar";
 import { RollingNumber } from "@/components/ui/AnimatedNumber";
@@ -41,16 +41,30 @@ export function SessionTopBar({
   );
 }
 
+/** A drop shorter than this is a routine reconnect, not news. */
+const OFFLINE_GRACE_MS = 1500;
+
 /**
  * Silent while the socket is up. When it drops (usually a phone that slept
  * or switched networks) it says so, so nobody mistakes a stale screen for a
- * frozen quiz.
+ * frozen quiz. The quick reconnect a tab makes when it comes back to the
+ * front passes without a flicker.
  */
 function ConnectionStatus({ connected }: { connected: boolean }) {
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    if (connected) return;
+    const timer = window.setTimeout(() => setOffline(true), OFFLINE_GRACE_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setOffline(false);
+    };
+  }, [connected]);
+
   return (
     <span role="status" aria-live="polite" className="contents">
       <AnimatePresence initial={false}>
-        {!connected && (
+        {offline && (
           <motion.span key="offline" {...fade}>
             <Badge tone="warning" dot>
               Reconnecting

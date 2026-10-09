@@ -62,7 +62,9 @@ LOBBY → ACTIVE → ENDED
   - `/topic/session.{sessionId}.analytics` — answer counts, `LEADERBOARD_UPDATE`, and `SESSION_END` with final standings (organizer only)
   - `/user/queue/answers` — a player's own `ANSWER_ACCEPTED` / `ANSWER_REJECTED` acknowledgements
 
-The wire types live in `frontend/features/session/session-types.ts`. The connection is managed by `frontend/features/session/useStompClient.ts`: exponential reconnect from 500ms to 5s, 10s heartbeats, an immediate reconnect when the tab returns or the network comes back, and subscriptions replayed on every reconnect.
+The wire types live in `frontend/features/session/session-types.ts`. The connection is managed by `frontend/features/session/useStompClient.ts`: exponential reconnect from 500ms to 5s, 10s heartbeats both ways (the simple broker beats too; the client ticks from a worker so background throttling spares it), an immediate reconnect when the tab returns or the network comes back — including when the socket still claims to be open but has heard nothing for 15s — and subscriptions replayed on every reconnect.
+
+Live screens mix REST snapshots with STOMP events through `frontend/features/session/live-sync.ts`: overlapping resyncs collapse into one follow-up, and events that land while a snapshot is in flight are replayed on top of it, so a snapshot never undoes newer news. The player keeps any pick or lock-in the server hasn't confirmed when a snapshot lands; the host reads the session back after every control instead of waiting on the socket, and a control refused because the screen was stale (409) just catches up.
 
 ### State Split: PostgreSQL vs Redis
 - **PostgreSQL:** Users, Events, Quizzes, Questions, Sessions, Participants, Answers (persistent). Scores and standings are always derived from the graded answers here.
@@ -72,7 +74,8 @@ The wire types live in `frontend/features/session/session-types.ts`. The connect
 | Service | Responsibility |
 |---|---|
 | `session/SessionService` | Organizer-facing session API: authorizes every call, validates lifecycle preconditions, delegates transitions to `SessionEngine` |
-| `session/SessionEngine` | Transactional state machine: question display/advance, timer start and expiry, session end. No auth checks — callers authorize first and invoke cross-bean so `@Transactional` applies |
+| `session/SessionEngine` | Transactional state machine: session start, question display/advance, timer start and expiry, session end. No auth checks — callers authorize first and invoke cross-bean so `@Transactional` applies |
+| `session/SessionTransitions` | Per-session Redis lock held across each lifecycle transition (host controls and timer expiry), so overlapping presses take effect once and the rest are refused with 409 |
 | `session/SessionTimerScheduler` | Schedules and cancels the per-session Quartz job that fires `jobs/SessionTimeoutJob` on timer expiry |
 | `session/SessionSnapshotService` | Builds, serializes, and loads the quiz snapshot frozen at session creation |
 | `session/SessionEventPublisher` | All STOMP broadcasts; drops messages silently while the broker is offline |
@@ -95,7 +98,8 @@ The wire types live in `frontend/features/session/session-types.ts`. The connect
 | `lib/session-storage.ts` | Device storage: rejoin tokens, player names, hosts' join codes |
 | `components/Providers.tsx` | SWR config (capped retries, none on 401/403/404), reduced-motion handling, toasts |
 | `components/OrganiserShell.tsx` | Organiser top bar, sign-out, and expired-token handling |
-| `features/session/useStompClient.ts` | STOMP connection, subscription replay, queued publishes |
+| `features/session/useStompClient.ts` | STOMP connection, subscription replay, queued publishes, dead-socket detection on tab return |
+| `features/session/live-sync.ts` | Ordering of REST snapshots against live events (coalesced resyncs, in-flight event replay) |
 | `features/session/{host,play}/` | Each side's reducer (`*-state.ts`), hook (`use*Session.ts`), and screens |
 | `app/globals.css` | Design tokens and component classes (buttons, inputs, option tiles, dialogs) |
 | `lib/motion.ts` | Motion vocabulary, mirroring the CSS duration tokens |
