@@ -2,8 +2,10 @@
 
 import { useId, useState, type CSSProperties, type FormEvent } from "react";
 import { motion } from "motion/react";
+import { useUnsavedChanges } from "@/components/LeaveGuard";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Field, TextAreaField, TextField } from "@/components/ui/Field";
 import { Icon } from "@/components/ui/Icon";
 import {
@@ -11,15 +13,20 @@ import {
   type Segment,
 } from "@/components/ui/SegmentedControl";
 import { describeError } from "@/lib/api";
-import { rise } from "@/lib/motion";
+import { fade, rise } from "@/lib/motion";
 import { optionColor, optionLetter } from "@/lib/options";
 import type { DisplayMode, QuestionType } from "@/lib/types";
 import {
   DISPLAY_MODES,
+  displayChoice,
+  displayModeLabel,
   isCorrect,
   MIN_OPTIONS,
   QUESTION_TYPES,
+  sameDraft,
+  scoringSummary,
   toggleCorrect,
+  usesCustomScoring,
   validateQuestion,
   withQuestionType,
   type QuestionDraft,
@@ -49,13 +56,14 @@ export function QuestionFields({
 }) {
   const typeId = useId();
   const displayId = useId();
+  const detailsId = useId();
+  // Folded away until wanted, unless this question already uses them.
+  const [details, setDetails] = useState(() => usesCustomScoring(draft));
   const displayChoices: Segment<DisplayChoice>[] = [
     {
       value: "QUIZ_DEFAULT",
-      label: "Default",
-      description: `Uses the quiz setting, currently ${DISPLAY_MODES.find(
-        (mode) => mode.value === quizDisplayMode,
-      )?.label.toLowerCase()}.`,
+      label: "Quiz default",
+      description: `Follows the quiz: ${displayModeLabel(quizDisplayMode).toLowerCase()}.`,
     },
     ...DISPLAY_MODES,
   ];
@@ -91,8 +99,8 @@ export function QuestionFields({
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Field id={typeId} label="Answers">
+      <Field id={typeId} label="Answers">
+        <div className="max-w-md">
           <SegmentedControl<QuestionType>
             id={typeId}
             value={draft.questionType}
@@ -101,23 +109,62 @@ export function QuestionFields({
               onChange(withQuestionType(draft, questionType))
             }
           />
-        </Field>
-        <Field id={displayId} label="Answer display">
-          <SegmentedControl<DisplayChoice>
-            id={displayId}
-            value={draft.displayModeOverride ?? "QUIZ_DEFAULT"}
-            options={displayChoices}
-            onChange={(choice) =>
-              onChange({
-                ...draft,
-                displayModeOverride: choice === "QUIZ_DEFAULT" ? null : choice,
-              })
-            }
-          />
-        </Field>
-      </div>
+        </div>
+      </Field>
 
-      <OptionsEditor draft={draft} onChange={onChange} />
+      <OptionsEditor draft={draft} onChange={onChange} showPoints={details} />
+
+      <div className="border-t border-border pt-4">
+        <button
+          type="button"
+          aria-expanded={details}
+          aria-controls={detailsId}
+          onClick={() => setDetails((open) => !open)}
+          className="flex w-full items-center justify-between gap-4 text-left text-sm"
+        >
+          <span className="font-medium text-foreground">Points & display</span>
+          <span className="flex items-center gap-2 text-subtle">
+            {!details && scoringSummary(draft)}
+            <Icon
+              name="chevron-down"
+              size={16}
+              className={`transition-transform duration-(--duration-base) ${details ? "rotate-180" : ""}`}
+            />
+          </span>
+        </button>
+        {details && (
+          <motion.div
+            id={detailsId}
+            {...fade}
+            className="mt-5 flex flex-col gap-5"
+          >
+            <p className="text-sm text-muted">
+              Set each option&apos;s points beside it above. A negative value
+              takes points away for a wrong pick.
+            </p>
+            <Field id={displayId} label="Answer display on the big screen">
+              <div className="max-w-md">
+                <SegmentedControl<DisplayChoice>
+                  id={displayId}
+                  value={
+                    draft.displayModeOverride
+                      ? displayChoice(draft.displayModeOverride)
+                      : "QUIZ_DEFAULT"
+                  }
+                  options={displayChoices}
+                  onChange={(choice) =>
+                    onChange({
+                      ...draft,
+                      displayModeOverride:
+                        choice === "QUIZ_DEFAULT" ? null : choice,
+                    })
+                  }
+                />
+              </div>
+            </Field>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }
@@ -125,9 +172,12 @@ export function QuestionFields({
 function OptionsEditor({
   draft,
   onChange,
+  showPoints,
 }: {
   draft: QuestionDraft;
   onChange: (next: QuestionDraft) => void;
+  /** Each option's points, shown when the author opens scoring. */
+  showPoints: boolean;
 }) {
   const setOption = (
     index: number,
@@ -145,8 +195,7 @@ function OptionsEditor({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <legend className="text-sm font-medium text-muted">Options</legend>
         <p className="text-sm text-subtle">
-          Tap a letter to mark it correct. Negative points penalise a wrong
-          pick.
+          Tap a letter to mark the right answer.
         </p>
       </div>
 
@@ -186,31 +235,33 @@ function OptionsEditor({
                 className="input min-h-11 py-2.5"
               />
               <div className="flex items-start gap-1">
-                <div className="relative w-24">
-                  <input
-                    value={option.points}
-                    onChange={(event) => {
-                      const raw = event.target.value;
-                      if (/^-?\d*$/.test(raw))
-                        setOption(index, { points: raw });
-                    }}
-                    inputMode="numeric"
-                    aria-label={`Option ${letter} points`}
-                    className={`input pr-10 text-right font-mono tabular-nums ${
-                      correct
-                        ? "text-success"
-                        : Number(option.points) < 0
-                          ? "text-danger"
-                          : ""
-                    }`}
-                  />
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-subtle"
-                  >
-                    pts
-                  </span>
-                </div>
+                {showPoints && (
+                  <div className="relative w-24">
+                    <input
+                      value={option.points}
+                      onChange={(event) => {
+                        const raw = event.target.value;
+                        if (/^-?\d*$/.test(raw))
+                          setOption(index, { points: raw });
+                      }}
+                      inputMode="numeric"
+                      aria-label={`Option ${letter} points`}
+                      className={`input pr-10 text-right font-mono tabular-nums ${
+                        correct
+                          ? "text-success"
+                          : Number(option.points) < 0
+                            ? "text-danger"
+                            : ""
+                      }`}
+                    />
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-subtle"
+                    >
+                      pts
+                    </span>
+                  </div>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -236,6 +287,7 @@ function OptionsEditor({
           variant="ghost"
           size="sm"
           icon="plus"
+          className="ghost-flush-start"
           onClick={() =>
             onChange({
               ...draft,
@@ -254,6 +306,7 @@ function OptionsEditor({
  * A question in its own form: new standalone questions, edits, and new
  * sub-questions of a saved passage. Validation runs before anything is sent;
  * a server refusal keeps the draft and shows the reason above the buttons.
+ * Cancelling with changes asks first, and so does leaving the page.
  */
 export function QuestionEditor({
   heading,
@@ -276,6 +329,9 @@ export function QuestionEditor({
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const dirty = !sameDraft(draft, initial);
+  useUnsavedChanges(dirty && !pending);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -294,10 +350,15 @@ export function QuestionEditor({
     }
   };
 
+  const cancel = () => (dirty ? setConfirmDiscard(true) : onCancel());
+
   return (
     <motion.form
       {...rise}
       onSubmit={submit}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !confirmDiscard) cancel();
+      }}
       aria-labelledby={headingId}
       className="border border-primary/40 bg-surface p-5 sm:p-6"
     >
@@ -321,10 +382,18 @@ export function QuestionEditor({
         <Button type="submit" variant="primary" pending={pending}>
           {pending ? "Saving…" : submitLabel}
         </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+        <Button variant="ghost" onClick={cancel} disabled={pending}>
           Cancel
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        title="Discard your changes?"
+        description="What you've written here won't be saved."
+        confirmLabel="Discard"
+        onConfirm={onCancel}
+      />
     </motion.form>
   );
 }

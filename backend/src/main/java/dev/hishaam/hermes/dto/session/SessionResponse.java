@@ -9,4 +9,5 @@ public record SessionResponse(
     String status,
     OffsetDateTime startedAt,
     OffsetDateTime endedAt,
-    OffsetDateTime createdAt) {}
+    OffsetDateTime createdAt,
+    boolean rehearsal) {}

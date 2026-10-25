@@ -55,24 +55,30 @@ export const QUESTION_TYPES: Segment<QuestionType>[] = [
   },
 ];
 
+/*
+ * How the big screen shows the answers coming in. The join code is on the
+ * big screen all quiz long now, so the old code display behaves exactly
+ * like hidden, and is shown and saved as hidden.
+ */
 export const DISPLAY_MODES: Segment<DisplayMode>[] = [
   {
     value: "LIVE",
     label: "Live",
-    description: "The answer spread fills in on screen as players respond.",
+    description:
+      "The spread of answers fills in on the big screen as players respond.",
   },
   {
     value: "BLIND",
-    label: "Blind",
-    description: "Responses stay hidden until time is up, then are revealed.",
-  },
-  {
-    value: "CODE_DISPLAY",
-    label: "Code",
+    label: "Hidden",
     description:
-      "The join code stays on screen beside the question for latecomers. Responses stay hidden until time is up.",
+      "The spread stays hidden until time is up, so nobody follows the crowd.",
   },
 ];
+
+/** The choice a stored mode shows as: code display reads as hidden. */
+export function displayChoice(mode: DisplayMode): DisplayMode {
+  return mode === "CODE_DISPLAY" ? "BLIND" : mode;
+}
 
 export const TIMER_MODES: Segment<PassageTimerMode>[] = [
   {
@@ -88,7 +94,17 @@ export const TIMER_MODES: Segment<PassageTimerMode>[] = [
 ];
 
 export function displayModeLabel(mode: DisplayMode): string {
-  return DISPLAY_MODES.find((option) => option.value === mode)?.label ?? mode;
+  return (
+    DISPLAY_MODES.find((option) => option.value === displayChoice(mode))
+      ?.label ?? mode
+  );
+}
+
+/** The display mode in a few plain words, for a question's facts. */
+export function displayModeNote(mode: DisplayMode): string {
+  return displayChoice(mode) === "LIVE"
+    ? "Answers shown live"
+    : "Answers hidden till time's up";
 }
 
 export function questionTypeLabel(type: QuestionType): string {
@@ -199,6 +215,27 @@ export function withQuestionType(
       return toInt(option.points) > 0 ? { ...option, points: "0" } : option;
     }),
   };
+}
+
+/** Whether a draft scores or displays any differently from the defaults. */
+export function usesCustomScoring(draft: QuestionDraft): boolean {
+  return (
+    draft.displayModeOverride !== null ||
+    draft.options.some(
+      (option) => option.points !== "0" && option.points !== CORRECT_POINTS,
+    )
+  );
+}
+
+/** The scoring in a few words, for when its fields are folded away. */
+export function scoringSummary(draft: QuestionDraft): string {
+  return usesCustomScoring(draft)
+    ? "Custom"
+    : `${CORRECT_POINTS} points for a right answer`;
+}
+
+export function sameDraft(a: QuestionDraft, b: QuestionDraft): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /* ── Validation ───────────────────────────────────────────────────────────── */

@@ -13,12 +13,13 @@ import { TextField } from "@/components/ui/Field";
 import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { eventsApi } from "@/features/events/events-api";
+import { quizApi } from "@/features/quizzes/quiz-api";
 import { describeError } from "@/lib/api";
 import { rise } from "@/lib/motion";
 import { byOrderIndex } from "@/lib/options";
 import type { EventSummary, QuizSummary } from "@/lib/types";
 
-const CRUMBS = [{ href: "/dashboard", label: "Events" }];
+const CRUMBS = [{ href: "/dashboard", label: "Quizzes" }];
 
 export function EventClient({ eventId }: { eventId: string }) {
   const {
@@ -36,7 +37,7 @@ export function EventClient({ eventId }: { eventId: string }) {
         <LoadError
           error={error}
           resource="event"
-          back={{ href: "/dashboard", label: "All events" }}
+          back={{ href: "/dashboard", label: "All quizzes" }}
           onRetry={() => void mutate()}
         />
       </Page>
@@ -60,6 +61,25 @@ export function EventClient({ eventId }: { eventId: string }) {
       { revalidate: false },
     );
     toast.success(`Deleted "${target.title}"`);
+  };
+
+  const duplicate = async (quiz: QuizSummary) => {
+    try {
+      const copy = await quizApi.duplicate(quiz.id);
+      await mutate(
+        {
+          ...event,
+          quizzes: [
+            ...event.quizzes,
+            { id: copy.id, title: copy.title, orderIndex: copy.orderIndex },
+          ],
+        },
+        { revalidate: false },
+      );
+      toast.success(`Added "${copy.title}"`);
+    } catch (err) {
+      toast.error(describeError(err, "Couldn't duplicate the quiz."));
+    }
   };
 
   const newQuizButton = (label: string) => (
@@ -126,6 +146,8 @@ export function EventClient({ eventId }: { eventId: string }) {
                       {String(index + 1).padStart(2, "0")}
                     </span>
                   }
+                  duplicateLabel={`Duplicate quiz: ${quiz.title}`}
+                  onDuplicate={() => void duplicate(quiz)}
                   deleteLabel={`Delete quiz: ${quiz.title}`}
                   onDelete={() => {
                     setTarget(quiz);

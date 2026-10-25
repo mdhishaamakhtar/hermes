@@ -1,10 +1,18 @@
 "use client";
 
-import { useId, useState, type CSSProperties, type FormEvent } from "react";
+import {
+  useId,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useUnsavedChanges } from "@/components/LeaveGuard";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Field, TextAreaField, TextField } from "@/components/ui/Field";
 import { Icon } from "@/components/ui/Icon";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -19,7 +27,7 @@ import type {
   Question,
 } from "@/lib/types";
 import {
-  displayModeLabel,
+  displayModeNote,
   draftFromPassage,
   draftFromQuestion,
   newPassageDraft,
@@ -44,6 +52,7 @@ export interface BlockActions {
   ) => Promise<void>;
   savePassage: (passage: Passage, draft: PassageDraft) => Promise<void>;
   addSubQuestion: (passage: Passage, draft: QuestionDraft) => Promise<void>;
+  duplicateQuestion: (questionId: number) => Promise<void>;
   requestDelete: (target: DeleteTarget) => void;
 }
 
@@ -55,15 +64,31 @@ function BlockActionsBar({
   label,
   locked,
   onEdit,
+  onDuplicate,
   onDelete,
+  handle,
 }: {
   label: string;
   locked: boolean;
   onEdit: () => void;
+  onDuplicate?: () => void;
   onDelete: () => void;
+  /** The reorder grip, last in the row, as iOS places it. */
+  handle?: ReactNode;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1">
+      {onDuplicate && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="copy"
+          aria-label={`Duplicate ${label}`}
+          title="Duplicate"
+          disabled={locked}
+          onClick={onDuplicate}
+        />
+      )}
       <Button
         variant="ghost"
         size="sm"
@@ -83,6 +108,7 @@ function BlockActionsBar({
         onClick={onDelete}
         className="hover:text-danger"
       />
+      {handle}
     </div>
   );
 }
@@ -94,6 +120,7 @@ export function QuestionBlock({
   number,
   passage,
   actions,
+  handle,
 }: {
   question: Question;
   /** Position in the running order, as players will see it. */
@@ -101,8 +128,11 @@ export function QuestionBlock({
   /** The passage this question sits in, if any. */
   passage?: Passage;
   actions: BlockActions;
+  /** The grip that moves the block, for a block in the running order. */
+  handle?: ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
+  const [copying, setCopying] = useState(false);
   const ownTimer = !passage || passage.timerMode === "PER_SUB_QUESTION";
   const missingTimer = ownTimer && question.timeLimitSeconds <= 0;
 
@@ -140,9 +170,7 @@ export function QuestionBlock({
             <span className="font-mono">{question.timeLimitSeconds} sec</span>
           )}
           {question.displayModeOverride && (
-            <span>
-              {displayModeLabel(question.displayModeOverride)} display
-            </span>
+            <span>{displayModeNote(question.displayModeOverride)}</span>
           )}
           {missingTimer && (
             <span>
@@ -152,11 +180,20 @@ export function QuestionBlock({
         </p>
         <BlockActionsBar
           label={`question ${number}`}
-          locked={actions.locked}
+          locked={actions.locked || copying}
           onEdit={() => setEditing(true)}
+          onDuplicate={async () => {
+            setCopying(true);
+            try {
+              await actions.duplicateQuestion(question.id);
+            } finally {
+              setCopying(false);
+            }
+          }}
           onDelete={() =>
             actions.requestDelete({ kind: "question", id: question.id, number })
           }
+          handle={handle}
         />
       </div>
       <h3 className="mt-1 text-lg leading-snug font-semibold whitespace-pre-wrap text-foreground">
@@ -206,11 +243,14 @@ export function PassageBlock({
   passage,
   firstNumber,
   actions,
+  handle,
 }: {
   passage: Passage;
   /** Running-order number of its first question. */
   firstNumber: number;
   actions: BlockActions;
+  /** The grip that moves the block in the running order. */
+  handle?: ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -263,6 +303,7 @@ export function PassageBlock({
                 questionCount: questions.length,
               })
             }
+            handle={handle}
           />
         </div>
         <p
@@ -391,6 +432,11 @@ function PassageEditor({
   const [draft, setDraft] = useState(() => draftFromPassage(passage));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const dirty =
+    JSON.stringify(draft) !== JSON.stringify(draftFromPassage(passage));
+  useUnsavedChanges(dirty && !pending);
+  const cancel = () => (dirty ? setConfirmDiscard(true) : onCancel());
   const losesSharedTimer =
     passage.timerMode === "ENTIRE_PASSAGE" &&
     draft.timerMode === "PER_SUB_QUESTION";
@@ -434,10 +480,15 @@ function PassageEditor({
         <Button type="submit" variant="primary" pending={pending}>
           {pending ? "Saving…" : "Save passage"}
         </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+        <Button variant="ghost" onClick={cancel} disabled={pending}>
           Cancel
         </Button>
       </div>
+      <DiscardDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        onDiscard={onCancel}
+      />
     </motion.form>
   );
 }
@@ -461,7 +512,17 @@ export function PassageComposer({
   ]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const ownTimer = draft.timerMode === "PER_SUB_QUESTION";
+  const dirty =
+    draft.text.trim() !== "" ||
+    questions.some(
+      (question) =>
+        question.text.trim() !== "" ||
+        question.options.some((option) => option.text.trim() !== ""),
+    );
+  useUnsavedChanges(dirty && !pending);
+  const cancel = () => (dirty ? setConfirmDiscard(true) : onCancel());
 
   const updateQuestion = (index: number, next: QuestionDraft) =>
     setQuestions((current) => current.map((q, i) => (i === index ? next : q)));
@@ -581,10 +642,36 @@ export function PassageComposer({
         <Button type="submit" variant="primary" pending={pending}>
           {pending ? "Creating…" : "Add passage"}
         </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+        <Button variant="ghost" onClick={cancel} disabled={pending}>
           Cancel
         </Button>
       </div>
+      <DiscardDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        onDiscard={onCancel}
+      />
     </motion.form>
+  );
+}
+
+function DiscardDialog({
+  open,
+  onClose,
+  onDiscard,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <ConfirmDialog
+      open={open}
+      onClose={onClose}
+      title="Discard your changes?"
+      description="What you've written here won't be saved."
+      confirmLabel="Discard"
+      onConfirm={onDiscard}
+    />
   );
 }

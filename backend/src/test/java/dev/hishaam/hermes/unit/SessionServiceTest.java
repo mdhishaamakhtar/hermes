@@ -95,7 +95,7 @@ class SessionServiceTest {
           .thenReturn(true);
 
       SessionResponse response =
-          sessionService.createSession(new CreateSessionRequest(QUIZ_ID), USER_ID);
+          sessionService.createSession(new CreateSessionRequest(QUIZ_ID, false), USER_ID);
 
       assertThat(response.joinCode()).hasSize(6);
       verify(stateStore, times(3)).tryReserveJoinCode(anyString());
@@ -121,7 +121,7 @@ class SessionServiceTest {
       when(stateStore.tryReserveJoinCode(anyString())).thenReturn(false);
 
       assertThatThrownBy(
-              () -> sessionService.createSession(new CreateSessionRequest(QUIZ_ID), USER_ID))
+              () -> sessionService.createSession(new CreateSessionRequest(QUIZ_ID, false), USER_ID))
           .isInstanceOf(AppException.class)
           .hasMessage("Failed to generate unique join code");
 
@@ -136,7 +136,7 @@ class SessionServiceTest {
           .thenReturn(Optional.of(Quiz.builder().id(QUIZ_ID).title("Empty").build()));
 
       assertThatThrownBy(
-              () -> sessionService.createSession(new CreateSessionRequest(QUIZ_ID), USER_ID))
+              () -> sessionService.createSession(new CreateSessionRequest(QUIZ_ID, false), USER_ID))
           .isInstanceOf(AppException.class)
           .hasMessage("Quiz must have at least one question");
 

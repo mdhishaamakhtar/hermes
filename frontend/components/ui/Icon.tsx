@@ -39,6 +39,9 @@ const PATHS = {
     "M3 8h3l4-3.5v11L6 12H3zM13.5 7.5a3.5 3.5 0 010 5M15.5 5a7 7 0 010 10",
   "volume-off": "M3 8h3l4-3.5v11L6 12H3zM13 8l4 4M17 8l-4 4",
   grip: "M7.5 5v1M12.5 5v1M7.5 9.5v1M12.5 9.5v1M7.5 14v1M12.5 14v1",
+  phone: "M6.5 2.5h7v15h-7zM9 14.5h2",
+  sparkle:
+    "M10 3v4M10 13v4M3 10h4M13 10h4M6 6l1.5 1.5M12.5 12.5L14 14M14 6l-1.5 1.5M7.5 12.5L6 14",
   download: "M10 3v10M5.5 8.5L10 13l4.5-4.5M4 17h12",
   share: "M10 13V3M6 7l4-4 4 4M4 11v6h12v-6",
   poll: "M4 16V9M10 16V4M16 16v-5",

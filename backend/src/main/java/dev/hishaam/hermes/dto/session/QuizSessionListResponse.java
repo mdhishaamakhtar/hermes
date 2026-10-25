@@ -7,4 +7,5 @@ public record QuizSessionListResponse(
     String status,
     OffsetDateTime startedAt,
     OffsetDateTime endedAt,
-    long participantCount) {}
+    long participantCount,
+    boolean rehearsal) {}

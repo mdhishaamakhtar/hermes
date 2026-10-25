@@ -99,6 +99,8 @@ export interface HostSessionSync {
   timeLeftSeconds: number | null;
   scoring: ScoringRules;
   scene: StageScene;
+  /** The host's own run-through, kept out of the quiz's history. */
+  rehearsal: boolean;
 }
 
 export interface LobbySnapshot {
@@ -108,6 +110,7 @@ export interface LobbySnapshot {
   quizTitle: string;
   /** Everyone in the room, in the order they arrived. */
   players: PlayerInfo[];
+  rehearsal: boolean;
 }
 
 /* ── REST: player ─────────────────────────────────────────────────────────── */

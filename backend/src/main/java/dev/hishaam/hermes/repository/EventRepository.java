@@ -10,7 +10,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
-  List<Event> findByUserIdOrderByCreatedAtDesc(Long userId);
+  List<Event> findByUserIdAndDefaultEventFalseOrderByCreatedAtDesc(Long userId);
+
+  Optional<Event> findFirstByUserIdAndDefaultEventTrueOrderByIdAsc(Long userId);
 
   @Query("SELECT e FROM Event e JOIN FETCH e.user WHERE e.id = :id")
   Optional<Event> findByIdWithUser(@Param("id") Long id);

@@ -15,6 +15,10 @@ import { duration, ease } from "@/lib/motion";
 const SHELL =
   "relative flex min-h-[4.5rem] items-center gap-4 border border-border bg-surface px-5 py-3.5";
 
+/** On pointer devices a row's tools wait for hover or focus. */
+const HOVER_REVEAL =
+  "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100";
+
 /**
  * One navigable item in an organiser list: the whole row opens it, and a
  * delete button sits above the link layer. On pointer devices the delete
@@ -27,6 +31,8 @@ export function ResourceRow({
   leading,
   deleteLabel,
   onDelete,
+  duplicateLabel,
+  onDuplicate,
 }: {
   href: string;
   title: string;
@@ -35,6 +41,9 @@ export function ResourceRow({
   /** Accessible name for the delete button, e.g. "Delete event: Trivia". */
   deleteLabel: string;
   onDelete: () => void;
+  /** Accessible name for the duplicate button, when the row has one. */
+  duplicateLabel?: string;
+  onDuplicate?: () => void;
 }) {
   return (
     <motion.li
@@ -58,6 +67,17 @@ export function ResourceRow({
         )}
       </div>
       <div className="relative z-[var(--z-raised)] flex shrink-0 items-center gap-1">
+        {onDuplicate && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="copy"
+            aria-label={duplicateLabel}
+            title="Duplicate"
+            onClick={onDuplicate}
+            className={HOVER_REVEAL}
+          />
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -65,7 +85,7 @@ export function ResourceRow({
           aria-label={deleteLabel}
           title="Delete"
           onClick={onDelete}
-          className="hover:text-danger [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
+          className={`hover:text-danger ${HOVER_REVEAL}`}
         />
         <Icon
           name="arrow-right"

@@ -1,11 +1,10 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { sessionsApi } from "@/features/session/session-api";
 import { storeJoinCode } from "@/lib/session-storage";
 import type {
   DisplayMode,
-  EventSummary,
   Passage,
   Question,
   Quiz,
@@ -21,6 +20,7 @@ import {
   withQuestion,
   type PassageDraft,
   type QuestionDraft,
+  type QuizBlock,
 } from "./editor-model";
 import { quizApi } from "./quiz-api";
 
@@ -30,30 +30,41 @@ import { quizApi } from "./quiz-api";
  * so the screen always shows what the server holds. A failed save throws for
  * the form that asked, which keeps the draft and says why.
  */
-export function useQuizEditor(eventId: string, quizId: string) {
+export function useQuizEditor(quizId: string) {
   const quizQuery = useSWR<Quiz>(`/api/quizzes/${quizId}`);
   const sessionsQuery = useSWR<SessionSummary[]>(
     `/api/quizzes/${quizId}/sessions`,
   );
-  // Only for the breadcrumb; usually already cached from the event page.
-  const { data: event } = useSWR<EventSummary>(`/api/events/${eventId}`);
+
+  const { mutate: mutateKey } = useSWRConfig();
 
   const quiz = quizQuery.data;
   const sessions = sessionsQuery.data ?? [];
 
-  const patch = (change: (quiz: Quiz) => Quiz) =>
-    quizQuery.mutate((current) => current && change(current), {
+  // The quiz list shows question counts, so it is refreshed behind every
+  // save and is current when the organiser goes back to it.
+  const refreshList = () => void mutateKey("/api/quizzes");
+
+  const patch = async (change: (quiz: Quiz) => Quiz) => {
+    await quizQuery.mutate((current) => current && change(current), {
       revalidate: false,
     });
+    refreshList();
+  };
 
   const requireQuiz = () => {
     if (!quiz) throw new Error("The quiz has not loaded yet.");
     return quiz;
   };
 
+  // A whole-quiz answer from the server, which renumbers positions.
+  const replace = async (next: Quiz) => {
+    await quizQuery.mutate(next, { revalidate: false });
+    refreshList();
+  };
+
   return {
     quiz,
-    event,
     error: quizQuery.error,
     retry: () => void quizQuery.mutate(),
     sessions,
@@ -140,9 +151,31 @@ export function useQuizEditor(eventId: string, quizId: string) {
       await patch((q) => withQuestion(q, created));
     },
 
-    /** Opens a lobby and returns its session id. */
-    async launch() {
-      const session = await sessionsApi.create(Number(quizId));
+    /** Copies a question into the slot right after it. */
+    async duplicateQuestion(questionId: number) {
+      await replace(await quizApi.duplicateQuestion(questionId));
+    },
+
+    /** Saves a new running order, top to bottom. */
+    async reorder(blocks: QuizBlock[]) {
+      await replace(
+        await quizApi.reorder(
+          quizId,
+          blocks.map((block) =>
+            block.kind === "question"
+              ? { kind: "QUESTION", id: block.question.id }
+              : { kind: "PASSAGE", id: block.passage.id },
+          ),
+        ),
+      );
+    },
+
+    /**
+     * Opens a lobby and returns its session id. A rehearsal is the host's
+     * own run-through, kept out of the quiz's past sessions.
+     */
+    async launch({ rehearsal = false } = {}) {
+      const session = await sessionsApi.create(Number(quizId), { rehearsal });
       storeJoinCode(session.id, session.joinCode);
       return session.id;
     },

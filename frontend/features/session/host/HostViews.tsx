@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RollingNumber } from "@/components/ui/AnimatedNumber";
+import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
-import { displayModeLabel } from "@/features/quizzes/editor-model";
+import { displayModeNote } from "@/features/quizzes/editor-model";
 import { countLabel, countNoun, formatNumber, percent } from "@/lib/format";
 import { spring, stageCut } from "@/lib/motion";
 import { AnswerOption } from "../components/AnswerOption";
 import { CountdownBar, CountdownClock } from "../components/Countdown";
 import { copy, JoinCodeDisplay, useJoinUrl } from "../components/JoinCode";
+import { JoinQr } from "../components/JoinQr";
 import { Leaderboard } from "../components/Leaderboard";
 import { ScoringDrawer, type ScoringTarget } from "../components/ScoringDrawer";
 import { ScoringRules } from "../components/ScoringRules";
@@ -112,14 +114,41 @@ export function HostLobby({ session }: { session: HostSession }) {
       >
         <div className="flex min-w-0 flex-col gap-8">
           <header>
+            {session.rehearsal && (
+              <Badge tone="warning" dot className="mb-5">
+                Rehearsal
+              </Badge>
+            )}
             <h1 className="display display-tight text-[clamp(2.5rem,6vw,4rem)] leading-[0.92] text-balance text-foreground">
               {session.title || "Lobby"}
             </h1>
             <p className="mt-3 max-w-[38rem] text-lg text-muted">
-              Players are joining. Put the big screen on the projector, then
-              start when the room is ready.
+              {session.rehearsal
+                ? "A run-through on your own. Join on your phone to see what players see, and open the big screen to see what the room sees. Nothing from a rehearsal is kept."
+                : "Players are joining. Put the big screen on the projector, then start when the room is ready."}
             </p>
           </header>
+
+          {session.rehearsal && joinCode && (
+            <section
+              aria-labelledby="rehearse-heading"
+              className="flex flex-col gap-5 border border-border bg-surface p-5 sm:flex-row sm:items-center sm:p-6"
+            >
+              <JoinQr url={url.withCode} className="size-32 shrink-0" />
+              <div className="min-w-0">
+                <h2
+                  id="rehearse-heading"
+                  className="font-semibold text-foreground"
+                >
+                  Play along on your phone
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  Scan this with your phone&apos;s camera to join as a player,
+                  then run the quiz from here.
+                </p>
+              </div>
+            </section>
+          )}
 
           <section
             aria-labelledby="screen-heading"
@@ -373,7 +402,7 @@ export function HostStage({ session }: { session: HostSession }) {
                 of {totalQuestions}
                 <span className="max-sm:block">
                   <span className="max-sm:hidden"> · </span>
-                  {displayModeLabel(displayMode)} display
+                  {displayModeNote(displayMode)}
                 </span>
               </p>
               <CountdownClock
@@ -734,29 +763,44 @@ export function HostEnded({ session }: { session: HostSession }) {
         <header className="mb-10 flex flex-wrap items-end justify-between gap-6">
           <div>
             <h1 className="display display-tight text-[clamp(2.75rem,6vw,4.5rem)] leading-[0.92] text-foreground">
-              That&apos;s a wrap
+              {session.rehearsal ? "Rehearsal over" : "That's a wrap"}
             </h1>
             <p className="mt-3 text-muted">
-              {countLabel(participantCount, "player", "players")}
-              {results &&
-                ` · ${countLabel(results.questionsAsked ?? results.questions.length, "question", "questions")} · ${results.quizTitle}`}
+              {session.rehearsal
+                ? "Nothing from it is kept. Change what you need, then run it for real."
+                : [
+                    countLabel(participantCount, "player", "players"),
+                    results &&
+                      countLabel(
+                        results.questionsAsked ?? results.questions.length,
+                        "question",
+                        "questions",
+                      ),
+                    results?.quizTitle,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             {results && (
               <ButtonLink
                 href={`/events/${results.eventId}/quizzes/${results.quizId}`}
+                variant={session.rehearsal ? "primary" : undefined}
+                trailingIcon={session.rehearsal ? "arrow-right" : undefined}
               >
                 Back to the quiz
               </ButtonLink>
             )}
-            <ButtonLink
-              href={`/session/${session.sessionId}/review`}
-              variant="primary"
-              trailingIcon="arrow-right"
-            >
-              Full review
-            </ButtonLink>
+            {!session.rehearsal && (
+              <ButtonLink
+                href={`/session/${session.sessionId}/review`}
+                variant="primary"
+                trailingIcon="arrow-right"
+              >
+                Full review
+              </ButtonLink>
+            )}
           </div>
         </header>
         <WrapUp

@@ -4,6 +4,7 @@ import type {
   Passage,
   PassageTimerMode,
   Question,
+  Quiz,
 } from "@/lib/types";
 import type { QuestionPayload } from "./editor-model";
 
@@ -14,7 +15,26 @@ interface PassagePayload {
   timeLimitSeconds: number | null;
 }
 
+/** One entry of a quiz's running order, top to bottom. */
+export interface OrderBlock {
+  kind: "QUESTION" | "PASSAGE";
+  id: number;
+}
+
 export const quizApi = {
+  /** A new quiz, in the event given or the organiser's own quizzes. */
+  create: (title: string, eventId?: number) =>
+    api.post<Quiz>("/api/quizzes", { title, eventId }),
+  // These send an empty body so the client reads the quiz they return.
+  createSample: () => api.post<Quiz>("/api/quizzes/sample", {}),
+  duplicate: (quizId: number) =>
+    api.post<Quiz>(`/api/quizzes/${quizId}/duplicate`, {}),
+  delete: (quizId: number) => api.delete(`/api/quizzes/${quizId}`),
+  reorder: (quizId: string, blocks: OrderBlock[]) =>
+    api.put<Quiz>(`/api/quizzes/${quizId}/order`, { blocks }),
+  duplicateQuestion: (id: number) =>
+    api.post<Quiz>(`/api/questions/${id}/duplicate`, {}),
+
   update: (
     quizId: string,
     data: { title: string; orderIndex: number; displayMode: DisplayMode },

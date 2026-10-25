@@ -4,6 +4,7 @@ import dev.hishaam.hermes.entity.enums.SessionStatus;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -57,6 +58,15 @@ public class QuizSession {
    */
   @Column(name = "opened_question_count")
   private Integer openedQuestionCount;
+
+  /**
+   * A run-through the host does alone, usually playing along on their own phone. It works like any
+   * session but never appears in the quiz's past sessions or an event's standings.
+   */
+  @Column(name = "rehearsal", nullable = false)
+  @ColumnDefault("false")
+  @Builder.Default
+  private boolean rehearsal = false;
 
   @Column(name = "created_at")
   private OffsetDateTime createdAt;

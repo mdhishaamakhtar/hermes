@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
@@ -31,6 +32,16 @@ public class Event {
 
   @Column(columnDefinition = "TEXT")
   private String description;
+
+  /**
+   * The organiser's catch-all event, made the first time they create a quiz without choosing one.
+   * Quizzes don't need an event; this is where the ones without one live. It never shows as an
+   * event of its own.
+   */
+  @Column(name = "default_event", nullable = false)
+  @ColumnDefault("false")
+  @Builder.Default
+  private boolean defaultEvent = false;
 
   @Column(name = "created_at")
   private OffsetDateTime createdAt;

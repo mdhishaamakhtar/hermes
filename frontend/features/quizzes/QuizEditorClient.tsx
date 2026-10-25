@@ -1,8 +1,14 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  Reorder,
+  useDragControls,
+} from "motion/react";
+import { LeaveGuard } from "@/components/LeaveGuard";
 import { LoadError } from "@/components/LoadError";
 import { Page, PageHeader, PageHeaderSkeleton } from "@/components/Page";
 import { Alert } from "@/components/ui/Alert";
@@ -10,6 +16,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { Icon } from "@/components/ui/Icon";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
@@ -19,9 +26,11 @@ import { fade } from "@/lib/motion";
 import type { DisplayMode, SessionSummary } from "@/lib/types";
 import {
   DISPLAY_MODES,
+  displayChoice,
   newQuestionDraft,
   questionCount,
   quizBlocks,
+  type QuizBlock,
 } from "./editor-model";
 import { QuestionEditor } from "./QuestionEditor";
 import {
@@ -36,6 +45,11 @@ import { useQuizEditor } from "./useQuizEditor";
 
 type Composer = "question" | "passage" | null;
 
+const blockKey = (block: QuizBlock) =>
+  block.kind === "question"
+    ? `question-${block.question.id}`
+    : `passage-${block.passage.id}`;
+
 export function QuizEditorClient({
   eventId,
   quizId,
@@ -44,12 +58,16 @@ export function QuizEditorClient({
   quizId: string;
 }) {
   const router = useRouter();
-  const editor = useQuizEditor(eventId, quizId);
-  const { quiz, event, runningSession } = editor;
+  const editor = useQuizEditor(quizId);
+  const { quiz, runningSession } = editor;
   const displayId = useId();
 
   const [composer, setComposer] = useState<Composer>(null);
-  const [launching, setLaunching] = useState(false);
+  // The running order while a block is being dragged, before it is saved.
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
+  const [launching, setLaunching] = useState<"session" | "rehearsal" | null>(
+    null,
+  );
   const [launchError, setLaunchError] = useState<string | null>(null);
   // Targets are kept apart from the open flags so a dialog's copy does not
   // blank out while it animates closed.
@@ -75,7 +93,12 @@ export function QuizEditorClient({
     );
   }
 
-  const blocks = quizBlocks(quiz);
+  const saved = quizBlocks(quiz);
+  const blocks = dragOrder
+    ? dragOrder
+        .map((key) => saved.find((block) => blockKey(block) === key))
+        .filter((block): block is QuizBlock => Boolean(block))
+    : saved;
   const total = questionCount(quiz);
   const locked = Boolean(runningSession);
 
@@ -96,21 +119,58 @@ export function QuizEditorClient({
     saveQuestion: editor.saveQuestion,
     savePassage: editor.savePassage,
     addSubQuestion: editor.addSubQuestion,
+    duplicateQuestion: async (questionId) => {
+      try {
+        await editor.duplicateQuestion(questionId);
+      } catch (err) {
+        toast.error(describeError(err, "Couldn't duplicate the question."));
+      }
+    },
     requestDelete: (target) => {
       setDeleteTarget(target);
       setDeleteOpen(true);
     },
   };
 
-  const launch = async () => {
-    setLaunching(true);
+  const launch = async (kind: "session" | "rehearsal") => {
+    setLaunching(kind);
     setLaunchError(null);
     try {
-      router.push(`/session/${await editor.launch()}/host`);
+      const sessionId = await editor.launch({
+        rehearsal: kind === "rehearsal",
+      });
+      router.push(`/session/${sessionId}/host`);
     } catch (err) {
       setLaunchError(describeError(err, "Couldn't open a lobby."));
-      setLaunching(false);
+      setLaunching(null);
     }
+  };
+
+  /** Saves a new running order; a refusal puts the saved one back. */
+  const saveOrder = async (next: QuizBlock[]) => {
+    const unchanged = next.every(
+      (block, index) => blockKey(block) === blockKey(saved[index]),
+    );
+    if (unchanged) {
+      setDragOrder(null);
+      return;
+    }
+    setDragOrder(next.map(blockKey));
+    try {
+      await editor.reorder(next);
+    } catch (err) {
+      toast.error(describeError(err, "Couldn't save the new order."));
+    } finally {
+      setDragOrder(null);
+    }
+  };
+
+  const moveBy = (index: number, by: -1 | 1) => {
+    const target = index + by;
+    if (target < 0 || target >= blocks.length) return;
+    const next = [...blocks];
+    [next[index], next[target]] = [next[target], next[index]];
+    void saveOrder(next);
   };
 
   const changeDisplayMode = async (mode: DisplayMode) => {
@@ -125,8 +185,10 @@ export function QuizEditorClient({
     <Page>
       <PageHeader
         crumbs={[
-          { href: "/dashboard", label: "Events" },
-          { href: `/events/${eventId}`, label: event?.title ?? "Event" },
+          { href: "/dashboard", label: "Quizzes" },
+          ...(quiz.defaultEvent
+            ? []
+            : [{ href: `/events/${eventId}`, label: quiz.eventTitle }]),
         ]}
         title={quiz.title}
         meta={
@@ -140,17 +202,29 @@ export function QuizEditorClient({
           </>
         }
         actions={
-          <Button
-            variant="primary"
-            size="lg"
-            icon="play"
-            onClick={launch}
-            pending={launching}
-            disabled={total === 0 || locked}
-            title={total === 0 ? "Add a question first" : undefined}
-          >
-            {launching ? "Opening lobby…" : "Start a session"}
-          </Button>
+          <>
+            <Button
+              size="lg"
+              icon="phone"
+              onClick={() => void launch("rehearsal")}
+              pending={launching === "rehearsal"}
+              disabled={total === 0 || locked || launching !== null}
+              title="Run through it alone, playing along on your phone. Nothing is kept."
+            >
+              {launching === "rehearsal" ? "Opening…" : "Rehearse"}
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              icon="play"
+              onClick={() => void launch("session")}
+              pending={launching === "session"}
+              disabled={total === 0 || locked || launching !== null}
+              title={total === 0 ? "Add a question first" : undefined}
+            >
+              {launching === "session" ? "Opening lobby…" : "Start a session"}
+            </Button>
+          </>
         }
       />
 
@@ -171,7 +245,8 @@ export function QuizEditorClient({
             </ButtonLink>
           }
         >
-          A session of this quiz is{" "}
+          {runningSession.rehearsal ? "A rehearsal" : "A session"} of this quiz
+          is{" "}
           {runningSession.status === "LOBBY"
             ? "waiting in the lobby"
             : "live right now"}
@@ -183,11 +258,11 @@ export function QuizEditorClient({
         aria-label="Quiz settings"
         className="mb-12 border border-border bg-surface p-5 sm:p-6"
       >
-        <Field id={displayId} label="Answer display during questions">
+        <Field id={displayId} label="Answer display on the big screen">
           <div className="max-w-md">
             <SegmentedControl<DisplayMode>
               id={displayId}
-              value={quiz.displayMode}
+              value={displayChoice(quiz.displayMode)}
               options={DISPLAY_MODES}
               onChange={changeDisplayMode}
               disabled={locked}
@@ -230,23 +305,46 @@ export function QuizEditorClient({
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {blocks.map((block, index) =>
-              block.kind === "question" ? (
-                <QuestionBlock
-                  key={`question-${block.question.id}`}
-                  question={block.question}
-                  number={starts[index]}
-                  actions={actions}
-                />
-              ) : (
-                <PassageBlock
-                  key={`passage-${block.passage.id}`}
-                  passage={block.passage}
-                  firstNumber={starts[index]}
-                  actions={actions}
-                />
-              ),
-            )}
+            <Reorder.Group
+              as="div"
+              axis="y"
+              values={blocks.map(blockKey)}
+              onReorder={setDragOrder}
+              className="flex flex-col gap-3"
+            >
+              {blocks.map((block, index) => (
+                <DraggableBlock
+                  key={blockKey(block)}
+                  value={blockKey(block)}
+                  label={
+                    block.kind === "question"
+                      ? `question ${starts[index]}`
+                      : `the passage at question ${starts[index]}`
+                  }
+                  disabled={locked || blocks.length < 2}
+                  onDrop={() => void saveOrder(blocks)}
+                  onMove={(by) => moveBy(index, by)}
+                >
+                  {(handle) =>
+                    block.kind === "question" ? (
+                      <QuestionBlock
+                        question={block.question}
+                        number={starts[index]}
+                        actions={actions}
+                        handle={handle}
+                      />
+                    ) : (
+                      <PassageBlock
+                        passage={block.passage}
+                        firstNumber={starts[index]}
+                        actions={actions}
+                        handle={handle}
+                      />
+                    )
+                  }
+                </DraggableBlock>
+              ))}
+            </Reorder.Group>
 
             <AnimatePresence mode="wait" initial={false}>
               {composer === "question" ? (
@@ -332,6 +430,8 @@ export function QuizEditorClient({
         }
       />
 
+      <LeaveGuard />
+
       <ConfirmDialog
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
@@ -343,6 +443,62 @@ export function QuizEditorClient({
         }
       />
     </Page>
+  );
+}
+
+/**
+ * One block of the running order. It moves by its grip: dragged with a
+ * pointer, or with the arrow keys once the grip has focus. Each move saves.
+ */
+function DraggableBlock({
+  value,
+  label,
+  disabled,
+  onDrop,
+  onMove,
+  children,
+}: {
+  value: string;
+  /** What the block is, for the grip's accessible name. */
+  label: string;
+  disabled: boolean;
+  onDrop: () => void;
+  onMove: (by: -1 | 1) => void;
+  children: (handle: ReactNode) => ReactNode;
+}) {
+  const controls = useDragControls();
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      onMove(event.key === "ArrowUp" ? -1 : 1);
+    }
+  };
+
+  const handle = disabled ? null : (
+    <button
+      type="button"
+      aria-label={`Move ${label}. Drag, or use the up and down arrow keys.`}
+      title="Drag to move"
+      onPointerDown={(event) => controls.start(event)}
+      onKeyDown={onKeyDown}
+      className="btn btn-ghost btn-sm btn-icon cursor-grab touch-none active:cursor-grabbing"
+    >
+      <Icon name="grip" size={14} />
+    </button>
+  );
+
+  return (
+    <Reorder.Item
+      as="div"
+      value={value}
+      dragListener={false}
+      dragControls={controls}
+      onDragEnd={onDrop}
+      className="relative"
+      whileDrag={{ zIndex: 20 }}
+    >
+      {children(handle)}
+    </Reorder.Item>
   );
 }
 

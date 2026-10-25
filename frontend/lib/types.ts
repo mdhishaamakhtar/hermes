@@ -40,6 +40,10 @@ export interface Passage {
 
 export interface Quiz {
   id: number;
+  eventId: number;
+  eventTitle: string;
+  /** The quiz sits in no event the organiser chose. */
+  defaultEvent: boolean;
   title: string;
   orderIndex: number;
   displayMode: DisplayMode;
@@ -51,6 +55,18 @@ export interface QuizSummary {
   id: number;
   title: string;
   orderIndex: number;
+}
+
+/** A quiz as the quiz list shows it, whichever event it sits in. */
+export interface QuizListItem {
+  id: number;
+  title: string;
+  eventId: number;
+  eventTitle: string;
+  /** The quiz sits in no event the organiser chose, so none is named. */
+  defaultEvent: boolean;
+  questionCount: number;
+  createdAt: string;
 }
 
 export interface EventSummary {
@@ -68,4 +84,6 @@ export interface SessionSummary {
   startedAt: string | null;
   endedAt: string | null;
   participantCount: number;
+  /** The host's own run-through; listed only while it runs. */
+  rehearsal: boolean;
 }

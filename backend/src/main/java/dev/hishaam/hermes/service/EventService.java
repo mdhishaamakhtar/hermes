@@ -43,9 +43,27 @@ public class EventService {
 
   @Transactional(readOnly = true)
   public List<EventResponse> listEvents(Long userId) {
-    return eventRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+    return eventRepository.findByUserIdAndDefaultEventFalseOrderByCreatedAtDesc(userId).stream()
         .map(this::toResponse)
         .toList();
+  }
+
+  /** Where the organiser's quizzes without an event live, made the first time one needs it. */
+  @Transactional
+  public Event defaultEvent(Long userId) {
+    return eventRepository
+        .findFirstByUserIdAndDefaultEventTrueOrderByIdAsc(userId)
+        .orElseGet(
+            () ->
+                eventRepository.save(
+                    Event.builder()
+                        .user(
+                            userRepository
+                                .findById(userId)
+                                .orElseThrow(() -> AppException.notFound("User not found")))
+                        .title("My quizzes")
+                        .defaultEvent(true)
+                        .build()));
   }
 
   @Transactional
