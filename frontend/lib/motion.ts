@@ -16,23 +16,26 @@
  */
 
 export const duration = {
-  instant: 0.1,
-  base: 0.16,
-  enter: 0.24,
-  sheet: 0.32,
-  stage: 0.48,
+  instant: 0.12,
+  base: 0.22,
+  enter: 0.38,
+  sheet: 0.46,
+  stage: 0.7,
   /**
    * The slate lifting off the question: the one exit slower than its
    * entrance, because it uncovers what the room is about to read.
    */
-  lift: 0.52,
+  lift: 0.75,
 } as const;
 
 type Bezier = [number, number, number, number];
 
 export const ease = {
-  /** Expo-out: fast start, gentle settle. Anything arriving. */
-  out: [0.16, 1, 0.3, 1] as Bezier,
+  /**
+   * Quart-out: leaves promptly, then spends most of its time settling.
+   * Anything arriving. Mirrors --ease-out.
+   */
+  out: [0.25, 1, 0.5, 1] as Bezier,
   /** Symmetric, for moves between two on-screen states. Mirrors --ease-in-out. */
   inOut: [0.65, 0, 0.35, 1] as Bezier,
   /**
@@ -46,21 +49,24 @@ export const ease = {
 } as const;
 
 export const spring = {
-  /** Values that grow to represent a quantity: response bars. */
-  bar: { type: "spring", stiffness: 260, damping: 30 },
+  /**
+   * Values that grow to represent a quantity: response bars. Just past
+   * critical (2 * sqrt(150) ~ 24.5), so a bar fills without wobbling.
+   */
+  bar: { type: "spring", stiffness: 150, damping: 26 },
   /**
    * Things that move to a new slot: reordered rows, a tab indicator.
-   * Critically damped (2 * sqrt(480) ~ 44): nobody flicked these, so they
-   * settle without overshooting the slot.
+   * Critically damped (2 * sqrt(200) ~ 28): nobody flicked these, so they
+   * glide over and settle without overshooting the slot.
    */
-  slot: { type: "spring", stiffness: 480, damping: 44 },
+  slot: { type: "spring", stiffness: 200, damping: 30 },
   /** A mark pressed onto a surface: a lock on commit, a tick on reveal. */
-  stamp: { type: "spring", duration: 0.32, bounce: 0.3 },
+  stamp: { type: "spring", duration: 0.45, bounce: 0.12 },
   /**
-   * The clock's last five seconds, punching in on every tick: one small
-   * overshoot, then still. A lower damping ratio wobbled the digits.
+   * The clock's last five seconds, punching in on every tick: the faintest
+   * overshoot, then still.
    */
-  tick: { type: "spring", duration: 0.3, bounce: 0.2 },
+  tick: { type: "spring", duration: 0.4, bounce: 0.08 },
 } as const;
 
 export const fade = {
@@ -84,14 +90,14 @@ export const rise = {
  * an arrival when a question comes in with no slate, after a reconnect.
  */
 export const stageCut = {
-  initial: { opacity: 0, transform: "translateY(10px)" },
+  initial: { opacity: 0, transform: "translateY(12px)" },
   animate: { opacity: 1, transform: "translateY(0px)" },
   exit: { opacity: 0, transition: { duration: duration.base } },
   transition: { duration: duration.stage, ease: ease.out },
 } as const;
 
-const STAGGER_STEP = 0.035;
-const STAGGER_MAX = 0.28;
+const STAGGER_STEP = 0.06;
+const STAGGER_MAX = 0.42;
 
 /**
  * Delay for the nth item of a list that is being revealed: leaderboards,

@@ -26,9 +26,11 @@ interface AnswerOptionProps {
   aside?: ReactNode;
   /**
    * `xl` for a lone question on a large stage; `screen` for the big screen,
-   * where the tile scales with the projector rather than the page.
+   * where the tile scales with the projector rather than the page, and
+   * `screen-sm` for the big screen when it shares the frame with a passage
+   * or another question.
    */
-  size?: "md" | "lg" | "xl" | "screen";
+  size?: "md" | "lg" | "xl" | "screen" | "screen-sm";
   /** The player committed to this pick; the letter becomes a lock. */
   locked?: boolean;
   /** Makes the tile a toggle the player presses to choose it. */
@@ -43,20 +45,33 @@ const LETTER_SIZE = {
   lg: "size-9 text-sm",
   xl: "size-11 text-base",
   screen: "size-[clamp(2.75rem,5.5vh,4.5rem)] text-[clamp(1rem,2.2vh,1.75rem)]",
+  "screen-sm":
+    "size-[clamp(2.5rem,5vh,4rem)] text-[clamp(0.875rem,2vh,1.5rem)]",
 };
 const TEXT_SIZE = {
   md: "text-base leading-snug",
   lg: "text-lg leading-snug font-medium",
   xl: "text-xl leading-snug font-medium xl:text-2xl",
   screen: "text-[clamp(1.25rem,min(2.4vw,4vh),3rem)] leading-tight font-medium",
+  "screen-sm":
+    "text-[clamp(1.125rem,min(1.9vw,3.4vh),2.375rem)] leading-snug font-medium",
 };
 const TILE_SIZE = {
   md: "",
   lg: "min-h-16 px-4 py-4",
   xl: "min-h-20 gap-x-4 px-5 py-5",
   screen: "min-h-[clamp(4.5rem,11vh,9rem)] gap-x-[1.5vw] px-[1.5vw] py-[1.5vh]",
+  "screen-sm":
+    "min-h-[clamp(3.75rem,9vh,7.5rem)] gap-x-[1.2vw] px-[1.2vw] py-[1.2vh]",
 };
-const ICON_SIZE = { md: 14, lg: 16, xl: 16, screen: 28 };
+const ICON_SIZE = { md: 14, lg: 16, xl: 16, screen: 28, "screen-sm": 24 };
+const ASIDE_SIZE = {
+  md: "text-sm",
+  lg: "text-sm",
+  xl: "text-sm",
+  screen: "text-[clamp(1rem,2.4vh,2rem)]",
+  "screen-sm": "text-[clamp(0.875rem,2vh,1.5rem)]",
+};
 
 /**
  * An answer, in any context: the host's stage, a player's phone, results.
@@ -131,9 +146,7 @@ export function AnswerOption({
       </span>
       {aside !== undefined ? (
         <span
-          className={`relative flex items-center gap-3 font-mono text-muted tabular-nums ${
-            size === "screen" ? "text-[clamp(1rem,2.4vh,2rem)]" : "text-sm"
-          }`}
+          className={`relative flex items-center gap-3 font-mono text-muted tabular-nums ${ASIDE_SIZE[size]}`}
         >
           {aside}
         </span>

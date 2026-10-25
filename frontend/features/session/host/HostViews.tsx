@@ -71,7 +71,11 @@ function Dock({
         >
           {status}
         </p>
-        <div className="flex items-center gap-2">{children}</div>
+        {/* On a phone the main control takes a row of its own under the
+            others, so nothing is pushed off the edge. */}
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -218,6 +222,7 @@ export function HostLobby({ session }: { session: HostSession }) {
                 )}
               </span>
             </p>
+            <PlayerList session={session} className="mt-4" />
           </section>
           <ScoringRules
             rules={session.scoring}
@@ -279,7 +284,14 @@ export function HostStage({ session }: { session: HostSession }) {
   const [scoring, setScoring] = useState<ScoringTarget | null>(null);
   const [scoringOpen, setScoringOpen] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
-  useClicker(session.advance, !confirmEnd && !scoringOpen);
+  const toggleStandings = () => {
+    if (session.canShowStandings) {
+      void session.setScene(
+        session.scene === "STANDINGS" ? "QUESTION" : "STANDINGS",
+      );
+    }
+  };
+  useClicker(session.advance, !confirmEnd && !scoringOpen, toggleStandings);
 
   const first = questions[0];
   const last = questions.at(-1);
@@ -358,7 +370,11 @@ export function HostStage({ session }: { session: HostSession }) {
                     ? `Questions ${first.number}–${last.number}`
                     : `Question ${first?.number ?? "–"}`}
                 </span>{" "}
-                of {totalQuestions} · {displayModeLabel(displayMode)} display
+                of {totalQuestions}
+                <span className="max-sm:block">
+                  <span className="max-sm:hidden"> · </span>
+                  {displayModeLabel(displayMode)} display
+                </span>
               </p>
               <CountdownClock
                 countdown={countdown}
@@ -450,6 +466,21 @@ export function HostStage({ session }: { session: HostSession }) {
             </div>
             <Leaderboard entries={leaderboard} limit={10} />
           </section>
+          <details className="group border border-border bg-surface">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground">
+              <span>
+                Players{" "}
+                <span className="font-mono text-sm font-medium text-subtle">
+                  {participantCount}
+                </span>
+              </span>
+              <Icon
+                name="chevron-down"
+                className="text-subtle transition-transform duration-(--duration-base) group-open:rotate-180"
+              />
+            </summary>
+            <PlayerList session={session} className="px-5 pb-5" />
+          </details>
         </aside>
       </main>
 
@@ -469,13 +500,24 @@ export function HostStage({ session }: { session: HostSession }) {
         >
           End session
         </Button>
+        {session.canShowStandings && (
+          <Button
+            icon="standings"
+            onClick={toggleStandings}
+            aria-pressed={session.scene === "STANDINGS"}
+            title="Shortcut: S"
+            className="shrink-0 max-sm:ml-auto"
+          >
+            {session.scene === "STANDINGS" ? "Hide standings" : "Standings"}
+          </Button>
+        )}
         {lifecycle === "TIMED" ? (
           <Button
             size="lg"
             icon="stop"
             onClick={controls.endTimer}
             pending={pending === "end-timer"}
-            className="max-sm:flex-1"
+            className="max-sm:basis-full"
           >
             {pending === "end-timer" ? "Stopping…" : "End timer now"}
           </Button>
@@ -490,12 +532,17 @@ export function HostStage({ session }: { session: HostSession }) {
             onClick={nextStep.run}
             pending={pending === nextStep.control}
             title="Shortcut: → or Page Down"
-            className="max-sm:flex-1"
+            className="max-sm:basis-full"
           >
             {nextStep.label}
           </Button>
         ) : (
-          <Button variant="primary" size="lg" pending className="max-sm:flex-1">
+          <Button
+            variant="primary"
+            size="lg"
+            pending
+            className="max-sm:basis-full"
+          >
             Grading…
           </Button>
         )}
@@ -600,6 +647,70 @@ function ControllerQuestion({
         })}
       </ul>
     </div>
+  );
+}
+
+/* ── Players ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Everyone in the room, newest first, each with a way out: a name that
+ * should not be on the big screen can be removed before anyone reads it.
+ */
+function PlayerList({
+  session,
+  className = "",
+}: {
+  session: HostSession;
+  className?: string;
+}) {
+  const [target, setTarget] = useState<{ id: number; name: string } | null>(
+    null,
+  );
+  const [open, setOpen] = useState(false);
+  const players = session.players.toReversed();
+
+  if (players.length === 0) return null;
+
+  return (
+    <>
+      <ul
+        className={`flex max-h-80 flex-col overflow-y-auto border-t border-border ${className}`}
+      >
+        {players.map((player) => (
+          <li
+            key={player.participantId}
+            className="flex items-center justify-between gap-3 border-b border-border py-1.5 last:border-b-0"
+          >
+            <span className="min-w-0 truncate text-sm text-foreground">
+              {player.displayName}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="close"
+              aria-label={`Remove ${player.displayName}`}
+              title="Remove from the session"
+              className="ghost-flush-end shrink-0 hover:text-danger"
+              onClick={() => {
+                setTarget({
+                  id: player.participantId,
+                  name: player.displayName,
+                });
+                setOpen(true);
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Remove ${target?.name ?? "this player"}?`}
+        description="They leave the session, their answers and points go with them, and their phone tells them so. They can join again with the code."
+        confirmLabel="Remove"
+        onConfirm={() => (target ? session.removePlayer(target.id) : undefined)}
+      />
+    </>
   );
 }
 

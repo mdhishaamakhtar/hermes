@@ -22,6 +22,15 @@ import type {
 
 export type QuestionLifecycle = "DISPLAYED" | "TIMED" | "FROZEN" | "REVIEWING";
 
+/** What the big screen shows while the quiz runs. */
+export type StageScene = "QUESTION" | "STANDINGS";
+
+/** A player in the room, as the host's screens list them. */
+export interface PlayerInfo {
+  participantId: number;
+  displayName: string;
+}
+
 export interface OptionInfo {
   id: number;
   text: string;
@@ -89,6 +98,7 @@ export interface HostSessionSync {
   leaderboard: LeaderboardEntry[];
   timeLeftSeconds: number | null;
   scoring: ScoringRules;
+  scene: StageScene;
 }
 
 export interface LobbySnapshot {
@@ -96,6 +106,8 @@ export interface LobbySnapshot {
   participantCount: number;
   joinCode: string;
   quizTitle: string;
+  /** Everyone in the room, in the order they arrived. */
+  players: PlayerInfo[];
 }
 
 /* ── REST: player ─────────────────────────────────────────────────────────── */
@@ -145,6 +157,7 @@ export interface RejoinResponse {
   /** This player's graded score on each reviewed question on screen. */
   myScores: Record<string, number>;
   scoring: ScoringRules;
+  scene: StageScene;
 }
 
 export interface JoinResponse {
@@ -286,6 +299,20 @@ export interface ParticipantLeaderboardMsg {
 export interface ParticipantJoinedMsg {
   event: "PARTICIPANT_JOINED";
   count: number;
+  participantId: number;
+  displayName: string;
+}
+
+/** The host removed a player; that player's screen knows it by the id. */
+export interface ParticipantLeftMsg {
+  event: "PARTICIPANT_LEFT";
+  count: number;
+  participantId: number;
+}
+
+export interface SceneChangedMsg {
+  event: "SCENE_CHANGED";
+  scene: StageScene;
 }
 
 /** In BLIND mode `counts` arrives empty; CODE_DISPLAY sends no updates. */
@@ -328,6 +355,8 @@ export type SessionMessage =
   | QuestionReviewedMsg
   | ParticipantLeaderboardMsg
   | ParticipantJoinedMsg
+  | ParticipantLeftMsg
+  | SceneChangedMsg
   | AnswerUpdateMsg
   | AnswerRevealMsg
   | LeaderboardUpdateMsg

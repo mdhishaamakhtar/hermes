@@ -27,7 +27,7 @@ export function Page({ children }: { children: ReactNode }) {
  * text-3xl, then of text-4xl from sm up.
  */
 const BLOCK = "mb-8 sm:mb-10";
-const TITLE_TYPE = "text-3xl sm:text-4xl leading-tight";
+const TITLE_TYPE = "text-4xl sm:text-5xl leading-[0.95]";
 
 export function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
   return (
@@ -68,7 +68,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
         <div className="min-w-0 flex-1 basis-80">
           <h1
-            className={`${TITLE_TYPE} font-bold tracking-tight break-words text-foreground`}
+            className={`display display-tight ${TITLE_TYPE} break-words text-foreground`}
           >
             {title}
           </h1>

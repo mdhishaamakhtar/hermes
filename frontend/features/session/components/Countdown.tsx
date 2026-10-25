@@ -47,7 +47,7 @@ export function CountdownClock({
       <motion.span
         key={final ? countdown.left : "steady"}
         className="inline-block"
-        initial={final ? { scale: 1.12 } : false}
+        initial={final ? { scale: 1.06 } : false}
         animate={{ scale: 1 }}
         transition={spring.tick}
       >

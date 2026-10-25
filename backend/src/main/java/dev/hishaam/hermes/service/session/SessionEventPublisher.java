@@ -6,6 +6,7 @@ import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.dto.session.SessionResultsResponse.LeaderboardEntry;
 import dev.hishaam.hermes.dto.ws.WsPayloads;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.LeaderboardService;
@@ -53,8 +54,21 @@ public class SessionEventPublisher {
     this.leaderboardService = leaderboardService;
   }
 
-  public void publishParticipantJoined(Long sessionId, long participantCount) {
-    send(WsTopics.sessionQuestion(sessionId), new WsPayloads.ParticipantJoined(participantCount));
+  public void publishParticipantJoined(
+      Long sessionId, long participantCount, Long participantId, String displayName) {
+    send(
+        WsTopics.sessionQuestion(sessionId),
+        new WsPayloads.ParticipantJoined(participantCount, participantId, displayName));
+  }
+
+  public void publishParticipantLeft(Long sessionId, long participantCount, Long participantId) {
+    send(
+        WsTopics.sessionQuestion(sessionId),
+        new WsPayloads.ParticipantLeft(participantCount, participantId));
+  }
+
+  public void publishScene(Long sessionId, StageScene scene) {
+    send(WsTopics.sessionQuestion(sessionId), new WsPayloads.SceneChanged(scene));
   }
 
   public void publishQuestionDisplayed(

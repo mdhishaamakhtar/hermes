@@ -10,6 +10,8 @@ import {
   ScreenEnded,
   ScreenLobby,
   ScreenStage,
+  ScreenStandings,
+  useStageSounds,
 } from "@/features/session/screen/ScreenViews";
 import { useWakeLock } from "@/lib/wake-lock";
 
@@ -17,7 +19,14 @@ export default function ScreenPage() {
   const { id } = useParams<{ id: string }>();
   const session = useHostSession(id);
   useWakeLock(session.status !== "ENDED");
-  useClicker(session.advance);
+  useClicker(session.advance, true, () => {
+    if (session.canShowStandings) {
+      void session.setScene(
+        session.scene === "STANDINGS" ? "QUESTION" : "STANDINGS",
+      );
+    }
+  });
+  useStageSounds(session);
 
   if (session.loadError) {
     return (
@@ -37,5 +46,8 @@ export default function ScreenPage() {
   if (!session.hydrated) return <SessionLoading />;
   if (session.status === "LOBBY") return <ScreenLobby session={session} />;
   if (session.status === "ENDED") return <ScreenEnded session={session} />;
+  if (session.scene === "STANDINGS") {
+    return <ScreenStandings session={session} />;
+  }
   return <ScreenStage session={session} />;
 }

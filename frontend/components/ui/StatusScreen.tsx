@@ -40,7 +40,7 @@ export function StatusScreen({
           {code}
         </p>
       )}
-      <h1 className="mt-8 text-3xl leading-tight font-bold tracking-tight text-foreground sm:text-4xl">
+      <h1 className="display display-tight mt-8 text-4xl leading-[0.95] text-balance text-foreground sm:text-5xl">
         {title}
       </h1>
       {description && (

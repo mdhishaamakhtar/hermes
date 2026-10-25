@@ -1,6 +1,7 @@
 package dev.hishaam.hermes.dto.session;
 
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +26,8 @@ public record RejoinResponse(
     List<SessionResultsResponse.LeaderboardEntry> leaderboard,
     Integer timeLeftSeconds,
     Map<Long, Integer> myScores,
-    ScoringRules scoring) {
+    ScoringRules scoring,
+    StageScene scene) {
 
   public record CurrentQuestion(
       Long id,

@@ -70,6 +70,13 @@ public class SessionScoringRedisRepository {
     redis.expire(lockedInKey, SessionRedisKeys.SESSION_TTL);
   }
 
+  public void unmarkLockedIn(Long sessionId, Long questionId, Long participantId) {
+    redis
+        .opsForSet()
+        .remove(
+            SessionRedisKeys.questionLockedInKey(sessionId, questionId), participantId.toString());
+  }
+
   /** The live tallies for one question, alongside the session's participant count. */
   public AnswerStats answerStats(Long sessionId, Long questionId, long totalParticipants) {
     Map<Long, Long> counts = new LinkedHashMap<>();

@@ -2,6 +2,7 @@ package dev.hishaam.hermes.dto.ws;
 
 import dev.hishaam.hermes.dto.session.OptionInfo;
 import dev.hishaam.hermes.dto.session.SessionResultsResponse;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +27,8 @@ public final class WsPayloads {
     PARTICIPANT_LEADERBOARD,
     SESSION_END,
     PARTICIPANT_JOINED,
+    PARTICIPANT_LEFT,
+    SCENE_CHANGED,
     ANSWER_UPDATE,
     ANSWER_REVEAL,
     LEADERBOARD_UPDATE,
@@ -182,9 +185,25 @@ public final class WsPayloads {
 
   // ─── Analytics events ─────────────────────────────────────────────────────────
 
-  public record ParticipantJoined(EventType event, long count) {
-    public ParticipantJoined(long count) {
-      this(EventType.PARTICIPANT_JOINED, count);
+  /** Someone joined: the new count, and who, so the lobby can show the name arriving. */
+  public record ParticipantJoined(
+      EventType event, long count, Long participantId, String displayName) {
+    public ParticipantJoined(long count, Long participantId, String displayName) {
+      this(EventType.PARTICIPANT_JOINED, count, participantId, displayName);
+    }
+  }
+
+  /** The host removed a player. That player's screen uses the id to know it was them. */
+  public record ParticipantLeft(EventType event, long count, Long participantId) {
+    public ParticipantLeft(long count, Long participantId) {
+      this(EventType.PARTICIPANT_LEFT, count, participantId);
+    }
+  }
+
+  /** The host cut the big screen to another scene. */
+  public record SceneChanged(EventType event, StageScene scene) {
+    public SceneChanged(StageScene scene) {
+      this(EventType.SCENE_CHANGED, scene);
     }
   }
 

@@ -83,7 +83,7 @@ class SessionEventPublisherTest {
   void nothingIsSentBeforeTheBrokerReportsItselfOnline() {
     brokerOffline();
 
-    publisher.publishParticipantJoined(SESSION_ID, 3);
+    publisher.publishParticipantJoined(SESSION_ID, 3, 9L, "Ada");
     publisher.publishSessionEnd(SESSION_ID);
     publisher.publishAnswerAccepted("ws:1", "req-1", QUESTION_ID, false);
 
@@ -93,11 +93,11 @@ class SessionEventPublisherTest {
   /** Once the broker drops out mid-session, broadcasts are dropped instead of thrown. */
   @Test
   void broadcastsAreDroppedQuietlyAfterTheBrokerGoesOffline() {
-    publisher.publishParticipantJoined(SESSION_ID, 1);
+    publisher.publishParticipantJoined(SESSION_ID, 1, 9L, "Ada");
     verify(messaging, never()).convertAndSendToUser(anyString(), anyString(), any());
 
     brokerOffline();
-    publisher.publishParticipantJoined(SESSION_ID, 2);
+    publisher.publishParticipantJoined(SESSION_ID, 2, 9L, "Ada");
     publisher.publishAnswerRejected("ws:1", "req-1", QUESTION_ID, "CONFLICT", "nope", false);
 
     // Only the first, pre-offline broadcast reached the template.
@@ -114,7 +114,7 @@ class SessionEventPublisherTest {
         .when(messaging)
         .convertAndSendToUser(anyString(), anyString(), any());
 
-    publisher.publishParticipantJoined(SESSION_ID, 1);
+    publisher.publishParticipantJoined(SESSION_ID, 1, 9L, "Ada");
     publisher.publishAnswerAccepted("ws:1", "req-1", QUESTION_ID, false);
   }
 

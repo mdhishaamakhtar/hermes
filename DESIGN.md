@@ -322,16 +322,16 @@ Upright, uppercase, and quick under the finger.
 The top bar is the only navigation: the mark on the left, the context's controls on the right, translucent chrome. On live screens the mark does not link home, so one stray tap cannot pull anyone out of a session.
 
 ### Tally (signature)
-The lamp over a live camera, and the session's whole state in one word. **Standby** (amber text over a 10% amber tint, lobby), **On air** (filled tally red, ink text, while questions run), **Off air** (subtle text, control outline, hollow lamp, once ended). Steady, never blinking: on air is a state, not an alarm. Colour changes over 240ms.
+The lamp over a live camera, and the session's whole state in one word. **Standby** (amber text over a 10% amber tint, lobby), **On air** (filled tally red, ink text, while questions run), **Off air** (subtle text, control outline, hollow lamp, once ended). Steady, never blinking: on air is a state, not an alarm. Colour changes over 380ms.
 
 ### Waiting Light
 A square 8px light that pulses (opacity and scale, 1.6s) for waiting signals only: a lobby waiting for its first player, a screen waiting on the session. Waiting is a process; a state (tally, badge dot) is shown steady, never flashed.
 
 ### Slate (signature)
-A key-blue blind over the question area only, announcing the next segment ("Q04" or "Q04–06" in 72%-width display type in legal white, then "of 12 / One answer" in mono in key mist). It appears only when a question arrives with its timer not yet running, so it never costs answering time. It rolls down over 320ms (sheet) on expo-out, holds 1.15s, and lifts over 520ms (lift) ease-in-out: the one exit slower than its entrance, because it uncovers what the room is about to read. It lifts immediately when the timer starts. Header, clock and dock stay visible throughout, and it never takes a click. Reduced motion: it fades.
+A key-blue blind over the question area only, announcing the next segment ("Q04" or "Q04–06" in 72%-width display type in legal white, then "of 12 / One answer" in mono in key mist). It appears only when a question arrives with its timer not yet running, so it never costs answering time. It drops in over 750ms on the arrive curve (a gentle start, then a long settle), holds 1.3s, and lifts over the same 750ms ease-in-out, so neither leg feels faster than the other. It lifts immediately when the timer starts. Header, clock and dock stay visible throughout, and it never takes a click. Reduced motion: it fades.
 
 ### Rundown (signature)
-The host's running order, one 32px mono cell per question in a 2.25rem auto-fill grid with a "04 / 12" readout. Done cells are filled hairline with subtle text; the on-stage cell is outlined tally red, and filled tally with ink text while its clock runs; upcoming cells wait in outline. Cells change colour over 240ms. Hidden for single-question quizzes.
+The host's running order, one 32px mono cell per question in a 2.25rem auto-fill grid with a "04 / 12" readout. Done cells are filled hairline with subtle text; the on-stage cell is outlined tally red, and filled tally with ink text while its clock runs; upcoming cells wait in outline. Cells change colour over 380ms. Hidden for single-question quizzes.
 
 ### Station Clock (signature)
 Local time to the second (HH:MM:SS, 24-hour) in muted mono with tabular figures, ticked just after each second turns; on the host's top bar from md up and in the landing demo.
@@ -346,13 +346,13 @@ One tile for every context: editor, host stage, player, results. A three-column 
 - **Touch:** a pressed tile gives to 97% scale; hover outlines only on fine pointers.
 
 ### Countdown
-Mono digits, foreground while running, standby amber at ten seconds or fewer, tally red at five or fewer, where each tick punches in from 112% scale on the tick spring: the one place the stage raises its voice. A 4px drain bar beneath runs on the compositor in key light, amber, then tally red; colour changes over 240ms; under reduced motion it steps each second.
+Mono digits, foreground while running, standby amber at ten seconds or fewer, tally red at five or fewer, where each tick presses in from 106% scale on the tick spring: the one place the stage raises its voice. A 4px drain bar beneath runs on the compositor in key light, amber, then tally red; colour changes over 380ms; under reduced motion it steps each second.
 
 ### Leaderboard
 Rows keyed by player slide to their new rank on the slot spring; scores roll to new totals; a player who climbed carries a go-green arrow-up mark with the places gained. The viewer's row is outlined key blue; rank one is key light. Final standings reveal third, second, then the winner (larger, key-light tint), with the rest following.
 
 ### Motion and Haptics
-Durations: instant 100ms (press, hover), base 160ms (state change, most exits), enter 240ms (surfaces arriving, a lamp changing), sheet 320ms (surfaces that travel a long way: the drawer, the slate coming down), stage 480ms (a question cutting in, a podium place landing), and lift 520ms for the slate's exit alone. Curves: expo-out for arrivals, symmetric in-out for moves between two on-screen states, the iOS sheet curve for the drawer. Exits run a step faster than their entrance. A new question arrives as a top-down clip wipe (stage cut). Revealing lists stagger 35ms per row, capped at 280ms; navigational lists never stagger. Reduced motion removes travel but keeps colour and opacity, because those carry picked, correct and wrong. On phones that support it, three moments buzz: picking (6ms), locking in (14ms), and a verdict (a double pulse for points, one dull 32ms thud for none); nothing else does.
+Hermes moves slowly and settles softly; only direct feedback (a press, a hover, a typed character) stays quick. Durations: instant 120ms (press, hover), base 220ms (state change, most exits), enter 380ms (surfaces arriving, a lamp changing), sheet 460ms (surfaces that travel a long way: the drawer, the slate coming down), stage 700ms (a question cutting in, a podium place landing), and lift 750ms for the slate's exit alone. Springs are critically damped or close to it: nothing wobbles. Curves: quart-out for arrivals (it leaves promptly and spends most of its time settling), symmetric in-out for moves between two on-screen states, the iOS sheet curve for the drawer. Exits run a step faster than their entrance. A new question arrives as a top-down clip wipe (stage cut). Revealing lists stagger 60ms per row, capped at 420ms; navigational lists never stagger. Reduced motion removes travel but keeps colour and opacity, because those carry picked, correct and wrong. On phones that support it, three moments buzz: picking (6ms), locking in (14ms), and a verdict (a double pulse for points, one dull 32ms thud for none); nothing else does.
 
 ## Do's and Don'ts
 
@@ -364,7 +364,7 @@ Durations: instant 100ms (press, hover), base 160ms (state change, most exits), 
 - **Do** keep the colour bars in bar order (yellow, cyan, violet, magenta) with their lightness staircase (0.86, 0.80, 0.73, 0.64), and always show the A to D letter beside the colour.
 - **Do** set every live digit in Azeret Mono with tabular-nums.
 - **Do** keep inputs at 16px text and controls at 44px minimum height.
-- **Do** draw durations from the tokens (100 / 160 / 240 / 320 / 480ms, plus the 520ms slate lift) and the springs in the motion vocabulary, mirroring changes between the stylesheet and the motion module.
+- **Do** draw durations from the tokens (120 / 220 / 380 / 460 / 700ms, plus the 750ms slate lift) and the springs in the motion vocabulary, mirroring changes between the stylesheet and the motion module.
 - **Do** keep hover styles behind (hover: hover) and (pointer: fine), so a phone tap never leaves a tile looking picked.
 
 ### Don't:

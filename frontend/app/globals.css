@@ -136,12 +136,12 @@
   --shadow-float:
     0 24px 48px -12px rgb(0 0 0 / 0.6), 0 8px 16px -8px rgb(0 0 0 / 0.5);
 
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
-  --animate-rise: rise var(--duration-enter) var(--ease-out-expo) both;
-  --animate-fade: fade var(--duration-enter) var(--ease-out-expo) both;
+  --animate-rise: rise var(--duration-enter) var(--ease-out) both;
+  --animate-fade: fade var(--duration-enter) var(--ease-out) both;
 }
 
 /* Font variables are set on <html> by next/font, so resolve them in place. */
@@ -153,26 +153,32 @@
 
 /* ── 3. Motion ────────────────────────────────────────────────────────────── */
 /*
- * Curves: --ease-out-expo for anything arriving or responding; --ease-in-out
- * for something moving between two on-screen states (the slate lifting);
- * --ease-drawer (the iOS sheet curve) for surfaces that travel from an edge.
+ * Hermes moves slowly and settles softly: a broadcast eases things on, it
+ * never snaps them. Only direct feedback (a press, a hover, a typed
+ * character) stays quick, because the hand is waiting on it.
  *
- *   instant  100ms  press and hover feedback
- *   base     160ms  routine state changes
- *   enter    240ms  surfaces arriving: dialogs, panels; a lamp changing
- *   sheet    320ms  surfaces that travel a long way: the drawer, the slate
- *   stage    480ms  authored live moments: a question cutting in, a reveal
+ * Curves: --ease-out (quart-out) for anything arriving or responding: it
+ * leaves promptly but spends most of its time settling, so a slow entrance
+ * never reads as a jump followed by a crawl. --ease-in-out for something
+ * moving between two on-screen states (the slate lifting); --ease-drawer
+ * (the iOS sheet curve) for surfaces that travel from an edge.
+ *
+ *   instant  120ms  press and hover feedback
+ *   base     220ms  routine state changes
+ *   enter    380ms  surfaces arriving: dialogs, panels; a lamp changing
+ *   sheet    460ms  surfaces that travel a long way: the drawer, the slate
+ *   stage    700ms  authored live moments: a question cutting in, a reveal
  *
  * Exits run a step faster than their entrance: leaving is quicker than
  * arriving. The one exception is the slate, which uncovers the question
  * rather than snatching it away (see Slate.tsx).
  */
 :root {
-  --duration-instant: 100ms;
-  --duration-base: 160ms;
-  --duration-enter: 240ms;
-  --duration-sheet: 320ms;
-  --duration-stage: 480ms;
+  --duration-instant: 120ms;
+  --duration-base: 220ms;
+  --duration-enter: 380ms;
+  --duration-sheet: 460ms;
+  --duration-stage: 700ms;
 }
 
 /* ── 4. Layers ────────────────────────────────────────────────────────────── */
@@ -494,7 +500,7 @@
       background-color var(--duration-instant) ease,
       border-color var(--duration-instant) ease,
       color var(--duration-instant) ease,
-      transform var(--duration-instant) var(--ease-out-expo);
+      transform var(--duration-instant) var(--ease-out);
 
     /* Seats on press, the instant the finger lands. */
     &:active:not(:disabled, [aria-busy="true"]) {
@@ -530,7 +536,7 @@
   }
 
   .btn-trail {
-    transition: translate var(--duration-base) var(--ease-out-expo);
+    transition: translate var(--duration-base) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -653,7 +659,7 @@
       background-color var(--duration-base) ease,
       border-color var(--duration-base) ease,
       opacity var(--duration-base) ease,
-      scale var(--duration-instant) var(--ease-out-expo);
+      scale var(--duration-instant) var(--ease-out);
 
     &[data-state="selected"] {
       border-color: var(--tone);
@@ -775,7 +781,7 @@
       opacity: 1;
       translate: 0 0;
       transition-duration: var(--duration-enter);
-      transition-timing-function: var(--ease-out-expo);
+      transition-timing-function: var(--ease-out);
     }
 
     &::backdrop {

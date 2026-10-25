@@ -30,6 +30,8 @@ public interface ParticipantRepository extends JpaRepository<Participant, Long> 
 
   List<Participant> findBySessionId(Long sessionId);
 
+  List<Participant> findBySessionIdOrderByIdAsc(Long sessionId);
+
   @Query(
       "SELECT p.session.id, COUNT(p) FROM Participant p WHERE p.session.id IN :sessionIds GROUP BY p.session.id")
   List<Object[]> countBySessionIds(@Param("sessionIds") List<Long> sessionIds);

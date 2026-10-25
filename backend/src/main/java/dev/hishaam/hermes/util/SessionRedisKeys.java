@@ -62,6 +62,10 @@ public final class SessionRedisKeys {
     return sessionKey(sessionId, "timer_started_at");
   }
 
+  public static String sceneKey(Long sessionId) {
+    return sessionKey(sessionId, "scene");
+  }
+
   public static String transitionLockKey(Long sessionId) {
     return sessionKey(sessionId, "transition_lock");
   }

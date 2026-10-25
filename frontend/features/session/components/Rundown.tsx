@@ -27,8 +27,8 @@ export function Rundown({
       aria-label="Rundown"
       className="border border-border bg-surface p-5"
     >
-      <div className="mb-3 flex items-baseline justify-between gap-4">
-        <h2 className="label">Rundown</h2>
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-base font-semibold text-foreground">Rundown</h2>
         <p className="font-mono text-sm text-muted tabular-nums">
           <span className="text-foreground">
             {String(first).padStart(2, "0")}

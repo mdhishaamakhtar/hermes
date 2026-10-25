@@ -30,11 +30,13 @@ import type {
   LobbySnapshot,
   OptionInfo,
   PassageDisplayedMsg,
+  PlayerInfo,
   QuestionDisplayedMsg,
   QuestionLifecycle,
   QuestionStats,
   ScoringRules,
   SessionResults,
+  StageScene,
 } from "../session-types";
 
 /** A question on stage, numbered by its position in the quiz. */
@@ -69,6 +71,9 @@ export interface HostState {
   leaderboard: LeaderboardEntry[];
   results: SessionResults | null;
   scoring: ScoringRules;
+  /** Everyone in the room, in the order they arrived. */
+  players: PlayerInfo[];
+  scene: StageScene;
 }
 
 export type HostAction =
@@ -92,6 +97,9 @@ export type HostAction =
   | { type: "ANSWERS"; message: AnswerUpdateMsg | AnswerRevealMsg }
   | { type: "LEADERBOARD"; leaderboard: LeaderboardEntry[] }
   | { type: "PARTICIPANTS"; count: number }
+  | { type: "JOINED"; count: number; player: PlayerInfo }
+  | { type: "LEFT"; count: number; participantId: number }
+  | { type: "SCENE"; scene: StageScene }
   | { type: "ENDED"; leaderboard?: LeaderboardEntry[] };
 
 export function initialHostState(joinCode: string): HostState {
@@ -111,6 +119,8 @@ export function initialHostState(joinCode: string): HostState {
     leaderboard: [],
     results: null,
     scoring: { penalties: false, speedScoring: false },
+    players: [],
+    scene: "QUESTION",
   };
 }
 
@@ -184,6 +194,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
           ? sync.leaderboard
           : state.leaderboard,
         scoring: sync.scoring ?? state.scoring,
+        scene: sync.scene ?? "QUESTION",
       };
     }
 
@@ -195,6 +206,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         participantCount: action.lobby.participantCount,
         joinCode: action.lobby.joinCode || state.joinCode,
         title: action.lobby.quizTitle ?? state.title,
+        players: action.lobby.players ?? state.players,
       };
 
     case "STATUS":
@@ -228,6 +240,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         displayMode: message.effectiveDisplayMode,
         countdown: { ...IDLE_COUNTDOWN, run: state.countdown.run },
         stats: withEmptyStats(state.stats, [question], true),
+        scene: "QUESTION",
       };
     }
 
@@ -254,6 +267,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         displayMode: message.effectiveDisplayMode,
         countdown: { ...IDLE_COUNTDOWN, run: state.countdown.run },
         stats: withEmptyStats(state.stats, questions, false),
+        scene: "QUESTION",
       };
     }
 
@@ -315,6 +329,32 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
 
     case "PARTICIPANTS":
       return { ...state, participantCount: action.count };
+
+    case "JOINED":
+      return {
+        ...state,
+        participantCount: action.count,
+        players: state.players.some(
+          (player) => player.participantId === action.player.participantId,
+        )
+          ? state.players
+          : [...state.players, action.player],
+      };
+
+    case "LEFT":
+      return {
+        ...state,
+        participantCount: action.count,
+        players: state.players.filter(
+          (player) => player.participantId !== action.participantId,
+        ),
+        leaderboard: state.leaderboard.filter(
+          (entry) => entry.participantId !== action.participantId,
+        ),
+      };
+
+    case "SCENE":
+      return { ...state, scene: action.scene };
 
     case "ENDED":
       return {

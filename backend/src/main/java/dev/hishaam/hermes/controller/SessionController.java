@@ -88,6 +88,24 @@ public class SessionController {
     return ResponseEntity.ok(ApiResponse.ok(null));
   }
 
+  @PutMapping("/{id}/scene")
+  public ResponseEntity<ApiResponse<Void>> setScene(
+      @PathVariable Long id,
+      @Valid @RequestBody SceneRequest request,
+      @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.setScene(id, request.scene(), user.getId());
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
+
+  @DeleteMapping("/{id}/participants/{participantId}")
+  public ResponseEntity<ApiResponse<Void>> removeParticipant(
+      @PathVariable Long id,
+      @PathVariable Long participantId,
+      @AuthenticationPrincipal AuthenticatedUser user) {
+    sessionService.removeParticipant(id, participantId, user.getId());
+    return ResponseEntity.ok(ApiResponse.ok(null));
+  }
+
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> abandonSession(
       @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {

@@ -60,6 +60,10 @@ public interface ParticipantAnswerRepository extends JpaRepository<ParticipantAn
   @Query("DELETE FROM ParticipantAnswer a WHERE a.sessionId IN :sessionIds")
   void deleteBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
 
+  @Modifying
+  @Query("DELETE FROM ParticipantAnswer a WHERE a.participantId = :participantId")
+  void deleteByParticipantId(@Param("participantId") Long participantId);
+
   /**
    * Counts submitted answers the grading engine has never scored. Used when ending a session whose
    * Redis lifecycle state is gone, to decide whether the in-progress question still needs grading.

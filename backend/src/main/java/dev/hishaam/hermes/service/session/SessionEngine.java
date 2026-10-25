@@ -91,6 +91,8 @@ public class SessionEngine {
     if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) return;
 
     QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
+    // A new question always goes up on the big screen, whatever it was showing.
+    stateStore.clearScene(sessionId);
     QuizSnapshot.QuestionSnapshot next =
         snapshot.findNextQuestion(stateStore.getCurrentQuestionId(sessionId));
     if (next == null) {

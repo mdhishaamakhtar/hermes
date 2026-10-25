@@ -7,6 +7,7 @@ import type {
   MyResults,
   RejoinResponse,
   SessionResults,
+  StageScene,
 } from "./session-types";
 
 type Id = number | string;
@@ -28,6 +29,10 @@ export const sessionsApi = {
   next: (id: Id) => api.post<void>(`/api/sessions/${id}/next`),
   end: (id: Id) => api.post<void>(`/api/sessions/${id}/end`),
   abandon: (id: Id) => api.delete(`/api/sessions/${id}`),
+  removePlayer: (id: Id, participantId: number) =>
+    api.delete(`/api/sessions/${id}/participants/${participantId}`),
+  setScene: (id: Id, scene: StageScene) =>
+    api.put<void>(`/api/sessions/${id}/scene`, { scene }),
   hostSync: (id: Id) =>
     api.get<HostSessionSync>(`/api/sessions/${id}/host-sync`),
   lobby: (id: Id) => api.get<LobbySnapshot>(`/api/sessions/${id}/lobby`),

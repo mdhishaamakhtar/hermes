@@ -27,6 +27,7 @@ import type {
   RejoinQuestion,
   RejoinResponse,
   ScoringRules,
+  StageScene,
 } from "../session-types";
 import type { StagePassage } from "../host/host-state";
 
@@ -50,6 +51,8 @@ export interface PlayState {
   hydrated: boolean;
   /** The server does not know this player in this session any more. */
   missing: boolean;
+  /** The host took this player out of the session. */
+  removed: boolean;
   status: SessionStatus;
   lifecycle: QuestionLifecycle;
   title: string;
@@ -62,6 +65,8 @@ export interface PlayState {
   countdown: Countdown;
   leaderboard: LeaderboardEntry[];
   scoring: ScoringRules;
+  /** What the big screen is showing. */
+  scene: StageScene;
   sync: { status: SyncStatus; message: string };
 }
 
@@ -97,6 +102,8 @@ export type PlayAction =
       totalParticipants: number;
     }
   | { type: "PARTICIPANTS"; count: number }
+  | { type: "LEFT"; count: number; participantId: number }
+  | { type: "SCENE"; scene: StageScene }
   | { type: "ENDED" }
   | { type: "SYNC"; status: SyncStatus; message?: string }
   | { type: "SELECT"; questionId: number; selected: number[] }
@@ -105,6 +112,7 @@ export type PlayAction =
 export const initialPlayState: PlayState = {
   hydrated: false,
   missing: false,
+  removed: false,
   status: "LOBBY",
   lifecycle: "DISPLAYED",
   title: "",
@@ -117,6 +125,7 @@ export const initialPlayState: PlayState = {
   countdown: IDLE_COUNTDOWN,
   leaderboard: [],
   scoring: { penalties: false, speedScoring: false },
+  scene: "QUESTION",
   sync: { status: "idle", message: "" },
 };
 
@@ -249,6 +258,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
             : { ...IDLE_COUNTDOWN, run: state.countdown.run },
         leaderboard: response.leaderboard,
         scoring: response.scoring ?? state.scoring,
+        scene: response.scene ?? "QUESTION",
       };
     }
 
@@ -276,6 +286,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
         totalQuestions: message.totalQuestions,
         displayMode: message.effectiveDisplayMode,
         countdown: { ...IDLE_COUNTDOWN, run: state.countdown.run },
+        scene: "QUESTION",
         sync: { status: "idle", message: "" },
       };
     }
@@ -303,6 +314,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
         totalQuestions: message.totalQuestions,
         displayMode: message.effectiveDisplayMode,
         countdown: { ...IDLE_COUNTDOWN, run: state.countdown.run },
+        scene: "QUESTION",
         sync: { status: "idle", message: "" },
       };
     }
@@ -388,6 +400,14 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
 
     case "PARTICIPANTS":
       return { ...state, participantCount: action.count };
+
+    case "LEFT":
+      return action.participantId === state.participantId
+        ? { ...state, removed: true }
+        : { ...state, participantCount: action.count };
+
+    case "SCENE":
+      return { ...state, scene: action.scene };
 
     case "ENDED":
       return { ...state, status: "ENDED" };

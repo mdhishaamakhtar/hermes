@@ -1,5 +1,14 @@
 package dev.hishaam.hermes.dto.session;
 
-/** The lobby as the organiser's screens show it, with the quiz title for the big screen. */
+import java.util.List;
+
+/**
+ * The room as the organiser's screens show it: the quiz title for the big screen, and everyone who
+ * has joined, in the order they arrived.
+ */
 public record LobbyStateResponse(
-    String status, long participantCount, String joinCode, String quizTitle) {}
+    String status,
+    long participantCount,
+    String joinCode,
+    String quizTitle,
+    List<PlayerInfo> players) {}

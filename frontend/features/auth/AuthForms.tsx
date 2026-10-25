@@ -39,7 +39,7 @@ function useSignIn(next: string | null) {
 function AuthHeading({ title, lead }: { title: string; lead: string }) {
   return (
     <div className="mb-8">
-      <h1 className="text-3xl font-bold tracking-tight text-foreground">
+      <h1 className="display display-tight text-4xl leading-[0.95] text-foreground sm:text-5xl">
         {title}
       </h1>
       <p className="mt-2 text-muted">{lead}</p>

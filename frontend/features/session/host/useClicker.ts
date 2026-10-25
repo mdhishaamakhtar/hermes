@@ -16,8 +16,14 @@ function isEditable(target: EventTarget | null) {
  * plugged into. Key repeats and keys typed into a field are ignored, and
  * `advance` decides for itself whether there is a next step right now.
  */
-export function useClicker(advance: () => void, enabled = true) {
+export function useClicker(
+  advance: () => void,
+  enabled = true,
+  /** S puts the standings up on the big screen, or takes them down. */
+  toggleStandings?: () => void,
+) {
   const onAdvance = useEffectEvent(advance);
+  const onStandings = useEffectEvent(() => toggleStandings?.());
   useEffect(() => {
     if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
@@ -26,6 +32,8 @@ export function useClicker(advance: () => void, enabled = true) {
       if (event.key === "ArrowRight" || event.key === "PageDown") {
         event.preventDefault();
         onAdvance();
+      } else if (event.key === "s" || event.key === "S") {
+        onStandings();
       }
     };
     window.addEventListener("keydown", onKey);

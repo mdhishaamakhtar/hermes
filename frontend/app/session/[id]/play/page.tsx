@@ -44,6 +44,7 @@ function PlaySessionScreen({
     window.scrollTo(0, 0);
   }, [session.status]);
 
+  if (session.removed) return <PlayUnavailable reason="removed" />;
   if (session.missing) return <PlayUnavailable reason="missing" />;
   if (session.loadError) {
     return <PlayUnavailable reason="unreachable" onRetry={session.retry} />;

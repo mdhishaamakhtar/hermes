@@ -170,6 +170,10 @@ export function usePlaySession(sessionId: string, rejoinToken: string) {
   }, []);
 
   useEffect(() => {
+    if (state.removed) forgetPlayer(sessionId);
+  }, [sessionId, state.removed]);
+
+  useEffect(() => {
     if (state.status !== "ENDED" || redirected.current) return;
     redirected.current = true;
     router.replace(`/session/${sessionId}/results`);
@@ -413,6 +417,14 @@ function toAction(message: SessionMessage): PlayAction | null {
       };
     case "PARTICIPANT_JOINED":
       return { type: "PARTICIPANTS", count: message.count };
+    case "PARTICIPANT_LEFT":
+      return {
+        type: "LEFT",
+        count: message.count,
+        participantId: message.participantId,
+      };
+    case "SCENE_CHANGED":
+      return { type: "SCENE", scene: message.scene };
     case "ANSWER_UPDATE":
     case "ANSWER_REVEAL":
       return { type: "ANSWERS", message };

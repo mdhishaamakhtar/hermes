@@ -28,6 +28,10 @@ public class ParticipantRejoinTokenRedisRepository {
             SessionRedisKeys.REJOIN_TTL);
   }
 
+  public void delete(String rejoinToken) {
+    redis.delete(SessionRedisKeys.participantTokenKey(rejoinToken));
+  }
+
   /** Returns the cached session/participant pair, or {@code null} if absent or malformed. */
   public TokenEntry find(String rejoinToken) {
     String raw = redis.opsForValue().get(SessionRedisKeys.participantTokenKey(rejoinToken));

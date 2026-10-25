@@ -1,6 +1,7 @@
 package dev.hishaam.hermes.dto.session;
 
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +16,8 @@ public record HostSessionSyncResponse(
     Map<Long, QuestionStats> questionStatsById,
     List<SessionResultsResponse.LeaderboardEntry> leaderboard,
     Integer timeLeftSeconds,
-    ScoringRules scoring) {
+    ScoringRules scoring,
+    StageScene scene) {
 
   /** A question as the host sees it — standalone, or one sub-question of the current passage. */
   public record Question(

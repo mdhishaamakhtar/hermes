@@ -5,6 +5,7 @@ import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
@@ -14,6 +15,7 @@ import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.LeaderboardService;
 import dev.hishaam.hermes.service.OwnershipService;
+import dev.hishaam.hermes.service.ParticipantService;
 import java.security.SecureRandom;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +56,8 @@ public class SessionService {
   private final SessionTimerScheduler timerScheduler;
   private final LeaderboardService leaderboardService;
   private final SessionTransitions transitions;
+  private final SessionEventPublisher eventPublisher;
+  private final ParticipantService participantService;
 
   public SessionService(
       QuizSessionRepository sessionRepository,
@@ -67,7 +71,9 @@ public class SessionService {
       SessionEngine engine,
       SessionTimerScheduler timerScheduler,
       LeaderboardService leaderboardService,
-      SessionTransitions transitions) {
+      SessionTransitions transitions,
+      SessionEventPublisher eventPublisher,
+      ParticipantService participantService) {
     this.sessionRepository = sessionRepository;
     this.quizRepository = quizRepository;
     this.participantAnswerRepository = participantAnswerRepository;
@@ -80,6 +86,8 @@ public class SessionService {
     this.timerScheduler = timerScheduler;
     this.leaderboardService = leaderboardService;
     this.transitions = transitions;
+    this.eventPublisher = eventPublisher;
+    this.participantService = participantService;
   }
 
   // ─── Create Session ────────────────────────────────────────────────────────────
@@ -217,11 +225,16 @@ public class SessionService {
     if (participantCount == 0) {
       participantCount = participantRepository.countBySessionId(sessionId);
     }
+    List<PlayerInfo> players =
+        participantRepository.findBySessionIdOrderByIdAsc(sessionId).stream()
+            .map(p -> new PlayerInfo(p.getId(), p.getDisplayName()))
+            .toList();
     return new LobbyStateResponse(
         session.getStatus().name(),
         participantCount,
         session.getJoinCode(),
-        session.getQuiz().getTitle());
+        session.getQuiz().getTitle(),
+        players);
   }
 
   /**
@@ -285,7 +298,39 @@ public class SessionService {
         questionStatsById,
         active ? leaderboardService.standings(sessionId) : List.of(),
         ctx.timeLeftSeconds(),
-        ScoringRules.of(snapshot));
+        ScoringRules.of(snapshot),
+        active ? stateStore.getScene(sessionId) : StageScene.QUESTION);
+  }
+
+  /**
+   * Cuts the big screen to a scene. Standings can only go up once the question on screen has been
+   * reviewed, so they never reveal anything early; the next question always cuts back.
+   */
+  public void setScene(Long sessionId, StageScene scene, Long userId) {
+    ownershipService.requireSessionOwner(sessionId, userId);
+    transitions.run(
+        sessionId,
+        () -> {
+          if (stateStore.getStatus(sessionId) != SessionStatus.ACTIVE) {
+            throw AppException.conflict("The big screen only changes scene during the quiz");
+          }
+          if (scene == StageScene.STANDINGS
+              && stateStore.getQuestionState(sessionId) != QuestionLifecycleState.REVIEWING) {
+            throw AppException.conflict("Standings can go up once the question is reviewed");
+          }
+          stateStore.setScene(sessionId, scene);
+          eventPublisher.publishScene(sessionId, scene);
+        });
+  }
+
+  /** Removes a player from a session that has not ended. See {@link ParticipantService}. */
+  public void removeParticipant(Long sessionId, Long participantId, Long userId) {
+    QuizSession session = ownershipService.requireSessionOwner(sessionId, userId);
+    if (session.getStatus() == SessionStatus.ENDED) {
+      throw AppException.conflict("This session has ended");
+    }
+    transitions.run(
+        sessionId, () -> participantService.removeParticipant(sessionId, participantId));
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────

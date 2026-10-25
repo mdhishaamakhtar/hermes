@@ -12,7 +12,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { StatusScreen } from "@/components/ui/StatusScreen";
 import { countNoun, ordinal } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
-import { fade, rise, stageCut } from "@/lib/motion";
+import { duration, ease, fade, rise, stageCut } from "@/lib/motion";
 import { getStoredDisplayName } from "@/lib/session-storage";
 import { AnswerOption, type OptionState } from "../components/AnswerOption";
 import { CountdownBar, CountdownClock } from "../components/Countdown";
@@ -21,7 +21,7 @@ import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
 import { ScoringRules } from "../components/ScoringRules";
 import { QuestionSlate, slateDetail } from "../components/Slate";
 import { VERDICT_LABEL, verdictOf, type Verdict } from "../session-state";
-import type { QuestionLifecycle } from "../session-types";
+import type { LeaderboardEntry, QuestionLifecycle } from "../session-types";
 import type { PlayQuestion } from "./play-state";
 import type { PlaySession } from "./usePlaySession";
 
@@ -60,7 +60,8 @@ export function PlayLobby({
           <p className="mt-4 text-xl text-muted">{session.title}</p>
         )}
 
-        <div className="mt-12 flex items-end justify-between gap-6 border-t border-border pt-6">
+        {/* The status line sits on the same baseline as "players here". */}
+        <div className="mt-12 flex [align-items:last_baseline] justify-between gap-6 border-t border-border pt-6">
           <p className="flex items-center gap-2.5 text-foreground">
             <span aria-hidden className="live-dot text-accent" />
             Waiting for the host to start
@@ -147,6 +148,9 @@ export function PlayStage({ session }: { session: PlaySession }) {
   const anyPending = Object.keys(lockPending).length > 0;
   const allLocked =
     questions.length > 0 && questions.every((question) => question.lockedIn);
+  const verdictInView = useVerdictInView(
+    reviewed ? questions.map((question) => question.id).join("-") : null,
+  );
 
   return (
     <>
@@ -274,6 +278,8 @@ export function PlayStage({ session }: { session: PlaySession }) {
           <Dock
             lifecycle={lifecycle}
             last={Boolean(last && last.number >= totalQuestions)}
+            summary={verdictInView ? null : reviewSummary(questions, me)}
+            standingsUp={session.scene === "STANDINGS"}
             allLocked={allLocked}
             lockableCount={lockable.length}
             multiple={questions.length > 1}
@@ -289,9 +295,88 @@ export function PlayStage({ session }: { session: PlaySession }) {
   );
 }
 
+/**
+ * Whether any verdict banner is in sight between the sticky bars. The dock
+ * repeats the verdict only once the banners have scrolled away, so the
+ * screen never says it twice. `watch` changes when a new set of verdicts
+ * lands; null while nothing is graded.
+ */
+function useVerdictInView(watch: string | null) {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (watch === null) return;
+    const banners = document.querySelectorAll("[data-verdict]");
+    const visible = new Set<Element>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.add(entry.target);
+          else visible.delete(entry.target);
+        }
+        setInView(visible.size > 0);
+      },
+      // Clear of the top bar and question strip above, and the dock below.
+      { rootMargin: "-104px 0px -96px 0px" },
+    );
+    banners.forEach((banner) => observer.observe(banner));
+    return () => observer.disconnect();
+  }, [watch]);
+  return watch !== null && inView;
+}
+
+/**
+ * The reveal, said in one line for the dock, where it stays in view however
+ * far the questions above have scrolled: the verdict, the points, the rank.
+ */
+function reviewSummary(
+  questions: PlayQuestion[],
+  me: LeaderboardEntry | undefined,
+): { verdict: Verdict; text: string } | null {
+  if (questions.length === 0 || !questions.every((q) => q.stats.reviewed)) {
+    return null;
+  }
+  const verdicts = questions.map((question) =>
+    verdictOf({
+      selected: question.selected,
+      correctOptionIds: question.stats.correctOptionIds,
+      earned: question.earned ?? 0,
+      multiSelect: question.questionType === "MULTI_SELECT",
+    }),
+  );
+  const earned = questions.reduce((sum, q) => sum + (q.earned ?? 0), 0);
+  const verdict: Verdict =
+    verdicts.length === 1
+      ? verdicts[0]
+      : verdicts.every((v) => v === "correct")
+        ? "correct"
+        : verdicts.every((v) => v === "none")
+          ? "none"
+          : earned > 0
+            ? "partial"
+            : "wrong";
+  const parts = [
+    VERDICT_LABEL[verdict],
+    `${earned > 0 ? "+" : ""}${earned} pts`,
+    me && me.score > 0 ? `${ordinal(me.rank)} overall` : null,
+  ].filter(Boolean);
+  return { verdict, text: parts.join(" · ") };
+}
+
+const SUMMARY_ICON: Record<
+  Verdict,
+  { name: IconName; className: string } | null
+> = {
+  correct: { name: "check", className: "text-success" },
+  partial: { name: "check", className: "text-warning" },
+  wrong: { name: "close", className: "text-danger" },
+  none: null,
+};
+
 function Dock({
   lifecycle,
   last,
+  summary,
+  standingsUp,
   allLocked,
   lockableCount,
   multiple,
@@ -301,6 +386,10 @@ function Dock({
   lifecycle: QuestionLifecycle;
   /** The final question is on screen. */
   last: boolean;
+  /** The reveal in a line, once every question on screen is graded. */
+  summary: { verdict: Verdict; text: string } | null;
+  /** The host has the standings up on the big screen. */
+  standingsUp: boolean;
   allLocked: boolean;
   lockableCount: number;
   multiple: boolean;
@@ -327,6 +416,33 @@ function Dock({
     );
   }
 
+  if (lifecycle === "REVIEWING" && summary) {
+    const icon = SUMMARY_ICON[summary.verdict];
+    return (
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={`${summary.text}-${standingsUp}`}
+          {...fade}
+          className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-center"
+        >
+          <p className="flex items-center gap-2 font-semibold text-foreground">
+            {icon && (
+              <Icon name={icon.name} size={16} className={icon.className} />
+            )}
+            {summary.text}
+          </p>
+          <p className="text-xs text-muted">
+            {standingsUp
+              ? "The standings are up on the big screen."
+              : last
+                ? "That was the last question. Final standings are next."
+                : "Next question coming up."}
+          </p>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
   const message =
     lifecycle === "DISPLAYED"
       ? "Read the question. Answers open when the host starts the timer."
@@ -334,9 +450,11 @@ function Dock({
         ? "Locked in. Hang tight until time's up."
         : lifecycle === "FROZEN"
           ? "Time's up. Grading answers…"
-          : last
-            ? "That was the last question. Final standings are next."
-            : "Next question coming up. Keep this screen open.";
+          : standingsUp
+            ? "The standings are up on the big screen."
+            : last
+              ? "That was the last question. Final standings are next."
+              : "Next question coming up. Keep this screen open.";
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -465,9 +583,10 @@ function ResultBanner({ question }: { question: PlayQuestion }) {
   return (
     <motion.div
       role="status"
-      initial={{ opacity: 0, scale: 0.96, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 420, damping: 28 }}
+      data-verdict={verdict}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: duration.stage, ease: ease.out }}
       className={`mt-5 flex items-center justify-between gap-4 border px-5 py-4 ${style.tone}`}
     >
       <p className="flex items-center gap-2.5 text-lg font-semibold text-foreground">
@@ -496,7 +615,7 @@ export function PlayEnded() {
           role="status"
           className="flex animate-fade flex-col items-center gap-4 text-center"
         >
-          <h1 className="display text-4xl text-foreground">
+          <h1 className="display display-tight text-[clamp(2.5rem,9vw,3.75rem)] leading-[0.95] text-balance text-foreground">
             That&apos;s the end of the quiz
           </h1>
           <p className="flex items-center gap-2.5 text-muted">
@@ -514,7 +633,7 @@ export function PlayUnavailable({
   reason,
   onRetry,
 }: {
-  reason: "not-joined" | "missing" | "unreachable";
+  reason: "not-joined" | "missing" | "removed" | "unreachable";
   onRetry?: () => void;
 }) {
   const copy = {
@@ -522,6 +641,12 @@ export function PlayUnavailable({
       status: "Not joined",
       title: "You haven't joined this session",
       description: "Join with the code on the host's screen, then you're in.",
+    },
+    removed: {
+      status: "Off air",
+      title: "The host took you out of this session",
+      description:
+        "If that was a mistake, ask the host, then join again with the code on the big screen.",
     },
     missing: {
       status: "Off air",

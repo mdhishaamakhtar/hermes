@@ -18,8 +18,8 @@ type Climbs = Record<number, number>;
  * say who moved. Each beat starts as the last one is mostly done, so the
  * whole thing reads as one move, not three things at once.
  */
-const REORDER_DELAY = 0.22;
-const CLIMB_DELAY = 0.5;
+const REORDER_DELAY = 0.35;
+const CLIMB_DELAY = 0.85;
 
 /** A row that climbed into view rises from below; one that fell out sinks. */
 const ROW_TRAVEL = 14;
@@ -58,12 +58,18 @@ export function Leaderboard({
   meId,
   limit,
   emptyText = "Standings appear once someone scores.",
+  size = "page",
 }: {
   entries: LeaderboardEntry[];
   /** The viewing player, highlighted wherever they sit. */
   meId?: number | null;
   limit?: number;
   emptyText?: string;
+  /**
+   * `screen` and `screen-lg` for the big screen's standings scene: the
+   * larger matches the finale's podium, for a board of five rows or fewer.
+   */
+  size?: RowSize;
 }) {
   const climbs = useClimbs(entries);
   const sorted = entries.toSorted((a, b) => a.rank - b.rank);
@@ -74,14 +80,14 @@ export function Leaderboard({
 
   // A board of zeros ranks nobody: everyone on it is level.
   if (sorted.every((entry) => entry.score === 0)) {
-    return <p className="py-2 text-sm text-subtle">{emptyText}</p>;
+    return <p className={`text-subtle ${ROW_SIZE[size].empty}`}>{emptyText}</p>;
   }
 
   return (
     // popLayout lifts a leaving row out of the flow at once, so the rows
     // that stay travel straight to their final slot in a single move instead
     // of being shoved past it and snapping back.
-    <ol className="relative flex flex-col gap-1.5">
+    <ol className={`relative flex flex-col ${ROW_SIZE[size].list}`}>
       <AnimatePresence initial={false} mode="popLayout">
         {shown.map((entry) => (
           <motion.li
@@ -111,89 +117,132 @@ export function Leaderboard({
               entry={entry}
               me={entry.participantId === meId}
               climb={climbs[entry.participantId]}
-              live
+              size={size}
             />
           </motion.li>
         ))}
       </AnimatePresence>
       {meHidden && (
         <li className="mt-2 border-t border-dashed border-border-strong pt-3">
-          <Row entry={me} me climb={climbs[me.participantId]} live />
+          <Row entry={me} me climb={climbs[me.participantId]} size={size} />
         </li>
       )}
     </ol>
   );
 }
 
+type RowSize = "page" | "screen" | "screen-lg";
+
+/*
+ * One grid for every row (rank, name, climb, score) with a fixed rank
+ * column, so names and scores stay straight columns while rows travel.
+ */
+const ROW_SIZE = {
+  page: {
+    list: "gap-1.5 [--rank:1.75rem]",
+    row: "gap-x-3 px-3.5 py-2.5 text-sm",
+    empty: "py-2 text-sm",
+    name: "text-base",
+    climb: "text-xs",
+    icon: 12,
+  },
+  screen: {
+    list: "gap-[1.1vh] [--rank:clamp(3.5rem,8vh,6rem)]",
+    row: "gap-x-[1.5vw] px-[2vw] py-[1.4vh] text-[clamp(1.375rem,3.8vh,2.75rem)]",
+    empty: "text-[clamp(1.25rem,3vh,2rem)]",
+    name: "",
+    climb: "text-[0.6em]",
+    icon: 24,
+  },
+  // The finale's podium row (PODIUM_SIZE.screen), so the standings between
+  // questions and the final standings read as one scoreboard.
+  "screen-lg": {
+    list: "gap-[1.5vh] [--rank:clamp(4rem,9vh,6.5rem)]",
+    row: "gap-x-[1.5vw] px-[2vw] py-[2.4vh] text-[clamp(1.75rem,5vh,3.75rem)]",
+    empty: "text-[clamp(1.25rem,3vh,2rem)]",
+    name: "",
+    climb: "text-[0.55em]",
+    icon: 28,
+  },
+} as const;
+
 function Row({
   entry,
   me,
   climb,
-  live = false,
+  size = "page",
 }: {
   entry: LeaderboardEntry;
   me: boolean;
   /** Places gained in the latest reshuffle. */
   climb?: number;
-  /** Scores roll to new totals; final standings just state them. */
-  live?: boolean;
+  size?: RowSize;
 }) {
+  const look = ROW_SIZE[size];
   return (
     <div
-      className={`flex items-center gap-3 border px-3.5 py-2.5 ${
+      className={`grid grid-cols-[var(--rank)_minmax(0,1fr)_auto_auto] items-baseline border ${look.row} ${
         me ? "border-primary bg-primary/10" : "border-border bg-background"
       }`}
     >
       <span
-        className={`w-7 shrink-0 font-mono text-sm font-semibold tabular-nums ${
+        className={`font-mono leading-none font-semibold tabular-nums ${
           entry.rank === 1 ? "text-accent" : "text-subtle"
         }`}
       >
         {entry.rank}
       </span>
-      <span className="min-w-0 flex-1 truncate text-foreground">
+      <span
+        className={`min-w-0 truncate leading-tight text-foreground ${look.name}`}
+      >
         {entry.displayName}
         {me && (
-          <span className="ml-2 text-xs font-semibold text-accent">You</span>
+          <span className="ml-[0.6em] text-[0.75em] font-semibold text-accent">
+            You
+          </span>
         )}
       </span>
       {/* Lands once the row has arrived, rising the way the row moved. */}
-      <AnimatePresence>
-        {climb && (
-          <motion.span
-            key={`${entry.rank}-${climb}`}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: duration.base } }}
-            transition={{
-              duration: duration.enter,
-              ease: ease.out,
-              delay: CLIMB_DELAY,
-            }}
-            className="flex shrink-0 items-center gap-0.5 font-mono text-xs font-semibold text-success tabular-nums"
-          >
-            <Icon name="arrow-up" size={12} />
-            <span className="sr-only">Up </span>
-            {climb}
-          </motion.span>
-        )}
-      </AnimatePresence>
-      {live ? (
-        <RollingNumber
-          value={entry.score}
-          className="font-mono text-sm font-semibold text-foreground"
-        />
-      ) : (
-        <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
-          {formatNumber(entry.score)}
-        </span>
-      )}
+      <span
+        className={`font-mono font-semibold text-success tabular-nums ${look.climb}`}
+      >
+        <AnimatePresence>
+          {climb && (
+            <motion.span
+              key={`${entry.rank}-${climb}`}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: duration.base } }}
+              transition={{
+                duration: duration.enter,
+                ease: ease.out,
+                delay: CLIMB_DELAY,
+              }}
+              className="inline-flex items-center gap-0.5"
+            >
+              <Icon name="arrow-up" size={look.icon} className="self-center" />
+              <span className="sr-only">Up </span>
+              {climb}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </span>
+      <RollingNumber
+        value={entry.score}
+        className="font-mono leading-none font-semibold text-foreground"
+      />
     </div>
   );
 }
 
-/** Reveal order for the podium: third, then second, then the winner. */
-const PODIUM_DELAY = [0.9, 0.5, 0.15];
+/**
+ * When each podium place lands, winner first in the array: third, then
+ * second, then the winner. The big screen takes its time; a page does not.
+ */
+export const PODIUM_DELAY = {
+  quick: [0.9, 0.5, 0.15],
+  show: [4.2, 2.6, 1.0],
+} as const;
 
 /*
  * Every podium row is the same row: one grid (a fixed rank column, the name,
@@ -209,7 +258,7 @@ const PODIUM_SIZE = {
   },
   screen: {
     list: "gap-[1.5vh] [--rank:clamp(4rem,9vh,6.5rem)]",
-    row: "px-[2vw] py-[2.4vh]",
+    row: "gap-x-[1.5vw] px-[2vw] py-[2.4vh]",
     type: "text-[clamp(1.75rem,5vh,3.75rem)]",
   },
 } as const;
@@ -223,10 +272,13 @@ export function FinalStandings({
   entries,
   meId,
   size = "page",
+  pace = "quick",
 }: {
   entries: LeaderboardEntry[];
   meId?: number | null;
   size?: keyof typeof PODIUM_SIZE;
+  /** `show` for the big screen's finale, one place at a time. */
+  pace?: keyof typeof PODIUM_DELAY;
 }) {
   const sorted = entries.toSorted((a, b) => a.rank - b.rank);
   const podium = sorted.filter((entry) => entry.score > 0).slice(0, 3);
@@ -250,7 +302,7 @@ export function FinalStandings({
             transition={{
               duration: duration.stage,
               ease: ease.out,
-              delay: PODIUM_DELAY[index],
+              delay: PODIUM_DELAY[pace][index],
             }}
             className={`grid grid-cols-[var(--rank)_minmax(0,1fr)_auto] items-baseline border ${look.row} ${look.type} ${
               winner

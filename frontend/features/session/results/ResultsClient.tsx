@@ -137,7 +137,7 @@ function Verdict({ results }: { results: MyResults }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: duration.stage, ease: ease.out }}
     >
-      <h1 className="max-w-[24ch] text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.1] font-bold tracking-tight text-foreground">
+      <h1 className="display display-tight max-w-[20ch] text-[clamp(2.5rem,7vw,4.25rem)] leading-[0.95] text-balance text-foreground">
         {results.displayName},{" "}
         {won ? (
           <>

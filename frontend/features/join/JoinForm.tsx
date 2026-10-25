@@ -115,7 +115,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
         )}
       </AnimatePresence>
 
-      <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+      <h1 className="display display-tight text-4xl leading-[0.95] text-foreground sm:text-5xl">
         Join a session
       </h1>
       <p className="mt-2 text-muted">

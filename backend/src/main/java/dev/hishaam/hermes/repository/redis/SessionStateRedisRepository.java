@@ -2,6 +2,7 @@ package dev.hishaam.hermes.repository.redis;
 
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import dev.hishaam.hermes.util.SessionRedisKeys;
 import java.time.Duration;
 import java.util.List;
@@ -163,6 +164,25 @@ public class SessionStateRedisRepository {
     redis.delete(SessionRedisKeys.currentPassageKey(sessionId));
   }
 
+  // ─── Big-screen scene ──────────────────────────────────────────────────────────
+
+  public void setScene(Long sessionId, StageScene scene) {
+    redis
+        .opsForValue()
+        .set(SessionRedisKeys.sceneKey(sessionId), scene.name(), SessionRedisKeys.SESSION_TTL);
+  }
+
+  /** QUESTION unless the host has cut to another scene since the question went up. */
+  public StageScene getScene(Long sessionId) {
+    StageScene scene =
+        parse(redis.opsForValue().get(SessionRedisKeys.sceneKey(sessionId)), StageScene::valueOf);
+    return scene != null ? scene : StageScene.QUESTION;
+  }
+
+  public void clearScene(Long sessionId) {
+    redis.delete(SessionRedisKeys.sceneKey(sessionId));
+  }
+
   // ─── Join codes ────────────────────────────────────────────────────────────────
 
   /**
@@ -187,6 +207,11 @@ public class SessionStateRedisRepository {
   public long incrementParticipantCount(Long sessionId) {
     Long count = redis.opsForValue().increment(SessionRedisKeys.participantCountKey(sessionId));
     return count != null ? count : 0L;
+  }
+
+  public long decrementParticipantCount(Long sessionId) {
+    Long count = redis.opsForValue().decrement(SessionRedisKeys.participantCountKey(sessionId));
+    return count != null ? Math.max(0L, count) : 0L;
   }
 
   public long getParticipantCount(Long sessionId) {
@@ -322,6 +347,7 @@ public class SessionStateRedisRepository {
             SessionRedisKeys.timerKey(sessionId),
             SessionRedisKeys.questionStateKey(sessionId),
             SessionRedisKeys.currentPassageKey(sessionId),
-            SessionRedisKeys.timerStartedAtKey(sessionId)));
+            SessionRedisKeys.timerStartedAtKey(sessionId),
+            SessionRedisKeys.sceneKey(sessionId)));
   }
 }

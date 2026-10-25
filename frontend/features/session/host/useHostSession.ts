@@ -7,7 +7,11 @@ import { getStoredJoinCode } from "@/lib/session-storage";
 import { createLiveSync } from "../live-sync";
 import { numberKeyed } from "../session-state";
 import { sessionsApi } from "../session-api";
-import type { HostSessionSync, SessionMessage } from "../session-types";
+import type {
+  HostSessionSync,
+  SessionMessage,
+  StageScene,
+} from "../session-types";
 import { useStompClient } from "../useStompClient";
 import {
   hostReducer,
@@ -311,6 +315,29 @@ export function useHostSession(sessionId: string) {
     advance: () => {
       if (nextStep && !busy.current) nextStep.run();
     },
+    /** Standings can go up on the big screen once the question is graded. */
+    canShowStandings: state.status === "ACTIVE" && canAdvance,
+
+    /** Takes a player out of the session; their screen is told. */
+    async removePlayer(participantId: number) {
+      await sessionsApi.removePlayer(sessionId, participantId);
+      dispatch({
+        type: "LEFT",
+        count: Math.max(0, state.participantCount - 1),
+        participantId,
+      });
+    },
+
+    /** Cuts the big screen between the question and the standings. */
+    async setScene(scene: StageScene) {
+      dispatch({ type: "SCENE", scene });
+      try {
+        await sessionsApi.setScene(sessionId, scene);
+      } catch (err) {
+        await live.resync();
+        setControlError(describeError(err, "Couldn't change the big screen."));
+      }
+    },
 
     /** Re-score a graded question; the leaderboard recalculates on the server. */
     async correctScoring(
@@ -361,7 +388,24 @@ function toAction(message: SessionMessage): HostAction | null {
         correction: message.event === "SCORING_CORRECTED",
       };
     case "PARTICIPANT_JOINED":
-      return { type: "PARTICIPANTS", count: message.count };
+      return message.participantId != null
+        ? {
+            type: "JOINED",
+            count: message.count,
+            player: {
+              participantId: message.participantId,
+              displayName: message.displayName,
+            },
+          }
+        : { type: "PARTICIPANTS", count: message.count };
+    case "PARTICIPANT_LEFT":
+      return {
+        type: "LEFT",
+        count: message.count,
+        participantId: message.participantId,
+      };
+    case "SCENE_CHANGED":
+      return { type: "SCENE", scene: message.scene };
     case "ANSWER_UPDATE":
     case "ANSWER_REVEAL":
       return { type: "ANSWERS", message };

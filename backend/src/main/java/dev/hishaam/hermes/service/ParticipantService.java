@@ -13,6 +13,7 @@ import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
+import dev.hishaam.hermes.entity.enums.StageScene;
 import dev.hishaam.hermes.exception.AppException;
 import dev.hishaam.hermes.repository.ParticipantAnswerRepository;
 import dev.hishaam.hermes.repository.ParticipantRepository;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,7 +113,10 @@ public class ParticipantService {
     rejoinTokenStore.store(rejoinToken, participant.getId(), sessionId);
 
     eventPublisher.publishParticipantJoined(
-        sessionId, stateStore.incrementParticipantCount(sessionId));
+        sessionId,
+        stateStore.incrementParticipantCount(sessionId),
+        participant.getId(),
+        participant.getDisplayName());
 
     return new JoinResponse(participant.getId(), rejoinToken, sessionId);
   }
@@ -194,7 +199,65 @@ public class ParticipantService {
         reviewing ? leaderboardService.standings(sessionId) : List.of(),
         ctx.timeLeftSeconds(),
         myScores,
-        ScoringRules.of(snapshot));
+        ScoringRules.of(snapshot),
+        active ? stateStore.getScene(sessionId) : StageScene.QUESTION);
+  }
+
+  /**
+   * Takes a player out of a running or waiting session, usually a name that should not be on the
+   * big screen. Their answers and their place on the board go with them, a live question's tallies
+   * drop their pick, and their own screen is told it was them. Callers authorize and hold the
+   * session's transition lock, so this cannot interleave with grading.
+   */
+  @Transactional
+  public void removeParticipant(Long sessionId, Long participantId) {
+    Participant participant =
+        participantRepository
+            .findById(participantId)
+            .filter(p -> p.getSession().getId().equals(sessionId))
+            .orElseThrow(() -> AppException.notFound("Player not found in this session"));
+
+    boolean active = stateStore.getStatus(sessionId) == SessionStatus.ACTIVE;
+    List<QuizSnapshot.QuestionSnapshot> onScreen =
+        active ? questionsOnScreen(sessionId) : List.of();
+    for (QuizSnapshot.QuestionSnapshot question : onScreen) {
+      answerRepository
+          .findByParticipantIdAndQuestionId(participantId, question.id())
+          .ifPresent(
+              answer -> {
+                scoringStore.moveSelection(
+                    sessionId,
+                    question.id(),
+                    participantId,
+                    answer.getSelectedOptionIds(),
+                    Set.of());
+                scoringStore.unmarkLockedIn(sessionId, question.id(), participantId);
+              });
+    }
+
+    answerRepository.deleteByParticipantId(participantId);
+    participantRepository.delete(participant);
+    rejoinTokenStore.delete(participant.getRejoinToken());
+    long count = stateStore.decrementParticipantCount(sessionId);
+
+    eventPublisher.publishParticipantLeft(sessionId, count, participantId);
+    for (QuizSnapshot.QuestionSnapshot question : onScreen) {
+      eventPublisher.publishAnswerUpdate(
+          sessionId, question, scoringStore.answerStats(sessionId, question.id(), count));
+    }
+    if (active) {
+      eventPublisher.publishLeaderboard(sessionId);
+    }
+  }
+
+  private List<QuizSnapshot.QuestionSnapshot> questionsOnScreen(Long sessionId) {
+    QuizSnapshot snapshot = snapshotService.loadSnapshot(sessionId);
+    Long passageId = stateStore.getCurrentPassageId(sessionId);
+    if (passageId != null) {
+      return snapshot.subQuestionsOf(snapshot.requirePassage(passageId));
+    }
+    Long questionId = stateStore.getCurrentQuestionId(sessionId);
+    return questionId == null ? List.of() : List.of(snapshot.requireQuestion(questionId));
   }
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */
