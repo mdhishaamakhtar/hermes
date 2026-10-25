@@ -402,6 +402,7 @@ function toAction(message: SessionMessage): PlayAction | null {
         questionId: Number(message.questionId),
         correctOptionIds: (message.correctOptionIds ?? []).map(Number),
         optionPoints: numberKeyed(message.optionPoints),
+        scores: numberKeyed(message.scores),
         correction: message.event === "SCORING_CORRECTED",
       };
     case "PARTICIPANT_LEADERBOARD":

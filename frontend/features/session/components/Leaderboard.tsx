@@ -57,7 +57,7 @@ export function Leaderboard({
   entries,
   meId,
   limit,
-  emptyText = "Standings appear after the first question is graded.",
+  emptyText = "Standings appear once someone scores.",
 }: {
   entries: LeaderboardEntry[];
   /** The viewing player, highlighted wherever they sit. */
@@ -72,7 +72,8 @@ export function Leaderboard({
     meId != null ? sorted.find((e) => e.participantId === meId) : undefined;
   const meHidden = me && !shown.includes(me);
 
-  if (sorted.length === 0) {
+  // A board of zeros ranks nobody: everyone on it is level.
+  if (sorted.every((entry) => entry.score === 0)) {
     return <p className="py-2 text-sm text-subtle">{emptyText}</p>;
   }
 
@@ -209,8 +210,8 @@ export function FinalStandings({
   const podium = sorted.slice(0, 3);
   const rest = sorted.slice(3);
 
-  if (sorted.length === 0) {
-    return <p className="text-sm text-subtle">Nobody answered this time.</p>;
+  if (sorted.every((entry) => entry.score === 0)) {
+    return <p className="text-sm text-subtle">Nobody scored this time.</p>;
   }
 
   return (

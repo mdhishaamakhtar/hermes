@@ -143,3 +143,38 @@ export function groupByPassage<
   }
   return groups;
 }
+
+/**
+ * How an answer went. Only an exact match is correct, but picking some of
+ * the right answers can still score, and calling that wrong beside "+5 pts"
+ * would contradict itself. One rule for the reveal, the results page and the
+ * organiser's review, so a player never reads two verdicts for one answer.
+ */
+export type Verdict = "correct" | "partial" | "wrong" | "none";
+
+export function verdictOf({
+  selected,
+  correctOptionIds,
+  earned,
+  multiSelect,
+}: {
+  selected: number[];
+  correctOptionIds: number[];
+  earned: number;
+  multiSelect: boolean;
+}): Verdict {
+  if (selected.length === 0) return "none";
+  const correct = multiSelect
+    ? selected.length === correctOptionIds.length &&
+      selected.every((id) => correctOptionIds.includes(id))
+    : selected.every((id) => correctOptionIds.includes(id));
+  if (correct) return "correct";
+  return earned > 0 ? "partial" : "wrong";
+}
+
+export const VERDICT_LABEL: Record<Verdict, string> = {
+  correct: "Correct",
+  partial: "Partly right",
+  wrong: "Incorrect",
+  none: "No answer",
+};

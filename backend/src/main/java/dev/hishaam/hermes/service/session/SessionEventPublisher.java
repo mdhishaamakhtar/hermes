@@ -137,11 +137,12 @@ public class SessionEventPublisher {
    * Reveals a graded question's answer key and, where the display mode kept the tallies hidden
    * during the countdown, the final answer distribution.
    */
-  public void publishQuestionReviewed(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
+  public void publishQuestionReviewed(
+      Long sessionId, QuizSnapshot.QuestionSnapshot question, Map<Long, Integer> scores) {
     send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.QuestionReviewed(
-            question.id(), question.correctOptionIds(), question.optionPoints()));
+            question.id(), question.correctOptionIds(), question.optionPoints(), scores));
 
     if (question.effectiveDisplayMode() != DisplayMode.LIVE) {
       AnswerStats stats =
@@ -158,11 +159,12 @@ public class SessionEventPublisher {
     }
   }
 
-  public void publishScoringCorrected(Long sessionId, QuizSnapshot.QuestionSnapshot question) {
+  public void publishScoringCorrected(
+      Long sessionId, QuizSnapshot.QuestionSnapshot question, Map<Long, Integer> scores) {
     send(
         WsTopics.sessionQuestion(sessionId),
         new WsPayloads.ScoringCorrected(
-            question.id(), question.correctOptionIds(), question.optionPoints()));
+            question.id(), question.correctOptionIds(), question.optionPoints(), scores));
   }
 
   /** Sends the current standings to the organiser and to every player. */

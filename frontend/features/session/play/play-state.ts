@@ -26,6 +26,7 @@ import type {
   QuestionStats,
   RejoinQuestion,
   RejoinResponse,
+  ScoringRules,
 } from "../session-types";
 import type { StagePassage } from "../host/host-state";
 
@@ -39,6 +40,8 @@ export interface PlayQuestion {
   selected: number[];
   lockedIn: boolean;
   stats: QuestionStats;
+  /** What the server graded this player's answer, once it is reviewed. */
+  earned: number | null;
 }
 
 export type SyncStatus = "idle" | "saving" | "retrying" | "error";
@@ -58,6 +61,7 @@ export interface PlayState {
   displayMode: DisplayMode;
   countdown: Countdown;
   leaderboard: LeaderboardEntry[];
+  scoring: ScoringRules;
   sync: { status: SyncStatus; message: string };
 }
 
@@ -82,6 +86,8 @@ export type PlayAction =
       questionId: number;
       correctOptionIds: number[];
       optionPoints: Record<number, number>;
+      /** Every answering player's score on this question, by participant. */
+      scores: Record<number, number>;
       correction: boolean;
     }
   | { type: "ANSWERS"; message: AnswerUpdateMsg | AnswerRevealMsg }
@@ -110,6 +116,7 @@ export const initialPlayState: PlayState = {
   displayMode: "LIVE",
   countdown: IDLE_COUNTDOWN,
   leaderboard: [],
+  scoring: { penalties: false, speedScoring: false },
   sync: { status: "idle", message: "" },
 };
 
@@ -129,6 +136,7 @@ function fresh(
     selected: [],
     lockedIn: false,
     stats: emptyStats(),
+    earned: null,
   };
 }
 
@@ -136,6 +144,7 @@ function fromRejoin(
   question: RejoinQuestion,
   number: number,
   stats: Record<number, QuestionStats>,
+  myScores: Record<number, number>,
 ): PlayQuestion {
   return {
     ...fresh(
@@ -148,6 +157,7 @@ function fromRejoin(
     selected: question.selectedOptionIds.map(Number),
     lockedIn: question.lockedIn,
     stats: stats[question.id] ?? emptyStats(),
+    earned: stats[question.id]?.reviewed ? (myScores[question.id] ?? 0) : null,
   };
 }
 
@@ -192,6 +202,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
       const block = response.currentPassage;
       const single = response.currentQuestion;
       const stats = statsFromSnapshot(response.questionStatsById);
+      const myScores = numberKeyed(response.myScores);
       const lifecycle = response.questionLifecycle ?? "DISPLAYED";
       const left = response.timeLeftSeconds;
       const limit =
@@ -208,10 +219,15 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
         questions: withKept(
           block
             ? block.subQuestions.map((question, index) =>
-                fromRejoin(question, block.questionIndex + index, stats),
+                fromRejoin(
+                  question,
+                  block.questionIndex + index,
+                  stats,
+                  myScores,
+                ),
               )
             : single
-              ? [fromRejoin(single, single.orderIndex, stats)]
+              ? [fromRejoin(single, single.orderIndex, stats, myScores)]
               : [],
           state.questions,
           action.keep,
@@ -232,6 +248,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
             ? startCountdown(state.countdown, left, limit || left)
             : { ...IDLE_COUNTDOWN, run: state.countdown.run },
         leaderboard: response.leaderboard,
+        scoring: response.scoring ?? state.scoring,
       };
     }
 
@@ -327,6 +344,10 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
         questions: updateQuestion(state.questions, action.questionId, (q) => ({
           ...q,
           lockedIn: true,
+          earned:
+            state.participantId !== null
+              ? (action.scores[state.participantId] ?? 0)
+              : q.earned,
           stats: {
             ...q.stats,
             correctOptionIds: scoringOptionIds(

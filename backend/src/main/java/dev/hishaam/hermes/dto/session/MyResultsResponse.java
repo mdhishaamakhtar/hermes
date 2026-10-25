@@ -8,6 +8,7 @@ public record MyResultsResponse(
     int score,
     int correctCount,
     int totalQuestions,
+    int questionsAsked,
     int rank,
     long totalParticipants,
     List<QuestionResult> questions) {
@@ -19,6 +20,7 @@ public record MyResultsResponse(
       String questionType,
       Long passageId,
       String passageText,
+      boolean asked,
       List<Long> selectedOptionIds,
       List<Long> correctOptionIds,
       List<OptionInfo> options,

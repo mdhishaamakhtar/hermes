@@ -80,6 +80,30 @@ class LeaderboardBuilderTest {
         .containsExactly(tuple(1, "Scorer", 10L), tuple(2, "Silent", 0L));
   }
 
+  /**
+   * Verifies that everyone on zero shares the rank after the last scorer, whatever their answer
+   * times: nobody on zero beat anybody else on zero.
+   */
+  @Test
+  void everyoneOnZeroSharesTheRankAfterTheLastScorer() {
+    List<LeaderboardEntry> ranked =
+        LeaderboardBuilder.rank(
+            List.of(
+                participant(1L, "Silent"),
+                participant(2L, "Scorer"),
+                participant(3L, "Wrong but quick"),
+                participant(4L, "Wrong and slow")),
+            List.of(total(2L, 10, 1500), total(3L, 0, 900), total(4L, 0, 9000)));
+
+    assertThat(ranked)
+        .extracting(LeaderboardEntry::rank, LeaderboardEntry::displayName)
+        .containsExactly(
+            tuple(1, "Scorer"),
+            tuple(2, "Silent"),
+            tuple(2, "Wrong but quick"),
+            tuple(2, "Wrong and slow"));
+  }
+
   private static Participant participant(Long id, String name) {
     return Participant.builder().id(id).displayName(name).build();
   }

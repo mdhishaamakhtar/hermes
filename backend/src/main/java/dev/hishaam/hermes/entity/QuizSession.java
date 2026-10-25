@@ -49,11 +49,21 @@ public class QuizSession {
   @Column(name = "ended_at")
   private OffsetDateTime endedAt;
 
+  /**
+   * How far into the running order answers have been opened: the position of the last question
+   * whose timer started. Questions past it were never asked, so results can say so instead of
+   * showing them as unanswered. Null on sessions from before this was recorded, which count every
+   * question as asked.
+   */
+  @Column(name = "opened_question_count")
+  private Integer openedQuestionCount;
+
   @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
   @PrePersist
   protected void onCreate() {
     if (createdAt == null) createdAt = OffsetDateTime.now();
+    if (openedQuestionCount == null) openedQuestionCount = 0;
   }
 }

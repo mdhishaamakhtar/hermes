@@ -79,7 +79,9 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
         };
       }
       if (status === 409) {
-        return { code: "That session has already finished." };
+        return {
+          code: "That session has ended. Ask your host for a new code.",
+        };
       }
       return { form: describeError(err, "Couldn't join that session.") };
     }

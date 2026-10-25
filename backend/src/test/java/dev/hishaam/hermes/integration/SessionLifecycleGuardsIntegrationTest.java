@@ -16,8 +16,8 @@ import tools.jackson.databind.JsonNode;
 /**
  * Integration tests for lifecycle guardrails on sessions.
  *
- * <p>This suite focuses on invalid or out-of-order transitions: creation rules, double-starts, late
- * joins, timer state checks, and automatic session ending when the final question is completed.
+ * <p>This suite focuses on invalid or out-of-order transitions: creation rules, double-starts,
+ * timer state checks, and automatic session ending when the final question is completed.
  */
 class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
 
@@ -54,9 +54,8 @@ class SessionLifecycleGuardsIntegrationTest extends BaseIntegrationTest {
 
     JsonNode joinAfterStart =
         postJson(
-            "/api/sessions/join", null, Map.of("joinCode", joinCode, "displayName", "Late"), 409);
-    assertThat(joinAfterStart.path("error").path("message").asText())
-        .isEqualTo("Session is no longer accepting participants");
+            "/api/sessions/join", null, Map.of("joinCode", joinCode, "displayName", "Late"), 200);
+    assertThat(joinAfterStart.path("data").path("sessionId").asLong()).isEqualTo(sessionId);
 
     JsonNode endTimerWhileDisplayed =
         postJson("/api/sessions/" + sessionId + "/end-timer", organiser, Map.of(), 409);

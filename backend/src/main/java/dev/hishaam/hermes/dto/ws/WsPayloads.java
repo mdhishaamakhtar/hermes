@@ -131,17 +131,22 @@ public final class WsPayloads {
   // ─── Grading events ───────────────────────────────────────────────────────────
 
   /**
-   * Broadcast after a question is graded. Clients compute their own score from local selections +
-   * optionPoints map. correctOptionIds contains all options with pointValue > 0.
+   * Broadcast after a question is graded. correctOptionIds contains all options with pointValue >
+   * 0; scores holds what each participant who answered earned, keyed by participant id, so a
+   * player's screen shows the graded figure instead of recomputing it.
    */
   public record QuestionReviewed(
       EventType event,
       Long questionId,
       List<Long> correctOptionIds,
-      Map<Long, Integer> optionPoints) {
+      Map<Long, Integer> optionPoints,
+      Map<Long, Integer> scores) {
     public QuestionReviewed(
-        Long questionId, List<Long> correctOptionIds, Map<Long, Integer> optionPoints) {
-      this(EventType.QUESTION_REVIEWED, questionId, correctOptionIds, optionPoints);
+        Long questionId,
+        List<Long> correctOptionIds,
+        Map<Long, Integer> optionPoints,
+        Map<Long, Integer> scores) {
+      this(EventType.QUESTION_REVIEWED, questionId, correctOptionIds, optionPoints, scores);
     }
   }
 
@@ -251,18 +256,19 @@ public final class WsPayloads {
 
   // ─── Scoring correction ───────────────────────────────────────────────────────
 
-  /**
-   * Broadcast after a host corrects option point values. Clients recalculate their score for this
-   * question using local selection state + the new optionPoints map.
-   */
+  /** Broadcast after a host corrects option point values, with every participant's new score. */
   public record ScoringCorrected(
       EventType event,
       Long questionId,
       List<Long> correctOptionIds,
-      Map<Long, Integer> optionPoints) {
+      Map<Long, Integer> optionPoints,
+      Map<Long, Integer> scores) {
     public ScoringCorrected(
-        Long questionId, List<Long> correctOptionIds, Map<Long, Integer> optionPoints) {
-      this(EventType.SCORING_CORRECTED, questionId, correctOptionIds, optionPoints);
+        Long questionId,
+        List<Long> correctOptionIds,
+        Map<Long, Integer> optionPoints,
+        Map<Long, Integer> scores) {
+      this(EventType.SCORING_CORRECTED, questionId, correctOptionIds, optionPoints, scores);
     }
   }
 }

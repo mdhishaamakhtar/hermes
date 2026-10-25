@@ -11,6 +11,7 @@ public record SessionResultsResponse(
     OffsetDateTime startedAt,
     OffsetDateTime endedAt,
     long participantCount,
+    int questionsAsked,
     List<QuestionResult> questions,
     List<LeaderboardEntry> leaderboard) {
 
@@ -21,6 +22,7 @@ public record SessionResultsResponse(
       int timeLimitSeconds,
       Long passageId,
       String passageText,
+      boolean asked,
       long totalAnswers,
       List<OptionInfo> options) {}
 

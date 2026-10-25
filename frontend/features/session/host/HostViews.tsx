@@ -67,11 +67,16 @@ export function HostLobby({ session }: { session: HostSession }) {
             icon="play"
             onClick={controls.start}
             pending={pending === "start"}
+            disabled={participantCount === 0}
             className="w-full"
           >
             {pending === "start" ? "Starting…" : "Start the quiz"}
           </Button>
-          <p className="text-sm text-subtle">Nobody can join once you start.</p>
+          <p className="text-sm text-subtle">
+            {participantCount === 0
+              ? "You can start once the first player is in."
+              : "Latecomers can still join with the code."}
+          </p>
         </div>
       </main>
     </>

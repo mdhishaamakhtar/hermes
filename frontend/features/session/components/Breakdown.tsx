@@ -2,12 +2,17 @@
 
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { countLabel, formatNumber, formatPoints, percent } from "@/lib/format";
 import { revealRow } from "@/lib/motion";
 import { byOrderIndex } from "@/lib/options";
-import { groupByPassage } from "../session-state";
+import {
+  groupByPassage,
+  VERDICT_LABEL,
+  verdictOf,
+  type Verdict,
+} from "../session-state";
 import type { MyQuestionResult, QuestionResult } from "../session-types";
 import { AnswerOption, type OptionState } from "./AnswerOption";
 import { PassagePanel } from "./SessionChrome";
@@ -60,16 +65,21 @@ function QuestionShell({
   text,
   meta,
   action,
+  asked = true,
   children,
 }: {
   number: number;
   text: string;
   meta: ReactNode;
   action?: ReactNode;
+  /** False for a question the session ended before reaching. */
+  asked?: boolean;
   children: ReactNode;
 }) {
   return (
-    <article className="border border-border bg-surface p-5 sm:p-6">
+    <article
+      className={`border border-border bg-surface p-5 sm:p-6 ${asked ? "" : "opacity-60"}`}
+    >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-72">
           <p className="meta-line text-sm text-subtle">
@@ -101,13 +111,21 @@ export function QuestionBreakdown({
     <QuestionShell
       number={question.orderIndex}
       text={question.text}
+      asked={question.asked}
       meta={
-        <span>
-          {formatNumber(question.totalAnswers)} of{" "}
-          {countLabel(participantCount, "player", "players")} answered
-        </span>
+        question.asked ? (
+          <span>
+            {formatNumber(question.totalAnswers)} of{" "}
+            {countLabel(participantCount, "player", "players")} answered
+          </span>
+        ) : (
+          <span>
+            <Badge>Not asked</Badge>
+          </span>
+        )
       }
       action={
+        question.asked &&
         onEditScoring && (
           <Button size="sm" icon="pencil" onClick={onEditScoring}>
             Edit scoring
@@ -122,19 +140,21 @@ export function QuestionBreakdown({
             text={option.text}
             state={option.isCorrect ? "correct" : undefined}
             share={
-              question.totalAnswers > 0
+              question.asked && question.totalAnswers > 0
                 ? option.count / question.totalAnswers
-                : 0
+                : undefined
             }
             aside={
-              <>
-                <span className="text-foreground">
-                  {formatNumber(option.count)}
-                </span>
-                <span className="w-10 text-right text-subtle">
-                  {percent(option.count, question.totalAnswers)}%
-                </span>
-              </>
+              question.asked && (
+                <>
+                  <span className="text-foreground">
+                    {formatNumber(option.count)}
+                  </span>
+                  <span className="w-10 text-right text-subtle">
+                    {percent(option.count, question.totalAnswers)}%
+                  </span>
+                </>
+              )
             }
           />
         </li>
@@ -151,19 +171,12 @@ function stateFor(
   return correct ? "missed" : undefined;
 }
 
-/**
- * How an answer went, in a word. Only an exact match is correct, but a pick
- * of some right answers can still score; calling that "Incorrect" beside
- * "+10 pts" would contradict itself.
- */
-function verdict(question: MyQuestionResult) {
-  if (question.selectedOptionIds.length === 0)
-    return { label: "No answer", tone: "neutral" } as const;
-  if (question.isCorrect) return { label: "Correct", tone: "success" } as const;
-  return question.pointsEarned > 0
-    ? ({ label: "Partly right", tone: "warning" } as const)
-    : ({ label: "Incorrect", tone: "danger" } as const);
-}
+const VERDICT_TONE: Record<Verdict, BadgeTone> = {
+  correct: "success",
+  partial: "warning",
+  wrong: "danger",
+  none: "neutral",
+};
 
 /** One question as a player answered it: their picks against the key. */
 export function MyQuestionBreakdown({
@@ -171,20 +184,34 @@ export function MyQuestionBreakdown({
 }: {
   question: MyQuestionResult;
 }) {
-  const { label, tone } = verdict(question);
+  const verdict = verdictOf({
+    selected: question.selectedOptionIds,
+    correctOptionIds: question.correctOptionIds,
+    earned: question.pointsEarned,
+    multiSelect: question.questionType === "MULTI_SELECT",
+  });
   return (
     <QuestionShell
       number={question.orderIndex}
       text={question.questionText}
+      asked={question.asked}
       meta={
-        <>
+        question.asked ? (
+          <>
+            <span>
+              <Badge tone={VERDICT_TONE[verdict]}>
+                {VERDICT_LABEL[verdict]}
+              </Badge>
+            </span>
+            <span className="font-mono text-foreground">
+              {formatPoints(question.pointsEarned)} pts
+            </span>
+          </>
+        ) : (
           <span>
-            <Badge tone={tone}>{label}</Badge>
+            <Badge>Not asked</Badge>
           </span>
-          <span className="font-mono text-foreground">
-            {formatPoints(question.pointsEarned)} pts
-          </span>
-        </>
+        )
       }
     >
       {byOrderIndex(question.options).map((option, index) => {

@@ -34,7 +34,13 @@ public class SessionService {
   private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-  private static final String JOIN_CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  /**
+   * Join codes are read off a projector and typed on a phone, so the alphabet leaves out every
+   * character that can pass for another: 0 and O, 1, I and L, and U (read as V). 30^6 is still over
+   * 700 million codes.
+   */
+  private static final String JOIN_CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
 
   private final QuizSessionRepository sessionRepository;
   private final QuizRepository quizRepository;
@@ -275,7 +281,8 @@ public class SessionService {
         currentPassage,
         questionStatsById,
         active ? leaderboardService.standings(sessionId) : List.of(),
-        ctx.timeLeftSeconds());
+        ctx.timeLeftSeconds(),
+        ScoringRules.of(snapshot));
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────

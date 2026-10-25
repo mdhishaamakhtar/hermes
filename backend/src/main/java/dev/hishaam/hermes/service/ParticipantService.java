@@ -7,6 +7,7 @@ import dev.hishaam.hermes.dto.session.QuestionStats;
 import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.dto.session.RejoinRequest;
 import dev.hishaam.hermes.dto.session.RejoinResponse;
+import dev.hishaam.hermes.dto.session.ScoringRules;
 import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
 import dev.hishaam.hermes.entity.QuizSession;
@@ -92,9 +93,10 @@ public class ParticipantService {
             .findById(sessionId)
             .orElseThrow(() -> AppException.notFound("Session not found"));
 
-    // Only allow joining LOBBY sessions
-    if (session.getStatus() != SessionStatus.LOBBY) {
-      throw AppException.conflict("Session is no longer accepting participants");
+    // Players may join until the session ends. A latecomer enters at the question on screen and
+    // simply has no answers for the ones already played.
+    if (session.getStatus() == SessionStatus.ENDED) {
+      throw AppException.conflict("This session has ended");
     }
 
     String rejoinToken = generateRejoinToken();
@@ -166,6 +168,16 @@ public class ParticipantService {
 
     boolean reviewing = active && ctx.questionLifecycle() == QuestionLifecycleState.REVIEWING;
 
+    Map<Long, Integer> myScores = new LinkedHashMap<>();
+    if (reviewing) {
+      for (QuizSnapshot.QuestionSnapshot question : onScreen) {
+        ParticipantAnswer answer = currentAnswer(participantId, question.id());
+        if (answer != null && answer.getGradedAt() != null) {
+          myScores.put(question.id(), answer.getScore());
+        }
+      }
+    }
+
     return new RejoinResponse(
         participantId,
         sessionId,
@@ -180,7 +192,9 @@ public class ParticipantService {
         currentPassage,
         questionStatsById,
         reviewing ? leaderboardService.standings(sessionId) : List.of(),
-        ctx.timeLeftSeconds());
+        ctx.timeLeftSeconds(),
+        myScores,
+        ScoringRules.of(snapshot));
   }
 
   /** Resolves a participant ID from a rejoin token, checking Redis first with DB fallback. */

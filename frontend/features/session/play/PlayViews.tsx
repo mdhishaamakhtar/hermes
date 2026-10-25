@@ -8,7 +8,7 @@ import { CountUp, RollingNumber } from "@/components/ui/AnimatedNumber";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { StatusScreen } from "@/components/ui/StatusScreen";
 import { countNoun, ordinal } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
@@ -18,7 +18,9 @@ import { AnswerOption, type OptionState } from "../components/AnswerOption";
 import { CountdownBar, CountdownClock } from "../components/Countdown";
 import { Leaderboard } from "../components/Leaderboard";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
+import { ScoringRules } from "../components/ScoringRules";
 import { QuestionSlate, slateDetail } from "../components/Slate";
+import { VERDICT_LABEL, verdictOf, type Verdict } from "../session-state";
 import type { QuestionLifecycle } from "../session-types";
 import type { PlayQuestion } from "./play-state";
 import type { PlaySession } from "./usePlaySession";
@@ -74,6 +76,12 @@ export function PlayLobby({
           </p>
         </div>
 
+        <ScoringRules
+          rules={session.scoring}
+          audience="player"
+          className="mt-10 border-t border-border pt-6"
+        />
+
         <p className="mt-10 text-sm text-subtle">
           Keep this screen open. Questions appear here the moment the host
           starts.
@@ -105,16 +113,6 @@ export function PlayLobby({
 }
 
 /* ── Live question ────────────────────────────────────────────────────────── */
-
-function earnedPoints(question: PlayQuestion) {
-  return Math.max(
-    0,
-    question.selected.reduce(
-      (sum, id) => sum + (question.stats.optionPoints[id] ?? 0),
-      0,
-    ),
-  );
-}
 
 function optionState(
   question: PlayQuestion,
@@ -245,15 +243,18 @@ export function PlayStage({ session }: { session: PlaySession }) {
               >
                 Standings
               </h2>
-              {me && (
-                <p className="text-sm text-muted">
-                  You&apos;re{" "}
-                  <span className="font-semibold text-foreground">
-                    {ordinal(me.rank)}
-                  </span>{" "}
-                  of {leaderboard.length}
-                </p>
-              )}
+              {me &&
+                (me.score > 0 ? (
+                  <p className="text-sm text-muted">
+                    You&apos;re{" "}
+                    <span className="font-semibold text-foreground">
+                      {ordinal(me.rank)}
+                    </span>{" "}
+                    of {leaderboard.length}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted">No points yet</p>
+                ))}
             </div>
             <Leaderboard entries={leaderboard} meId={participantId} limit={5} />
           </motion.section>
@@ -272,6 +273,7 @@ export function PlayStage({ session }: { session: PlaySession }) {
           )}
           <Dock
             lifecycle={lifecycle}
+            last={Boolean(last && last.number >= totalQuestions)}
             allLocked={allLocked}
             lockableCount={lockable.length}
             multiple={questions.length > 1}
@@ -289,6 +291,7 @@ export function PlayStage({ session }: { session: PlaySession }) {
 
 function Dock({
   lifecycle,
+  last,
   allLocked,
   lockableCount,
   multiple,
@@ -296,6 +299,8 @@ function Dock({
   onLockIn,
 }: {
   lifecycle: QuestionLifecycle;
+  /** The final question is on screen. */
+  last: boolean;
   allLocked: boolean;
   lockableCount: number;
   multiple: boolean;
@@ -329,7 +334,9 @@ function Dock({
         ? "Locked in. Hang tight until time's up."
         : lifecycle === "FROZEN"
           ? "Time's up. Grading answers…"
-          : "Next question coming up. Keep this screen open.";
+          : last
+            ? "That was the last question. Final standings are next."
+            : "Next question coming up. Keep this screen open.";
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -413,23 +420,47 @@ function PlayQuestionBlock({
   );
 }
 
+const VERDICT_STYLE: Record<
+  Verdict,
+  { tone: string; icon: IconName | null; iconClass: string }
+> = {
+  correct: {
+    tone: "border-success/50 bg-success/10",
+    icon: "check",
+    iconClass: "text-success",
+  },
+  partial: {
+    tone: "border-warning/50 bg-warning/10",
+    icon: "check",
+    iconClass: "text-warning",
+  },
+  wrong: {
+    tone: "border-danger/50 bg-danger/10",
+    icon: "close",
+    iconClass: "text-danger",
+  },
+  none: { tone: "border-border-strong bg-surface", icon: null, iconClass: "" },
+};
+
 /**
  * The moment of truth after each question: the verdict lands with a small
- * spring, and the points count up.
+ * spring, and the points the server graded count up. The words match the
+ * results page exactly, so an answer is never called two things.
  */
 function ResultBanner({ question }: { question: PlayQuestion }) {
-  const earned = earnedPoints(question);
-  const answered = question.selected.length > 0;
+  const earned = question.earned ?? 0;
+  const verdict = verdictOf({
+    selected: question.selected,
+    correctOptionIds: question.stats.correctOptionIds,
+    earned,
+    multiSelect: question.questionType === "MULTI_SELECT",
+  });
+  const style = VERDICT_STYLE[verdict];
 
   // The verdict lands in the hand on the same frame it lands on screen.
   useEffect(() => {
-    if (answered) haptics.result(earned > 0);
-  }, [answered, earned]);
-  const tone = !answered
-    ? "border-border-strong bg-surface"
-    : earned > 0
-      ? "border-success/50 bg-success/10"
-      : "border-danger/50 bg-danger/10";
+    if (verdict !== "none") haptics.result(earned > 0);
+  }, [verdict, earned]);
 
   return (
     <motion.div
@@ -437,21 +468,13 @@ function ResultBanner({ question }: { question: PlayQuestion }) {
       initial={{ opacity: 0, scale: 0.96, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 420, damping: 28 }}
-      className={`mt-5 flex items-center justify-between gap-4 border px-5 py-4 ${tone}`}
+      className={`mt-5 flex items-center justify-between gap-4 border px-5 py-4 ${style.tone}`}
     >
       <p className="flex items-center gap-2.5 text-lg font-semibold text-foreground">
-        {answered && (
-          <Icon
-            name={earned > 0 ? "check" : "close"}
-            size={18}
-            className={earned > 0 ? "text-success" : "text-danger"}
-          />
+        {style.icon && (
+          <Icon name={style.icon} size={18} className={style.iconClass} />
         )}
-        {!answered
-          ? "No answer this time"
-          : earned > 0
-            ? "Nice one"
-            : "Not this time"}
+        {VERDICT_LABEL[verdict]}
       </p>
       <p className="font-mono text-2xl font-semibold text-foreground">
         {earned > 0 ? "+" : ""}

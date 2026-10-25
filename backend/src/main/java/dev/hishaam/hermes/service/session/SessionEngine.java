@@ -144,6 +144,7 @@ public class SessionEngine {
     }
 
     stateStore.setQuestionState(sessionId, QuestionLifecycleState.TIMED);
+    recordOpened(sessionId, target, snapshot);
     stateStore.setTimer(sessionId, timeLimit);
     stateStore.recordTimerStartedAt(sessionId, Instant.now().toEpochMilli());
     switch (target) {
@@ -304,6 +305,22 @@ public class SessionEngine {
     subQuestions.forEach(q -> scoringStore.initQuestionCounts(sessionId, q));
     eventPublisher.publishPassageDisplayed(sessionId, passage, subQuestions, snapshot);
     return lastSub;
+  }
+
+  /** Moves the opened mark up to the furthest question the timer just opened. */
+  private void recordOpened(Long sessionId, CurrentTarget target, QuizSnapshot snapshot) {
+    int furthest =
+        target.questionIds().stream().mapToInt(snapshot::questionPosition).max().orElse(0);
+    sessionRepository
+        .findById(sessionId)
+        .ifPresent(
+            s -> {
+              s.setOpenedQuestionCount(
+                  Math.max(
+                      furthest,
+                      s.getOpenedQuestionCount() != null ? s.getOpenedQuestionCount() : 0));
+              sessionRepository.save(s);
+            });
   }
 
   private void updateDbCurrentQuestion(Long sessionId, QuizSnapshot.QuestionSnapshot question) {

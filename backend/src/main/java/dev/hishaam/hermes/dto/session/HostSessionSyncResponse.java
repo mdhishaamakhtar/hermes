@@ -14,7 +14,8 @@ public record HostSessionSyncResponse(
     CurrentPassage currentPassage,
     Map<Long, QuestionStats> questionStatsById,
     List<SessionResultsResponse.LeaderboardEntry> leaderboard,
-    Integer timeLeftSeconds) {
+    Integer timeLeftSeconds,
+    ScoringRules scoring) {
 
   /** A question as the host sees it — standalone, or one sub-question of the current passage. */
   public record Question(

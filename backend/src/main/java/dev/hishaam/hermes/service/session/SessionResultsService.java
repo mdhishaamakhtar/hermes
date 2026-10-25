@@ -136,6 +136,7 @@ public class SessionResultsService {
                       q.questionType().name(),
                       q.passageId(),
                       passageText,
+                      snapshot.wasAsked(q.id(), session.getOpenedQuestionCount()),
                       selectedOptionIds(ans),
                       q.correctOptionIds(),
                       options,
@@ -150,6 +151,7 @@ public class SessionResultsService {
         totalScore,
         correctCount,
         snapshot.questions().size(),
+        questionsAsked(snapshot, session),
         rank,
         standings.size(),
         questions);
@@ -209,6 +211,7 @@ public class SessionResultsService {
                       q.timeLimitSeconds(),
                       q.passageId(),
                       passageText,
+                      snapshot.wasAsked(q.id(), session.getOpenedQuestionCount()),
                       totalAnswers,
                       options);
                 })
@@ -222,8 +225,16 @@ public class SessionResultsService {
         session.getStartedAt(),
         session.getEndedAt(),
         leaderboard.size(),
+        questionsAsked(snapshot, session),
         questionResults,
         leaderboard);
+  }
+
+  private static int questionsAsked(QuizSnapshot snapshot, QuizSession session) {
+    return (int)
+        snapshot.questions().stream()
+            .filter(q -> snapshot.wasAsked(q.id(), session.getOpenedQuestionCount()))
+            .count();
   }
 
   private List<Long> selectedOptionIds(ParticipantAnswer answer) {

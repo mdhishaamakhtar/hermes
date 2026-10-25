@@ -128,7 +128,9 @@ function Results({ sessionId }: { sessionId: string }) {
  * and what you scored, with the numbers set in the data face.
  */
 function Verdict({ results }: { results: MyResults }) {
-  const won = results.rank === 1 && results.totalParticipants > 1;
+  const won =
+    results.rank === 1 && results.score > 0 && results.totalParticipants > 1;
+  const asked = results.questionsAsked ?? results.totalQuestions;
   return (
     <motion.header
       initial={{ opacity: 0, y: 12 }}
@@ -141,6 +143,8 @@ function Verdict({ results }: { results: MyResults }) {
           <>
             you <span className="text-accent">won</span>
           </>
+        ) : results.score === 0 ? (
+          <>you didn&apos;t score this time</>
         ) : (
           <>
             you finished{" "}
@@ -149,16 +153,30 @@ function Verdict({ results }: { results: MyResults }) {
             </span>{" "}
             of {formatNumber(results.totalParticipants)}
           </>
-        )}{" "}
-        with{" "}
-        <span className="font-mono font-semibold">
-          <CountUp value={results.score} />
-        </span>{" "}
-        points.
+        )}
+        {results.score > 0 ? (
+          <>
+            {" "}
+            with{" "}
+            <span className="font-mono font-semibold">
+              <CountUp value={results.score} />
+            </span>{" "}
+            points.
+          </>
+        ) : (
+          "."
+        )}
       </h1>
       <p className="mt-5 text-lg text-muted">
         You got {formatNumber(results.correctCount)} of{" "}
-        {countLabel(results.totalQuestions, "question", "questions")} right.
+        {countLabel(asked, "question", "questions")} right
+        {asked < results.totalQuestions
+          ? `. The quiz ended with ${countLabel(
+              results.totalQuestions - asked,
+              "question",
+              "questions",
+            )} still to go.`
+          : "."}
       </p>
     </motion.header>
   );

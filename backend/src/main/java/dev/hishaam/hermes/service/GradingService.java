@@ -12,6 +12,7 @@ import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.service.session.SessionSnapshotService;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,6 +60,7 @@ public class GradingService {
     List<QuizSnapshot.QuestionSnapshot> questions =
         questionIds.stream().map(snapshot::requireQuestion).toList();
 
+    Map<Long, Map<Long, Integer>> scoresByQuestion = new LinkedHashMap<>();
     for (QuizSnapshot.QuestionSnapshot question : questions) {
       List<ParticipantAnswer> answers =
           answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, question.id());
@@ -72,9 +74,13 @@ public class GradingService {
         }
       }
       answerRepository.saveAll(answers);
+      scoresByQuestion.put(question.id(), scoresByParticipant(answers));
     }
 
-    questions.forEach(question -> eventPublisher.publishQuestionReviewed(sessionId, question));
+    questions.forEach(
+        question ->
+            eventPublisher.publishQuestionReviewed(
+                sessionId, question, scoresByQuestion.get(question.id())));
     eventPublisher.publishLeaderboard(sessionId);
   }
 
@@ -120,7 +126,17 @@ public class GradingService {
     }
     answerRepository.saveAll(answers);
 
-    eventPublisher.publishScoringCorrected(sessionId, question);
+    eventPublisher.publishScoringCorrected(sessionId, question, scoresByParticipant(answers));
     eventPublisher.publishLeaderboard(sessionId);
+  }
+
+  /**
+   * What each player scored on one question, sent with its answer key so every phone shows the
+   * server's figure rather than recomputing it.
+   */
+  private static Map<Long, Integer> scoresByParticipant(List<ParticipantAnswer> answers) {
+    Map<Long, Integer> scores = new LinkedHashMap<>();
+    answers.forEach(answer -> scores.put(answer.getParticipantId(), answer.getScore()));
+    return scores;
   }
 }

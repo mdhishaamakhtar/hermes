@@ -39,6 +39,14 @@ export interface QuestionStats {
   reviewed: boolean;
 }
 
+/** How a session scores, stated before anyone plays. */
+export interface ScoringRules {
+  /** Some options take points away. */
+  penalties: boolean;
+  /** A faster right answer earns more. */
+  speedScoring: boolean;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   participantId: number;
@@ -80,6 +88,7 @@ export interface HostSessionSync {
   questionStatsById: Record<string, QuestionStats>;
   leaderboard: LeaderboardEntry[];
   timeLeftSeconds: number | null;
+  scoring: ScoringRules;
 }
 
 export interface LobbySnapshot {
@@ -132,6 +141,9 @@ export interface RejoinResponse {
   questionStatsById: Record<string, QuestionStats>;
   leaderboard: LeaderboardEntry[];
   timeLeftSeconds: number | null;
+  /** This player's graded score on each reviewed question on screen. */
+  myScores: Record<string, number>;
+  scoring: ScoringRules;
 }
 
 export interface JoinResponse {
@@ -155,6 +167,8 @@ export interface QuestionResult {
   timeLimitSeconds: number;
   passageId: number | null;
   passageText: string | null;
+  /** False when the session ended before this question's answers opened. */
+  asked: boolean;
   options: ResultOption[];
   totalAnswers: number;
 }
@@ -167,6 +181,7 @@ export interface SessionResults {
   startedAt: string | null;
   endedAt: string | null;
   participantCount: number;
+  questionsAsked: number;
   leaderboard: LeaderboardEntry[];
   questions: QuestionResult[];
 }
@@ -178,6 +193,7 @@ export interface MyQuestionResult {
   questionType: QuestionType;
   passageId: number | null;
   passageText: string | null;
+  asked: boolean;
   selectedOptionIds: number[];
   correctOptionIds: number[];
   options: Array<OptionInfo & { isCorrect: boolean; pointValue: number }>;
@@ -191,6 +207,7 @@ export interface MyResults {
   score: number;
   correctCount: number;
   totalQuestions: number;
+  questionsAsked: number;
   rank: number;
   totalParticipants: number;
   questions: MyQuestionResult[];
@@ -246,12 +263,16 @@ export interface PassageFrozenMsg {
   subQuestionIds: number[];
 }
 
-/** Grading landed, or the organiser corrected it afterwards. */
+/**
+ * Grading landed, or the organiser corrected it afterwards. `scores` is what
+ * each player who answered earned, by participant id.
+ */
 export interface QuestionReviewedMsg {
   event: "QUESTION_REVIEWED" | "SCORING_CORRECTED";
   questionId: number;
   correctOptionIds: number[];
   optionPoints: Record<string, number>;
+  scores?: Record<string, number>;
 }
 
 /** The full standings, ranked, sent to players after each review. */

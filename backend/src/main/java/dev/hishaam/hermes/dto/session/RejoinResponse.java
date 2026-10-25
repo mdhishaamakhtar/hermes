@@ -4,6 +4,11 @@ import dev.hishaam.hermes.entity.enums.QuestionLifecycleState;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * A player's live view, rebuilt after a reconnect. {@code myScores} holds what the player earned on
+ * each graded question still on screen, keyed by question id, so a reconnect during the review
+ * shows the same verdict the reveal did.
+ */
 public record RejoinResponse(
     Long participantId,
     Long sessionId,
@@ -18,7 +23,9 @@ public record RejoinResponse(
     CurrentPassage currentPassage,
     Map<Long, QuestionStats> questionStatsById,
     List<SessionResultsResponse.LeaderboardEntry> leaderboard,
-    Integer timeLeftSeconds) {
+    Integer timeLeftSeconds,
+    Map<Long, Integer> myScores,
+    ScoringRules scoring) {
 
   public record CurrentQuestion(
       Long id,

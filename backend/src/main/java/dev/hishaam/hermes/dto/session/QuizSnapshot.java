@@ -49,6 +49,11 @@ public record QuizSnapshot(
       Integer timeLimitSeconds,
       List<Long> subQuestionIds) {}
 
+  /** Whether any option takes points away, which players should be told before they play. */
+  public boolean hasPenalties() {
+    return questions.stream().flatMap(q -> q.options().stream()).anyMatch(o -> o.pointValue() < 0);
+  }
+
   public QuestionSnapshot findQuestion(Long questionId) {
     return questions.stream().filter(q -> q.id().equals(questionId)).findFirst().orElse(null);
   }
@@ -115,6 +120,14 @@ public record QuizSnapshot(
         .filter(q -> globalSortKey(q) > currentKey)
         .min(Comparator.comparingDouble(this::globalSortKey))
         .orElse(null);
+  }
+
+  /**
+   * Whether a question had its answers opened, given how far into the running order the session
+   * got. A null count comes from a session recorded before this was tracked: every question counts.
+   */
+  public boolean wasAsked(Long questionId, Integer openedQuestionCount) {
+    return openedQuestionCount == null || questionPosition(questionId) <= openedQuestionCount;
   }
 
   /** Returns the 1-based position of the question among all questions sorted by orderIndex. */
