@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { TopBar } from "@/components/TopBar";
@@ -20,7 +20,12 @@ import { Leaderboard } from "../components/Leaderboard";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
 import { ScoringRules } from "../components/ScoringRules";
 import { QuestionSlate, slateDetail } from "../components/Slate";
-import { VERDICT_LABEL, verdictOf, type Verdict } from "../session-state";
+import {
+  VERDICT_LABEL,
+  verdictOf,
+  type Countdown,
+  type Verdict,
+} from "../session-state";
 import type { LeaderboardEntry, QuestionLifecycle } from "../session-types";
 import type { PlayQuestion } from "./play-state";
 import type { PlaySession } from "./usePlaySession";
@@ -155,6 +160,16 @@ export function PlayStage({ session }: { session: PlaySession }) {
   const verdictInView = useVerdictInView(
     reviewed ? questions.map((question) => question.id).join("-") : null,
   );
+  const stageKey = questions.map((question) => question.id).join("-");
+
+  // A new question takes focus, so a screen reader reads it out and a
+  // keyboard starts from it. Nothing changes on screen.
+  useEffect(() => {
+    if (!stageKey || document.activeElement?.closest("dialog")) return;
+    document
+      .querySelector<HTMLElement>("[data-question-heading]")
+      ?.focus({ preventScroll: true });
+  }, [stageKey]);
 
   return (
     <>
@@ -186,6 +201,9 @@ export function PlayStage({ session }: { session: PlaySession }) {
         id="main"
         className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 pt-6 pb-10 sm:px-6"
       >
+        <p aria-live="polite" aria-atomic="true" className="sr-only">
+          {timingAnnouncement(lifecycle, countdown)}
+        </p>
         {passage && <PassagePanel text={passage.text} />}
 
         <div className="relative">
@@ -297,6 +315,23 @@ export function PlayStage({ session }: { session: PlaySession }) {
       </div>
     </>
   );
+}
+
+/**
+ * The clock in words, for screen readers only, each said once as it
+ * changes: answers opening, ten seconds left, time up. The question itself
+ * is read when it takes focus, and the verdict has its own status.
+ */
+function timingAnnouncement(
+  lifecycle: QuestionLifecycle,
+  countdown: Countdown,
+): string {
+  if (lifecycle === "FROZEN") return "Time's up.";
+  if (lifecycle !== "TIMED") return "";
+  if (countdown.limit > 10 && countdown.left > 0 && countdown.left <= 10) {
+    return "Ten seconds left.";
+  }
+  return `Answers are open. ${countdown.limit} seconds.`;
 }
 
 /**
@@ -501,10 +536,22 @@ function PlayQuestionBlock({
   const multi = question.questionType === "MULTI_SELECT";
   const interactive = lifecycle === "TIMED" && !question.lockedIn && !pending;
   const reviewed = question.stats.reviewed;
+  // One tab stop for the group, on the pick if there is one: the arrow
+  // keys move between answers, and Space or Enter picks.
+  const tabStop = Math.max(
+    0,
+    question.options.findIndex((option) =>
+      question.selected.includes(option.id),
+    ),
+  );
 
   return (
     <section aria-label={`Question ${question.number}`}>
-      <h2 className="display text-[clamp(1.625rem,6.2vw,2.25rem)] leading-[1.1] text-foreground">
+      <h2
+        data-question-heading
+        tabIndex={-1}
+        className="display text-[clamp(1.625rem,6.2vw,2.25rem)] leading-[1.1] text-foreground focus:outline-none"
+      >
         {showNumber && (
           <span className="mr-2 font-mono text-base font-medium text-subtle">
             Q{question.number}
@@ -530,6 +577,7 @@ function PlayQuestionBlock({
       <div
         role={multi ? "group" : "radiogroup"}
         aria-label={`Answers for question ${question.number}`}
+        onKeyDown={moveBetweenAnswers}
         className="mt-5 grid gap-2.5 sm:grid-cols-2"
       >
         {question.options.map((option, index) => (
@@ -546,6 +594,7 @@ function PlayQuestionBlock({
               onToggle(option.id);
             }}
             disabled={!interactive}
+            tabIndex={index === tabStop ? 0 : -1}
           />
         ))}
       </div>
@@ -555,6 +604,40 @@ function PlayQuestionBlock({
       </AnimatePresence>
     </section>
   );
+}
+
+const ARROW_STEP: Record<string, number> = {
+  ArrowDown: 1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+};
+
+/**
+ * Arrow keys move focus round the answers, Home and End to the ends. Focus
+ * only: every pick is sent to the server, so picking stays a deliberate
+ * Space or Enter.
+ */
+function moveBetweenAnswers(event: KeyboardEvent<HTMLDivElement>) {
+  const answers = [
+    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+      "button:not(:disabled)",
+    ),
+  ];
+  const current = answers.indexOf(document.activeElement as HTMLButtonElement);
+  if (current < 0) return;
+  const step = ARROW_STEP[event.key];
+  const next =
+    step !== undefined
+      ? (current + step + answers.length) % answers.length
+      : event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? answers.length - 1
+          : null;
+  if (next === null) return;
+  event.preventDefault();
+  answers[next].focus();
 }
 
 const VERDICT_STYLE: Record<

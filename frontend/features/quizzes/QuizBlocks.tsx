@@ -308,7 +308,7 @@ export function PassageBlock({
           />
         </div>
         <p
-          className={`mt-3 max-w-[72ch] text-base leading-7 whitespace-pre-wrap text-foreground/90 ${
+          className={`mt-3 max-w-[62ch] text-base leading-7 whitespace-pre-wrap text-foreground/90 ${
             isLong && !expanded ? "line-clamp-6" : ""
           }`}
         >

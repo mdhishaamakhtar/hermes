@@ -38,6 +38,8 @@ interface AnswerOptionProps {
   disabled?: boolean;
   /** Multi-select tiles behave as checkboxes, single-select as radios. */
   role?: "radio" | "checkbox";
+  /** Set by a group that moves focus with the arrow keys. */
+  tabIndex?: number;
 }
 
 const LETTER_SIZE = {
@@ -89,6 +91,7 @@ export function AnswerOption({
   onPress,
   disabled = false,
   role,
+  tabIndex,
 }: AnswerOptionProps) {
   const style = { "--option": optionColor(index) } as CSSProperties;
   const marked = state === "correct" || state === "missed";
@@ -166,6 +169,7 @@ export function AnswerOption({
         aria-checked={role ? state === "selected" : undefined}
         onClick={onPress}
         disabled={disabled}
+        tabIndex={tabIndex}
         data-state={state}
         data-locked={locked || undefined}
         className={`${className} w-full disabled:cursor-default`}

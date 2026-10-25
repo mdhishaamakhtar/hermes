@@ -105,7 +105,7 @@ export function PassagePanel({ text }: { text: string }) {
     >
       <p className="label mb-2.5">Passage</p>
       <p
-        className={`max-w-[72ch] text-base leading-7 whitespace-pre-wrap text-foreground/90 ${
+        className={`max-w-[62ch] text-base leading-7 whitespace-pre-wrap text-foreground/90 ${
           long && !open ? "line-clamp-5 sm:line-clamp-none" : ""
         } sm:max-h-[40vh] sm:overflow-y-auto`}
       >

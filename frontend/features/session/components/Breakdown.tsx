@@ -155,7 +155,7 @@ export function QuestionBreakdown({
                   <span className="text-foreground">
                     {formatNumber(option.count)}
                   </span>
-                  <span className="w-10 text-right text-subtle">
+                  <span className="w-10 text-right text-muted">
                     {percent(option.count, question.totalAnswers)}%
                   </span>
                 </>
