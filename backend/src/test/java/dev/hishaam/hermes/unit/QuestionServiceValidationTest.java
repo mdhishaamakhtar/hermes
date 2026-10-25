@@ -39,7 +39,8 @@ class QuestionServiceValidationTest {
             QuestionType.class,
             int.class,
             List.class,
-            Long.class);
+            Long.class,
+            boolean.class);
     validateMethod.setAccessible(true);
   }
 
@@ -61,7 +62,8 @@ class QuestionServiceValidationTest {
           questionType,
           timeLimitSeconds,
           optionRequests,
-          currentQuestionId);
+          currentQuestionId,
+          false);
     } catch (Exception e) {
       if (e.getCause() instanceof AppException ae) {
         throw ae;
