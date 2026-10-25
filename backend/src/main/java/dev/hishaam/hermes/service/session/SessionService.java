@@ -218,7 +218,10 @@ public class SessionService {
       participantCount = participantRepository.countBySessionId(sessionId);
     }
     return new LobbyStateResponse(
-        session.getStatus().name(), participantCount, session.getJoinCode());
+        session.getStatus().name(),
+        participantCount,
+        session.getJoinCode(),
+        session.getQuiz().getTitle());
   }
 
   /**

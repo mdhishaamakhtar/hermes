@@ -95,6 +95,7 @@ export interface LobbySnapshot {
   status: SessionStatus;
   participantCount: number;
   joinCode: string;
+  quizTitle: string;
 }
 
 /* ── REST: player ─────────────────────────────────────────────────────────── */

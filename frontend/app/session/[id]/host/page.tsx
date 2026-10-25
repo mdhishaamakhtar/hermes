@@ -11,10 +11,12 @@ import {
   HostStage,
 } from "@/features/session/host/HostViews";
 import { useHostSession } from "@/features/session/host/useHostSession";
+import { useWakeLock } from "@/lib/wake-lock";
 
 export default function HostPage() {
   const { id } = useParams<{ id: string }>();
   const session = useHostSession(id);
+  useWakeLock(session.status !== "ENDED");
 
   // Lobby, stage and wrap-up are separate screens: open each at the top,
   // not wherever the previous one was scrolled to.

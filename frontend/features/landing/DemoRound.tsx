@@ -239,7 +239,7 @@ export function DemoRound() {
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 sm:px-5">
           <Tally state="on-air" />
           <span className="flex items-center gap-4 text-sm text-muted">
-            <StationClock className="hidden sm:inline" />
+            <StationClock className="hidden text-sm sm:inline" />
             <span>
               Code <span className="font-mono text-foreground">K7Q2XM</span>
             </span>

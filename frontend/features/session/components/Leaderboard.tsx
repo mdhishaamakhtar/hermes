@@ -195,88 +195,130 @@ function Row({
 /** Reveal order for the podium: third, then second, then the winner. */
 const PODIUM_DELAY = [0.9, 0.5, 0.15];
 
+/*
+ * Every podium row is the same row: one grid (a fixed rank column, the name,
+ * the score), one type size, one padding. The winner is told by the lit
+ * rank and the key-light tint, and by landing last, never by being bigger,
+ * so the names read as one column and the scores as another.
+ */
+const PODIUM_SIZE = {
+  page: {
+    list: "gap-2 [--rank:3rem]",
+    row: "px-4 py-3.5 sm:px-5",
+    type: "text-lg",
+  },
+  screen: {
+    list: "gap-[1.5vh] [--rank:clamp(4rem,9vh,6.5rem)]",
+    row: "px-[2vw] py-[2.4vh]",
+    type: "text-[clamp(1.75rem,5vh,3.75rem)]",
+  },
+} as const;
+
 /**
  * The final standings, told as a reveal: third place lands, then second,
- * then the winner, bigger and lit. Everyone else follows as a list.
+ * then the winner, lit. Everyone else follows in the same columns; on the
+ * big screen only the podium shows.
  */
 export function FinalStandings({
   entries,
   meId,
+  size = "page",
 }: {
   entries: LeaderboardEntry[];
   meId?: number | null;
+  size?: keyof typeof PODIUM_SIZE;
 }) {
   const sorted = entries.toSorted((a, b) => a.rank - b.rank);
-  const podium = sorted.slice(0, 3);
-  const rest = sorted.slice(3);
+  const podium = sorted.filter((entry) => entry.score > 0).slice(0, 3);
+  const rest = sorted.filter((entry) => !podium.includes(entry));
+  const look = PODIUM_SIZE[size];
 
-  if (sorted.every((entry) => entry.score === 0)) {
+  if (podium.length === 0) {
     return <p className="text-sm text-subtle">Nobody scored this time.</p>;
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col ${look.list}`}>
       {podium.map((entry, index) => {
         const winner = index === 0;
         const me = entry.participantId === meId;
         return (
           <motion.div
             key={entry.participantId}
-            initial={{ opacity: 0, y: 12, scale: winner ? 0.97 : 1 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{
               duration: duration.stage,
               ease: ease.out,
               delay: PODIUM_DELAY[index],
             }}
-            className={`flex items-center gap-4 border px-4 ${
+            className={`grid grid-cols-[var(--rank)_minmax(0,1fr)_auto] items-baseline border ${look.row} ${look.type} ${
               winner
-                ? "border-accent/60 bg-accent/10 py-5 sm:px-6"
+                ? "border-accent/60 bg-accent/10"
                 : me
-                  ? "border-primary bg-primary/10 py-3.5"
-                  : "border-border-strong bg-surface py-3.5"
+                  ? "border-primary bg-primary/10"
+                  : "border-border-strong bg-surface"
             }`}
           >
             <span
-              className={`w-9 shrink-0 font-mono font-semibold tabular-nums ${
-                winner ? "text-3xl text-accent" : "text-xl text-muted"
+              className={`font-mono leading-none font-semibold tabular-nums ${
+                winner ? "text-accent" : "text-muted"
               }`}
             >
               {entry.rank}
             </span>
-            <span
-              className={`min-w-0 flex-1 truncate font-semibold text-foreground ${
-                winner ? "text-2xl" : "text-lg"
-              }`}
-            >
+            <span className="min-w-0 truncate leading-tight font-semibold text-foreground">
               {entry.displayName}
-              {me && <span className="ml-2 text-sm text-accent">You</span>}
+              {me && (
+                <span className="ml-[0.6em] text-[0.55em] text-accent">
+                  You
+                </span>
+              )}
             </span>
-            <span
-              className={`font-mono font-semibold tabular-nums ${
-                winner ? "text-2xl text-foreground" : "text-lg text-foreground"
-              }`}
-            >
+            <span className="pl-4 font-mono leading-none font-semibold text-foreground tabular-nums">
               {formatNumber(entry.score)}
             </span>
           </motion.div>
         );
       })}
-      {rest.length > 0 && (
+      {size === "page" && rest.length > 0 && (
+        // The rest keep the podium's columns, so every name in the
+        // standings starts on one edge.
         <ol className="mt-2 flex flex-col gap-1.5">
-          {rest.map((entry, index) => (
-            <motion.li
-              key={entry.participantId}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{
-                duration: duration.enter,
-                delay: 1.2 + stagger(index),
-              }}
-            >
-              <Row entry={entry} me={entry.participantId === meId} />
-            </motion.li>
-          ))}
+          {rest.map((entry, index) => {
+            const me = entry.participantId === meId;
+            return (
+              <motion.li
+                key={entry.participantId}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{
+                  duration: duration.enter,
+                  delay: 1.2 + stagger(index),
+                }}
+                className={`grid grid-cols-[var(--rank)_minmax(0,1fr)_auto] items-baseline border px-4 py-2.5 text-lg sm:px-5 ${
+                  me
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-background"
+                }`}
+              >
+                <span className="font-mono leading-none font-semibold text-subtle tabular-nums">
+                  {entry.rank}
+                </span>
+                <span className="min-w-0 truncate leading-tight text-foreground">
+                  {entry.displayName}
+                  {me && (
+                    <span className="ml-[0.6em] text-[0.55em] font-semibold text-accent">
+                      You
+                    </span>
+                  )}
+                </span>
+                <span className="pl-4 font-mono leading-none font-semibold text-foreground tabular-nums">
+                  {formatNumber(entry.score)}
+                </span>
+              </motion.li>
+            );
+          })}
         </ol>
       )}
     </div>

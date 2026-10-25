@@ -33,6 +33,7 @@ import type {
   QuestionDisplayedMsg,
   QuestionLifecycle,
   QuestionStats,
+  ScoringRules,
   SessionResults,
 } from "../session-types";
 
@@ -54,6 +55,7 @@ export interface StagePassage {
 export interface HostState {
   hydrated: boolean;
   status: SessionStatus;
+  title: string;
   lifecycle: QuestionLifecycle;
   joinCode: string;
   participantCount: number;
@@ -66,6 +68,7 @@ export interface HostState {
   stats: Record<number, QuestionStats>;
   leaderboard: LeaderboardEntry[];
   results: SessionResults | null;
+  scoring: ScoringRules;
 }
 
 export type HostAction =
@@ -95,6 +98,7 @@ export function initialHostState(joinCode: string): HostState {
   return {
     hydrated: false,
     status: "LOBBY",
+    title: "",
     lifecycle: "DISPLAYED",
     joinCode,
     participantCount: 0,
@@ -106,6 +110,7 @@ export function initialHostState(joinCode: string): HostState {
     stats: {},
     leaderboard: [],
     results: null,
+    scoring: { penalties: false, speedScoring: false },
   };
 }
 
@@ -178,6 +183,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         leaderboard: sync.leaderboard.length
           ? sync.leaderboard
           : state.leaderboard,
+        scoring: sync.scoring ?? state.scoring,
       };
     }
 
@@ -188,6 +194,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         status: action.lobby.status,
         participantCount: action.lobby.participantCount,
         joinCode: action.lobby.joinCode || state.joinCode,
+        title: action.lobby.quizTitle ?? state.title,
       };
 
     case "STATUS":

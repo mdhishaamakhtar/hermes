@@ -24,8 +24,11 @@ interface AnswerOptionProps {
   share?: number;
   /** Right-hand detail: a count, points, or a status mark. */
   aside?: ReactNode;
-  /** `xl` is the host's projector size, for a lone question on the stage. */
-  size?: "md" | "lg" | "xl";
+  /**
+   * `xl` for a lone question on a large stage; `screen` for the big screen,
+   * where the tile scales with the projector rather than the page.
+   */
+  size?: "md" | "lg" | "xl" | "screen";
   /** The player committed to this pick; the letter becomes a lock. */
   locked?: boolean;
   /** Makes the tile a toggle the player presses to choose it. */
@@ -35,17 +38,25 @@ interface AnswerOptionProps {
   role?: "radio" | "checkbox";
 }
 
-const LETTER_SIZE = { md: "", lg: "size-9 text-sm", xl: "size-11 text-base" };
+const LETTER_SIZE = {
+  md: "",
+  lg: "size-9 text-sm",
+  xl: "size-11 text-base",
+  screen: "size-[clamp(2.75rem,5.5vh,4.5rem)] text-[clamp(1rem,2.2vh,1.75rem)]",
+};
 const TEXT_SIZE = {
   md: "text-base leading-snug",
   lg: "text-lg leading-snug font-medium",
   xl: "text-xl leading-snug font-medium xl:text-2xl",
+  screen: "text-[clamp(1.25rem,min(2.4vw,4vh),3rem)] leading-tight font-medium",
 };
 const TILE_SIZE = {
   md: "",
   lg: "min-h-16 px-4 py-4",
   xl: "min-h-20 gap-x-4 px-5 py-5",
+  screen: "min-h-[clamp(4.5rem,11vh,9rem)] gap-x-[1.5vw] px-[1.5vw] py-[1.5vh]",
 };
+const ICON_SIZE = { md: 14, lg: 16, xl: 16, screen: 28 };
 
 /**
  * An answer, in any context: the host's stage, a player's phone, results.
@@ -103,7 +114,7 @@ export function AnswerOption({
             transition={spring.stamp}
           >
             {glyph ? (
-              <Icon name={glyph} size={size === "md" ? 14 : 16} />
+              <Icon name={glyph} size={ICON_SIZE[size]} />
             ) : (
               optionLetter(index)
             )}
@@ -119,7 +130,11 @@ export function AnswerOption({
         {text}
       </span>
       {aside !== undefined ? (
-        <span className="relative flex items-center gap-3 font-mono text-sm text-muted tabular-nums">
+        <span
+          className={`relative flex items-center gap-3 font-mono text-muted tabular-nums ${
+            size === "screen" ? "text-[clamp(1rem,2.4vh,2rem)]" : "text-sm"
+          }`}
+        >
           {aside}
         </span>
       ) : (

@@ -17,13 +17,20 @@ const TALLY_LABEL: Record<TallyState, string> = {
  */
 export function Tally({
   state,
+  size = "page",
   className = "",
 }: {
   state: TallyState;
+  /** `screen` for the big screen, sized by the projector. */
+  size?: "page" | "screen";
   className?: string;
 }) {
   return (
-    <span data-tally={state} className={`tally ${className}`}>
+    <span
+      data-tally={state}
+      data-size={size === "screen" ? "screen" : undefined}
+      className={`tally ${className}`}
+    >
       {TALLY_LABEL[state]}
     </span>
   );
@@ -53,7 +60,12 @@ const timeFormat = new Intl.DateTimeFormat(undefined, {
  * The station clock every gallery runs: local time to the second. Rendered
  * only in the browser; the server sends a placeholder of the same width.
  */
-export function StationClock({ className = "" }: { className?: string }) {
+export function StationClock({
+  className = "text-sm",
+}: {
+  /** Sizing and visibility; the clock inherits size when none is given. */
+  className?: string;
+}) {
   const now = useSyncExternalStore(
     subscribeSeconds,
     () => Math.floor(Date.now() / 1000),
@@ -62,7 +74,7 @@ export function StationClock({ className = "" }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`font-mono text-sm text-muted tabular-nums ${className}`}
+      className={`font-mono text-muted tabular-nums ${className}`}
     >
       {now === null ? "––:––:––" : timeFormat.format(now * 1000)}
     </span>

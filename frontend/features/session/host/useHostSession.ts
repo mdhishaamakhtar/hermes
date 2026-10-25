@@ -218,6 +218,80 @@ export function useHostSession(sessionId: string) {
   };
 
   const lastQuestion = state.questions.at(-1);
+  const canAdvance =
+    state.lifecycle === "REVIEWING" &&
+    state.questions.length > 0 &&
+    state.questions.every((question) => state.stats[question.id]?.reviewed);
+  const isLastQuestion =
+    lastQuestion !== undefined &&
+    state.totalQuestions > 0 &&
+    lastQuestion.number >= state.totalQuestions;
+
+  const controls = {
+    start: () =>
+      run(
+        "start",
+        () => sessionsApi.start(sessionId),
+        "Couldn't start the session.",
+      ),
+    startTimer: () =>
+      run(
+        "start-timer",
+        () => sessionsApi.startTimer(sessionId),
+        "Couldn't start the timer.",
+      ),
+    endTimer: () =>
+      run(
+        "end-timer",
+        () => sessionsApi.endTimer(sessionId),
+        "Couldn't stop the timer.",
+      ),
+    next: () =>
+      run(
+        "next",
+        () => sessionsApi.next(sessionId),
+        "Couldn't move on to the next question.",
+      ),
+    end: () =>
+      run(
+        "end",
+        async () => {
+          await sessionsApi.end(sessionId);
+          dispatch({ type: "ENDED" });
+          await loadResults();
+        },
+        "Couldn't end the session.",
+      ),
+  };
+
+  /**
+   * The one next step the show is waiting on, if any: what the dock's
+   * primary button does, and what → on a clicker does on either screen.
+   */
+  const nextStep: {
+    control: HostControl;
+    label: string;
+    run: () => void;
+  } | null =
+    state.status === "LOBBY"
+      ? state.participantCount > 0
+        ? { control: "start", label: "Start the quiz", run: controls.start }
+        : null
+      : state.status !== "ACTIVE"
+        ? null
+        : state.lifecycle === "DISPLAYED"
+          ? {
+              control: "start-timer",
+              label: "Start timer",
+              run: controls.startTimer,
+            }
+          : canAdvance
+            ? {
+                control: "next",
+                label: isLastQuestion ? "Finish quiz" : "Next question",
+                run: controls.next,
+              }
+            : null;
 
   return {
     ...state,
@@ -229,50 +303,13 @@ export function useHostSession(sessionId: string) {
     controlError,
     dismissControlError: () => setControlError(null),
     /** Every question on stage has been graded, so the host may move on. */
-    canAdvance:
-      state.lifecycle === "REVIEWING" &&
-      state.questions.length > 0 &&
-      state.questions.every((question) => state.stats[question.id]?.reviewed),
-    isLastQuestion:
-      lastQuestion !== undefined &&
-      state.totalQuestions > 0 &&
-      lastQuestion.number >= state.totalQuestions,
-
-    controls: {
-      start: () =>
-        run(
-          "start",
-          () => sessionsApi.start(sessionId),
-          "Couldn't start the session.",
-        ),
-      startTimer: () =>
-        run(
-          "start-timer",
-          () => sessionsApi.startTimer(sessionId),
-          "Couldn't start the timer.",
-        ),
-      endTimer: () =>
-        run(
-          "end-timer",
-          () => sessionsApi.endTimer(sessionId),
-          "Couldn't stop the timer.",
-        ),
-      next: () =>
-        run(
-          "next",
-          () => sessionsApi.next(sessionId),
-          "Couldn't move on to the next question.",
-        ),
-      end: () =>
-        run(
-          "end",
-          async () => {
-            await sessionsApi.end(sessionId);
-            dispatch({ type: "ENDED" });
-            await loadResults();
-          },
-          "Couldn't end the session.",
-        ),
+    canAdvance,
+    isLastQuestion,
+    controls,
+    nextStep,
+    /** Takes the next step, unless a control is already in flight. */
+    advance: () => {
+      if (nextStep && !busy.current) nextStep.run();
     },
 
     /** Re-score a graded question; the leaderboard recalculates on the server. */

@@ -9,6 +9,8 @@ import { duration, ease, stagger } from "@/lib/motion";
 const PLACEHOLDER = "······";
 
 const SIZES = {
+  /** The big screen's lobby, sized by the projector rather than the page. */
+  screen: "h-[clamp(5rem,17vh,12rem)] text-[clamp(3rem,11vh,8rem)] gap-[1vw]",
   /** The lobby, read from the back of a room. */
   hero: "h-[clamp(4.5rem,11vw,7.5rem)] text-[clamp(2.75rem,7.5vw,5.25rem)] gap-2 sm:gap-3",
   /** A strip on the live stage, for latecomers. */
@@ -59,7 +61,7 @@ export function JoinCodeDisplay({
 const noSubscribe = () => () => {};
 
 /** The public join URL for this deployment, known only in the browser. */
-function useJoinUrl(code: string) {
+export function useJoinUrl(code: string) {
   const origin = useSyncExternalStore(
     noSubscribe,
     () => window.location.origin,
@@ -71,7 +73,7 @@ function useJoinUrl(code: string) {
   };
 }
 
-async function copy(text: string, confirmation: string) {
+export async function copy(text: string, confirmation: string) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(confirmation);

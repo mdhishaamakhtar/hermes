@@ -11,14 +11,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import dev.hishaam.hermes.dto.session.AnswerStats;
+import dev.hishaam.hermes.dto.session.QuizSnapshot;
 import dev.hishaam.hermes.dto.session.SessionResultsResponse;
 import dev.hishaam.hermes.dto.ws.WsPayloads;
+import dev.hishaam.hermes.entity.enums.DisplayMode;
+import dev.hishaam.hermes.entity.enums.QuestionType;
 import dev.hishaam.hermes.repository.redis.SessionScoringRedisRepository;
 import dev.hishaam.hermes.repository.redis.SessionStateRedisRepository;
 import dev.hishaam.hermes.service.LeaderboardService;
 import dev.hishaam.hermes.service.session.SessionEventPublisher;
 import dev.hishaam.hermes.util.WsTopics;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -163,6 +168,36 @@ class SessionEventPublisherTest {
         .convertAndSend(eq(WsTopics.sessionAnalytics(SESSION_ID)), (Object) analytics.capture());
     assertThat(analytics.getValue().leaderboard()).isEqualTo(standings);
     assertThat(analytics.getValue().totalParticipants()).isEqualTo(1);
+  }
+
+  /**
+   * The organiser's controller sees every count whatever the display mode, while players of a
+   * CODE_DISPLAY question hear nothing until it is reviewed.
+   */
+  @Test
+  void theOrganiserGetsEveryCountWhilePlayersFollowTheDisplayMode() {
+    QuizSnapshot.QuestionSnapshot question =
+        new QuizSnapshot.QuestionSnapshot(
+            QUESTION_ID,
+            "Hidden",
+            QuestionType.SINGLE_SELECT,
+            1,
+            30,
+            null,
+            DisplayMode.CODE_DISPLAY,
+            List.of(new QuizSnapshot.OptionSnapshot(7L, "A", 10, 0)),
+            null);
+
+    publisher.publishAnswerUpdate(SESSION_ID, question, new AnswerStats(Map.of(7L, 3L), 3, 5, 1));
+
+    ArgumentCaptor<WsPayloads.AnswerUpdate> organiser =
+        ArgumentCaptor.forClass(WsPayloads.AnswerUpdate.class);
+    verify(messaging)
+        .convertAndSend(eq(WsTopics.sessionAnalytics(SESSION_ID)), (Object) organiser.capture());
+    assertThat(organiser.getValue().counts()).containsEntry(7L, 3L);
+    assertThat(organiser.getValue().totalAnswered()).isEqualTo(3);
+    verify(messaging, never())
+        .convertAndSend(eq(WsTopics.sessionQuestion(SESSION_ID)), any(Object.class));
   }
 
   /** A rolled-back end never happened, so participants must not be told the session is over. */

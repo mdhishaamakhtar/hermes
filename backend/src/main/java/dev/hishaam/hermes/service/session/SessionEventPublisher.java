@@ -185,25 +185,34 @@ public class SessionEventPublisher {
   }
 
   /**
-   * Streams the live tallies for a question. What goes out follows its display mode: LIVE shows the
-   * per-option counts, BLIND only how many have answered, CODE_DISPLAY nothing until review.
+   * Streams the live tallies for a question. The organiser always gets every count: their
+   * controller is private, and the big screen decides for itself what the room may see. Players get
+   * what the display mode allows: LIVE the per-option counts, BLIND only how many have answered,
+   * CODE_DISPLAY nothing until review.
    */
   public void publishAnswerUpdate(
       Long sessionId, QuizSnapshot.QuestionSnapshot question, AnswerStats stats) {
+    send(
+        WsTopics.sessionAnalytics(sessionId),
+        new WsPayloads.AnswerUpdate(
+            question.id(),
+            stats.optionCounts(),
+            stats.totalAnswered(),
+            stats.totalParticipants(),
+            stats.totalLockedIn()));
+
     DisplayMode mode = question.effectiveDisplayMode();
     if (mode == DisplayMode.CODE_DISPLAY) {
       return;
     }
-
-    var answerUpdate =
+    send(
+        WsTopics.sessionQuestion(sessionId),
         new WsPayloads.AnswerUpdate(
             question.id(),
             mode == DisplayMode.BLIND ? Map.of() : stats.optionCounts(),
             stats.totalAnswered(),
             stats.totalParticipants(),
-            stats.totalLockedIn());
-    send(WsTopics.sessionAnalytics(sessionId), answerUpdate);
-    send(WsTopics.sessionQuestion(sessionId), answerUpdate);
+            stats.totalLockedIn()));
   }
 
   public void publishAnswerAccepted(

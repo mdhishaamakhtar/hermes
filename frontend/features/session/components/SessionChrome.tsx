@@ -34,7 +34,7 @@ export function SessionTopBar({
     <TopBar home={null} width="stage">
       <ConnectionStatus connected={connected} />
       {children}
-      {clock && <StationClock className="hidden md:inline" />}
+      {clock && <StationClock className="hidden text-sm md:inline" />}
       <PlayerCount count={participantCount} />
       <Tally state={tally} />
     </TopBar>
@@ -50,7 +50,7 @@ const OFFLINE_GRACE_MS = 1500;
  * frozen quiz. The quick reconnect a tab makes when it comes back to the
  * front passes without a flicker.
  */
-function ConnectionStatus({ connected }: { connected: boolean }) {
+export function ConnectionStatus({ connected }: { connected: boolean }) {
   const [offline, setOffline] = useState(false);
   useEffect(() => {
     if (connected) return;
@@ -76,7 +76,7 @@ function ConnectionStatus({ connected }: { connected: boolean }) {
   );
 }
 
-function PlayerCount({ count }: { count: number }) {
+export function PlayerCount({ count }: { count: number }) {
   return (
     <span
       className="flex items-center gap-1.5 text-sm text-muted"

@@ -1,33 +1,96 @@
 "use client";
 
-import { useEffect, useEffectEvent, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RollingNumber } from "@/components/ui/AnimatedNumber";
-import { Alert } from "@/components/ui/Alert";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
+import { Icon } from "@/components/ui/Icon";
 import { displayModeLabel } from "@/features/quizzes/editor-model";
 import { countLabel, countNoun, formatNumber, percent } from "@/lib/format";
-import { rise, spring, stageCut } from "@/lib/motion";
+import { spring, stageCut } from "@/lib/motion";
 import { AnswerOption } from "../components/AnswerOption";
 import { CountdownBar, CountdownClock } from "../components/Countdown";
-import { JoinCodeDisplay, JoinInstructions } from "../components/JoinCode";
+import { copy, JoinCodeDisplay, useJoinUrl } from "../components/JoinCode";
 import { Leaderboard } from "../components/Leaderboard";
 import { ScoringDrawer, type ScoringTarget } from "../components/ScoringDrawer";
+import { ScoringRules } from "../components/ScoringRules";
 import { Rundown } from "../components/Rundown";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
-import { QuestionSlate, slateDetail } from "../components/Slate";
 import { WrapUp } from "../components/WrapUp";
 import { emptyStats } from "../session-state";
 import type { QuestionStats } from "../session-types";
 import type { StageQuestion } from "./host-state";
+import { useClicker } from "./useClicker";
 import type { HostSession } from "./useHostSession";
+
+/*
+ * The controller: the host's private view of the show. The room watches the
+ * big screen (/screen); this page is where the host sees every count,
+ * the standings and the next step, and it fits a phone, so the host can
+ * walk the room. A clicker works here and on the big screen alike.
+ */
+
+function screenUrl(sessionId: string) {
+  return `/session/${sessionId}/screen`;
+}
+
+/** Opens the big screen in its own window, or brings that window back. */
+function openScreen(sessionId: string) {
+  window.open(screenUrl(sessionId), `hermes-screen-${sessionId}`);
+}
+
+function ScreenButton({ sessionId }: { sessionId: string }) {
+  return (
+    <Button
+      size="sm"
+      icon="screen"
+      onClick={() => openScreen(sessionId)}
+      title="Open the big screen in a new window"
+    >
+      <span className="max-sm:sr-only">Big screen</span>
+    </Button>
+  );
+}
+
+/** The step the dock is waiting on, under the host's thumb on a phone. */
+function Dock({
+  status,
+  children,
+}: {
+  status: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="chrome dock-inset sticky bottom-0 z-[var(--z-dock)] border-t border-border">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-6">
+        <p
+          role="status"
+          aria-live="polite"
+          className="min-w-0 text-sm text-muted sm:flex-1"
+        >
+          {status}
+        </p>
+        <div className="flex items-center gap-2">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 /* ── Lobby ────────────────────────────────────────────────────────────────── */
 
 export function HostLobby({ session }: { session: HostSession }) {
-  const { participantCount, joinCode, controls, pending, controlError } =
-    session;
+  const {
+    sessionId,
+    participantCount,
+    joinCode,
+    nextStep,
+    pending,
+    controlError,
+  } = session;
+  const url = useJoinUrl(joinCode);
+  useClicker(session.advance);
+
   return (
     <>
       <SessionTopBar
@@ -35,66 +98,168 @@ export function HostLobby({ session }: { session: HostSession }) {
         participantCount={participantCount}
         tally="standby"
         clock
-      />
+      >
+        <ScreenButton sessionId={sessionId} />
+      </SessionTopBar>
+
       <main
         id="main"
-        className="mx-auto flex w-full max-w-4xl flex-1 animate-rise flex-col items-center justify-center gap-14 px-4 py-12 sm:px-6"
+        className="mx-auto grid w-full max-w-6xl flex-1 animate-rise content-start gap-8 px-4 pt-8 pb-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:pt-12"
       >
-        <JoinInstructions code={joinCode} />
+        <div className="flex min-w-0 flex-col gap-8">
+          <header>
+            <h1 className="display display-tight text-[clamp(2.5rem,6vw,4rem)] leading-[0.92] text-balance text-foreground">
+              {session.title || "Lobby"}
+            </h1>
+            <p className="mt-3 max-w-[38rem] text-lg text-muted">
+              Players are joining. Put the big screen on the projector, then
+              start when the room is ready.
+            </p>
+          </header>
 
-        <div className="flex flex-col items-center gap-2 text-center">
-          <RollingNumber
-            value={participantCount}
-            className="font-mono text-[clamp(3.5rem,9vw,6rem)] leading-none font-semibold text-foreground"
-          />
-          <p className="flex items-center gap-2 text-muted">
-            {participantCount === 0 ? (
-              <>
-                <span aria-hidden className="live-dot text-accent" />
-                Waiting for the first player
-              </>
-            ) : (
-              `${countNoun(participantCount, "player", "players")} ready`
-            )}
-          </p>
-        </div>
-
-        <div className="flex w-full max-w-sm flex-col items-center gap-3">
-          {controlError && <Alert className="w-full">{controlError}</Alert>}
-          <Button
-            variant="primary"
-            size="lg"
-            icon="play"
-            onClick={controls.start}
-            pending={pending === "start"}
-            disabled={participantCount === 0}
-            className="w-full"
+          <section
+            aria-labelledby="screen-heading"
+            className="flex flex-col gap-5 border border-border bg-surface p-5 sm:flex-row sm:items-center sm:p-6"
           >
-            {pending === "start" ? "Starting…" : "Start the quiz"}
-          </Button>
-          <p className="text-sm text-subtle">
-            {participantCount === 0
-              ? "You can start once the first player is in."
-              : "Latecomers can still join with the code."}
-          </p>
+            <span
+              aria-hidden
+              className="grid size-12 shrink-0 place-items-center border border-primary/60 bg-primary/10 text-accent"
+            >
+              <Icon name="screen" size={22} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 id="screen-heading" className="font-semibold text-foreground">
+                The big screen
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                It shows the join code now and each question once you start. You
+                run the show from here, from your phone, or with a clicker on
+                either.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button
+                variant="primary"
+                trailingIcon="external"
+                onClick={() => openScreen(sessionId)}
+              >
+                Open it
+              </Button>
+              <Button
+                icon="link"
+                onClick={() =>
+                  void copy(
+                    `${window.location.origin}${screenUrl(sessionId)}`,
+                    "Big screen link copied",
+                  )
+                }
+              >
+                Copy link
+              </Button>
+            </div>
+          </section>
+
+          <section
+            aria-labelledby="join-heading"
+            className="border border-border bg-surface p-5 sm:p-6"
+          >
+            <h2 id="join-heading" className="font-semibold text-foreground">
+              Players join at{" "}
+              <span className="font-mono text-accent">{url.display}</span>
+            </h2>
+            <div className="mt-5 max-w-md">
+              <JoinCodeDisplay code={joinCode} size="strip" />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                icon="copy"
+                disabled={!joinCode}
+                onClick={() => void copy(joinCode, "Join code copied")}
+              >
+                Copy code
+              </Button>
+              <Button
+                size="sm"
+                icon="link"
+                disabled={!joinCode}
+                onClick={() => void copy(url.withCode, "Join link copied")}
+              >
+                Copy join link
+              </Button>
+            </div>
+          </section>
         </div>
+
+        <aside className="flex flex-col gap-6">
+          <section
+            aria-labelledby="players-heading"
+            className="border border-border bg-surface p-5"
+          >
+            <h2
+              id="players-heading"
+              className="text-base font-semibold text-foreground"
+            >
+              Players
+            </h2>
+            <p className="mt-3 flex items-baseline gap-3">
+              <RollingNumber
+                value={participantCount}
+                className="font-mono text-5xl leading-none font-semibold text-foreground"
+              />
+              <span className="flex items-center gap-2 text-muted">
+                {participantCount === 0 ? (
+                  <>
+                    <span aria-hidden className="live-dot text-accent" />
+                    Waiting for the first
+                  </>
+                ) : (
+                  `${countNoun(participantCount, "player", "players")} in`
+                )}
+              </span>
+            </p>
+          </section>
+          <ScoringRules
+            rules={session.scoring}
+            audience="host"
+            className="border border-border bg-surface p-5"
+          />
+        </aside>
       </main>
+
+      <Dock
+        status={
+          controlError ? (
+            <span className="text-danger">{controlError}</span>
+          ) : participantCount === 0 ? (
+            "You can start once the first player is in."
+          ) : (
+            "Latecomers can still join with the code once you start."
+          )
+        }
+      >
+        <Button
+          variant="primary"
+          size="lg"
+          icon="play"
+          onClick={session.controls.start}
+          pending={pending === "start"}
+          disabled={!nextStep}
+          title="Shortcut: → or Page Down"
+          className="max-sm:flex-1"
+        >
+          {pending === "start" ? "Starting…" : "Start the quiz"}
+        </Button>
+      </Dock>
     </>
   );
 }
 
-/* ── Live stage ───────────────────────────────────────────────────────────── */
-
-function isEditable(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-  );
-}
+/* ── Live controller ──────────────────────────────────────────────────────── */
 
 export function HostStage({ session }: { session: HostSession }) {
   const {
+    sessionId,
     lifecycle,
     questions,
     passage,
@@ -109,11 +274,12 @@ export function HostStage({ session }: { session: HostSession }) {
     pending,
     controlError,
     canAdvance,
-    isLastQuestion,
+    nextStep,
   } = session;
   const [scoring, setScoring] = useState<ScoringTarget | null>(null);
   const [scoringOpen, setScoringOpen] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  useClicker(session.advance, !confirmEnd && !scoringOpen);
 
   const first = questions[0];
   const last = questions.at(-1);
@@ -128,48 +294,20 @@ export function HostStage({ session }: { session: HostSession }) {
   const expected = participantCount * Math.max(1, questions.length);
   const grading =
     lifecycle === "FROZEN" || (lifecycle === "REVIEWING" && !canAdvance);
-
-  // The one next step, in the dock and on the presenter's clicker.
-  const primary =
-    lifecycle === "DISPLAYED"
-      ? {
-          label: "Start timer",
-          run: controls.startTimer,
-          control: "start-timer" as const,
-        }
-      : lifecycle === "REVIEWING" && canAdvance
-        ? {
-            label: isLastQuestion ? "Finish quiz" : "Next question",
-            run: controls.next,
-            control: "next" as const,
-          }
-        : null;
-
-  const advance = useEffectEvent(() => {
-    if (primary && !pending && !confirmEnd && !scoringOpen) void primary.run();
-  });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.repeat || isEditable(event.target)) return;
-      if (event.key === "ArrowRight" || event.key === "PageDown") {
-        event.preventDefault();
-        advance();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  const hiddenFromRoom = displayMode !== "LIVE";
 
   const phase =
     lifecycle === "DISPLAYED"
-      ? "Answers open when you start the timer."
+      ? "Players can read the question. Answers open when you start the timer."
       : lifecycle === "TIMED"
-        ? displayMode === "CODE_DISPLAY"
-          ? "Answering now. Responses stay hidden until time is up."
-          : `${formatNumber(answered)} of ${formatNumber(expected)} answers in`
+        ? `${formatNumber(answered)} of ${formatNumber(expected)} answers in${
+            hiddenFromRoom
+              ? ". The big screen keeps them hidden until time is up."
+              : "."
+          }`
         : grading
           ? "Time's up. Grading answers…"
-          : "Results are in. Correct answers are highlighted.";
+          : "Results are in. The big screen shows the right answer.";
 
   const openScoring = (question: StageQuestion) => {
     const points = stats[question.id]?.optionPoints ?? {};
@@ -198,31 +336,23 @@ export function HostStage({ session }: { session: HostSession }) {
           Code
           <span className="font-mono text-foreground">{joinCode}</span>
         </span>
+        <ScreenButton sessionId={sessionId} />
       </SessionTopBar>
 
       <main
         id="main"
         className="mx-auto grid w-full max-w-7xl flex-1 content-start gap-6 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,1fr)_21rem]"
       >
-        <section aria-label="Stage" className="flex min-w-0 flex-col gap-4">
-          {displayMode === "CODE_DISPLAY" && lifecycle !== "REVIEWING" && (
-            <motion.div
-              {...rise}
-              className="flex flex-wrap items-center gap-x-6 gap-y-3 border border-border bg-surface px-5 py-4"
-            >
-              <p className="text-muted">Still joining? Enter</p>
-              <div className="w-full max-w-sm">
-                <JoinCodeDisplay code={joinCode} size="strip" />
-              </div>
-            </motion.div>
-          )}
-
+        <section
+          aria-label="Now on the big screen"
+          className="flex min-w-0 flex-col gap-4"
+        >
           {passage && <PassagePanel text={passage.text} />}
 
           <div className="border border-border bg-surface">
             <CountdownBar countdown={countdown} lifecycle={lifecycle} />
-            <div className="flex items-start justify-between gap-4 px-5 pt-5 sm:px-8 sm:pt-7">
-              <p className="pt-2 text-sm text-muted">
+            <div className="flex items-start justify-between gap-4 px-5 pt-5 sm:px-6">
+              <p className="pt-1.5 text-sm text-muted">
                 <span className="font-mono text-foreground">
                   {first && last && last.number > first.number
                     ? `Questions ${first.number}–${last.number}`
@@ -233,68 +363,42 @@ export function HostStage({ session }: { session: HostSession }) {
               <CountdownClock
                 countdown={countdown}
                 lifecycle={lifecycle}
-                className="text-4xl sm:text-5xl"
+                className="text-4xl"
               />
             </div>
 
-            <div className="relative">
-              {first && last && (
-                <QuestionSlate
-                  key={questions.map((q) => q.id).join("-")}
-                  lifecycle={lifecycle}
-                  first={first.number}
-                  last={last.number}
-                  total={totalQuestions}
-                  detail={slateDetail(questions)}
-                />
-              )}
-
-              {/* The next question starts from the top, not wherever the last
-                one was scrolled to. */}
-              {/* popLayout, not wait: the new question mounts at once, so
-                  the area under the slate reaches its final height in the
-                  slate's first frame instead of resizing mid-drop. */}
-              <AnimatePresence
-                mode="popLayout"
-                initial={false}
-                onExitComplete={() => window.scrollTo(0, 0)}
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={questions.map((q) => q.id).join("-")}
+                {...stageCut}
+                className="divide-y divide-border px-5 pb-6 sm:px-6"
               >
-                <motion.div
-                  key={questions.map((q) => q.id).join("-")}
-                  {...stageCut}
-                  className="divide-y divide-border px-5 pt-4 pb-6 sm:px-8 sm:pb-8"
-                >
-                  {questions.length === 0 ? (
-                    <p className="py-10 text-center text-muted">
-                      The next question is on its way…
-                    </p>
-                  ) : (
-                    questions.map((question) => (
-                      <StageQuestionBlock
-                        key={question.id}
-                        question={question}
-                        stats={stats[question.id] ?? emptyStats()}
-                        compact={questions.length > 1}
-                        countsVisible={
-                          displayMode === "LIVE"
-                            ? lifecycle !== "DISPLAYED"
-                            : Boolean(stats[question.id]?.revealed)
-                        }
-                        onEditScoring={
-                          lifecycle === "REVIEWING" &&
-                          stats[question.id]?.reviewed
-                            ? () => openScoring(question)
-                            : undefined
-                        }
-                      />
-                    ))
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
+                {questions.length === 0 ? (
+                  <p className="py-10 text-center text-muted">
+                    The next question is on its way…
+                  </p>
+                ) : (
+                  questions.map((question) => (
+                    <ControllerQuestion
+                      key={question.id}
+                      question={question}
+                      stats={stats[question.id] ?? emptyStats()}
+                      compact={questions.length > 1}
+                      countsVisible={lifecycle !== "DISPLAYED"}
+                      onEditScoring={
+                        lifecycle === "REVIEWING" &&
+                        stats[question.id]?.reviewed
+                          ? () => openScoring(question)
+                          : undefined
+                      }
+                    />
+                  ))
+                )}
+              </motion.div>
+            </AnimatePresence>
 
-            {lifecycle !== "DISPLAYED" && displayMode !== "CODE_DISPLAY" && (
-              <div className="border-t border-border px-5 py-4 sm:px-8">
+            {lifecycle !== "DISPLAYED" && (
+              <div className="border-t border-border px-5 py-4 sm:px-6">
                 <div className="mb-2 flex flex-wrap justify-between gap-2 text-sm">
                   <span className="text-muted">
                     <span className="font-mono text-foreground">
@@ -335,79 +439,67 @@ export function HostStage({ session }: { session: HostSession }) {
             aria-labelledby="standings-heading"
             className="border border-border bg-surface p-5"
           >
-            <h2
-              id="standings-heading"
-              className="mb-4 text-base font-semibold text-foreground"
-            >
-              Standings
-            </h2>
+            <div className="mb-4 flex items-baseline justify-between gap-3">
+              <h2
+                id="standings-heading"
+                className="text-base font-semibold text-foreground"
+              >
+                Standings
+              </h2>
+              <span className="text-xs text-subtle">Only you see these</span>
+            </div>
             <Leaderboard entries={leaderboard} limit={10} />
           </section>
         </aside>
       </main>
 
-      {/* On a phone the dock stacks: what is happening, then the controls
-          across the full width of the content, the next step filling the
-          rest of the row under the host's thumb. */}
-      <div className="chrome dock-inset sticky bottom-0 z-[var(--z-dock)] border-t border-border">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-6">
-          <p
-            role="status"
-            aria-live="polite"
-            className="min-w-0 text-sm text-muted sm:flex-1"
+      <Dock
+        status={
+          controlError ? (
+            <span className="text-danger">{controlError}</span>
+          ) : (
+            phase
+          )
+        }
+      >
+        <Button
+          variant="ghost"
+          onClick={() => setConfirmEnd(true)}
+          className="shrink-0 hover:text-danger max-sm:ghost-flush-start"
+        >
+          End session
+        </Button>
+        {lifecycle === "TIMED" ? (
+          <Button
+            size="lg"
+            icon="stop"
+            onClick={controls.endTimer}
+            pending={pending === "end-timer"}
+            className="max-sm:flex-1"
           >
-            {controlError ? (
-              <span className="text-danger">{controlError}</span>
-            ) : (
-              phase
-            )}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setConfirmEnd(true)}
-              className="shrink-0 hover:text-danger max-sm:ghost-flush-start"
-            >
-              End session
-            </Button>
-            {lifecycle === "TIMED" ? (
-              <Button
-                size="lg"
-                icon="stop"
-                onClick={controls.endTimer}
-                pending={pending === "end-timer"}
-                className="max-sm:flex-1"
-              >
-                {pending === "end-timer" ? "Stopping…" : "End timer now"}
-              </Button>
-            ) : primary ? (
-              <Button
-                variant="primary"
-                size="lg"
-                icon={primary.control === "start-timer" ? "play" : undefined}
-                trailingIcon={
-                  primary.control === "next" ? "arrow-right" : undefined
-                }
-                onClick={primary.run}
-                pending={pending === primary.control}
-                title="Shortcut: → or Page Down"
-                className="max-sm:flex-1"
-              >
-                {primary.label}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                pending
-                className="max-sm:flex-1"
-              >
-                Grading…
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+            {pending === "end-timer" ? "Stopping…" : "End timer now"}
+          </Button>
+        ) : nextStep ? (
+          <Button
+            variant="primary"
+            size="lg"
+            icon={nextStep.control === "start-timer" ? "play" : undefined}
+            trailingIcon={
+              nextStep.control === "next" ? "arrow-right" : undefined
+            }
+            onClick={nextStep.run}
+            pending={pending === nextStep.control}
+            title="Shortcut: → or Page Down"
+            className="max-sm:flex-1"
+          >
+            {nextStep.label}
+          </Button>
+        ) : (
+          <Button variant="primary" size="lg" pending className="max-sm:flex-1">
+            Grading…
+          </Button>
+        )}
+      </Dock>
 
       <ScoringDrawer
         open={scoringOpen}
@@ -427,7 +519,8 @@ export function HostStage({ session }: { session: HostSession }) {
   );
 }
 
-function StageQuestionBlock({
+/** A question as the host sees it: every count, whatever the room is shown. */
+function ControllerQuestion({
   question,
   stats,
   compact,
@@ -442,15 +535,15 @@ function StageQuestionBlock({
 }) {
   const total = stats.totalAnswered;
   return (
-    <div className="py-4 first:pt-2">
-      {/* Beside the question on a wide stage; under it on a phone, where it
-          would squeeze the question to a word a line. */}
+    <div className="py-4 first:pt-3">
+      {/* Beside the question on a wide screen; under it on a phone, where
+          it would squeeze the question to a word a line. */}
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <h2
-          className={`display text-foreground ${
+          className={`display text-balance text-foreground ${
             compact
-              ? "text-xl leading-tight sm:text-2xl"
-              : "text-[clamp(1.875rem,4.2vw,4.5rem)] leading-[1.04] tracking-[-0.022em]"
+              ? "text-lg leading-tight sm:text-xl"
+              : "text-2xl leading-[1.1] sm:text-3xl"
           }`}
         >
           {compact && (
@@ -471,7 +564,7 @@ function StageQuestionBlock({
           </Button>
         )}
       </div>
-      <ul className="mt-6 grid gap-2.5 md:grid-cols-2">
+      <ul className="mt-5 grid gap-2 md:grid-cols-2">
         {question.options.map((option, index) => {
           const count = stats.counts[option.id] ?? 0;
           return (
@@ -479,7 +572,6 @@ function StageQuestionBlock({
               <AnswerOption
                 index={index}
                 text={option.text}
-                size={compact ? "md" : "xl"}
                 state={
                   stats.reviewed
                     ? stats.correctOptionIds.includes(option.id)
@@ -496,7 +588,7 @@ function StageQuestionBlock({
                       <span className="text-foreground">
                         {formatNumber(count)}
                       </span>
-                      <span className="w-10 text-right text-subtle">
+                      <span className="w-10 text-right text-muted">
                         {percent(count, total)}%
                       </span>
                     </>
@@ -521,7 +613,9 @@ export function HostEnded({ session }: { session: HostSession }) {
         connected
         participantCount={participantCount}
         tally="off-air"
-      />
+      >
+        <ScreenButton sessionId={session.sessionId} />
+      </SessionTopBar>
       <main
         id="main"
         className="mx-auto w-full max-w-7xl flex-1 px-4 pt-10 pb-24 sm:px-6"
@@ -534,7 +628,7 @@ export function HostEnded({ session }: { session: HostSession }) {
             <p className="mt-3 text-muted">
               {countLabel(participantCount, "player", "players")}
               {results &&
-                ` · ${countLabel(results.questions.length, "question", "questions")} · ${results.quizTitle}`}
+                ` · ${countLabel(results.questionsAsked ?? results.questions.length, "question", "questions")} · ${results.quizTitle}`}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

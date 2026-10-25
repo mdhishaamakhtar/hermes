@@ -31,6 +31,19 @@ const PATHS = {
   eye: "M2.5 10S5.2 5 10 5s7.5 5 7.5 5-2.7 5-7.5 5-7.5-5-7.5-5zM12 10a2 2 0 11-4 0 2 2 0 014 0z",
   "eye-off":
     "M3 3l14 14M8.3 5.2A7.7 7.7 0 0110 5c4.8 0 7.5 5 7.5 5a13 13 0 01-1.9 2.4M13.7 13.9A7 7 0 0110 15c-4.8 0-7.5-5-7.5-5a13 13 0 013-3.4",
+  screen: "M2.5 4h15v10h-15zM7 17h6M10 14v3",
+  external: "M11 4h5v5M16 4l-7 7M14 12v4H4V6h4",
+  expand: "M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5",
+  collapse: "M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5",
+  volume:
+    "M3 8h3l4-3.5v11L6 12H3zM13.5 7.5a3.5 3.5 0 010 5M15.5 5a7 7 0 010 10",
+  "volume-off": "M3 8h3l4-3.5v11L6 12H3zM13 8l4 4M17 8l-4 4",
+  grip: "M7.5 5v1M12.5 5v1M7.5 9.5v1M12.5 9.5v1M7.5 14v1M12.5 14v1",
+  download: "M10 3v10M5.5 8.5L10 13l4.5-4.5M4 17h12",
+  share: "M10 13V3M6 7l4-4 4 4M4 11v6h12v-6",
+  poll: "M4 16V9M10 16V4M16 16v-5",
+  bolt: "M11 2.5L4.5 11H10l-1 6.5L15.5 9H10z",
+  standings: "M3 17h14M4.5 17v-5h3.5v5M8 17V7h4v10M12 17v-7h3.5v7",
 } as const;
 
 export type IconName = keyof typeof PATHS;

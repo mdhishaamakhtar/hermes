@@ -5,7 +5,7 @@ import { AUTH_COOKIE } from "@/lib/auth";
 const ORGANISER_ONLY = [
   /^\/dashboard$/,
   /^\/events\/.+/,
-  /^\/session\/[^/]+\/(host|review)$/,
+  /^\/session\/[^/]+\/(host|screen|review)$/,
 ];
 
 /*
