@@ -25,7 +25,8 @@ public record MyResultsResponse(
       List<Long> correctOptionIds,
       List<OptionInfo> options,
       boolean isCorrect,
-      int pointsEarned) {}
+      int pointsEarned,
+      boolean poll) {}
 
   public record OptionInfo(
       Long id, String text, int orderIndex, boolean isCorrect, int pointValue) {}

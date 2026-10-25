@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
@@ -37,6 +38,15 @@ public class Quiz {
   @Column(name = "display_mode", nullable = false)
   @Builder.Default
   private DisplayMode displayMode = DisplayMode.BLIND;
+
+  /**
+   * Faster right answers score more: a right answer keeps its full points if given at once, and
+   * loses up to half of them over the timer.
+   */
+  @Column(name = "speed_scoring", nullable = false)
+  @ColumnDefault("false")
+  @Builder.Default
+  private boolean speedScoring = false;
 
   @Column(name = "created_at")
   private OffsetDateTime createdAt;

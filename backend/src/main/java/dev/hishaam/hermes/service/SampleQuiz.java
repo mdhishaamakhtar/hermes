@@ -10,9 +10,9 @@ import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
 
 /**
- * The quiz a new organiser can start from: six questions that between them show off one answer and
- * several, a reading passage, and a wrong answer that costs points. Built fresh each time, so it
- * can be edited like any other quiz.
+ * The quiz a new organiser can start from: seven questions that between them show off one answer
+ * and several, a reading passage, a wrong answer that costs points, and a poll. Built fresh each
+ * time, so it can be edited like any other quiz.
  */
 final class SampleQuiz {
 
@@ -102,6 +102,21 @@ final class SampleQuiz {
         option("Q", CORRECT),
         option("X", PENALTY),
         option("Z", PENALTY));
+
+    Question poll =
+        build(
+            quiz,
+            null,
+            5,
+            "Where would you rather explore?",
+            QuestionType.SINGLE_SELECT,
+            TIMER,
+            option("The deep ocean", 0),
+            option("Outer space", 0),
+            option("A rainforest", 0),
+            option("The polar ice", 0));
+    poll.setPoll(true);
+    quiz.getQuestions().add(poll);
     return quiz;
   }
 

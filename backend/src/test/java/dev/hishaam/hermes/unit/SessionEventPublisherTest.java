@@ -186,7 +186,8 @@ class SessionEventPublisherTest {
             null,
             DisplayMode.CODE_DISPLAY,
             List.of(new QuizSnapshot.OptionSnapshot(7L, "A", 10, 0)),
-            null);
+            null,
+            false);
 
     publisher.publishAnswerUpdate(SESSION_ID, question, new AnswerStats(Map.of(7L, 3L), 3, 5, 1));
 

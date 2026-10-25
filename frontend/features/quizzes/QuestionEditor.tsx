@@ -22,12 +22,14 @@ import {
   displayModeLabel,
   isCorrect,
   MIN_OPTIONS,
+  QUESTION_KINDS,
   QUESTION_TYPES,
   sameDraft,
   scoringSummary,
   toggleCorrect,
   usesCustomScoring,
   validateQuestion,
+  withPoll,
   withQuestionType,
   type QuestionDraft,
 } from "./editor-model";
@@ -54,6 +56,7 @@ export function QuestionFields({
   /** Off where another field on the form should take focus first. */
   autoFocus?: boolean;
 }) {
+  const kindId = useId();
   const typeId = useId();
   const displayId = useId();
   const detailsId = useId();
@@ -99,8 +102,16 @@ export function QuestionFields({
         )}
       </div>
 
-      <Field id={typeId} label="Answers">
-        <div className="max-w-md">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Field id={kindId} label="Kind">
+          <SegmentedControl<"QUIZ" | "POLL">
+            id={kindId}
+            value={draft.poll ? "POLL" : "QUIZ"}
+            options={QUESTION_KINDS}
+            onChange={(kind) => onChange(withPoll(draft, kind === "POLL"))}
+          />
+        </Field>
+        <Field id={typeId} label="Answers">
           <SegmentedControl<QuestionType>
             id={typeId}
             value={draft.questionType}
@@ -109,10 +120,14 @@ export function QuestionFields({
               onChange(withQuestionType(draft, questionType))
             }
           />
-        </div>
-      </Field>
+        </Field>
+      </div>
 
-      <OptionsEditor draft={draft} onChange={onChange} showPoints={details} />
+      <OptionsEditor
+        draft={draft}
+        onChange={onChange}
+        showPoints={details && !draft.poll}
+      />
 
       <div className="border-t border-border pt-4">
         <button
@@ -122,7 +137,9 @@ export function QuestionFields({
           onClick={() => setDetails((open) => !open)}
           className="flex w-full items-center justify-between gap-4 text-left text-sm"
         >
-          <span className="font-medium text-foreground">Points & display</span>
+          <span className="font-medium text-foreground">
+            {draft.poll ? "Display" : "Points & display"}
+          </span>
           <span className="flex items-center gap-2 text-subtle">
             {!details && scoringSummary(draft)}
             <Icon
@@ -138,10 +155,12 @@ export function QuestionFields({
             {...fade}
             className="mt-5 flex flex-col gap-5"
           >
-            <p className="text-sm text-muted">
-              Set each option&apos;s points beside it above. A negative value
-              takes points away for a wrong pick.
-            </p>
+            {!draft.poll && (
+              <p className="text-sm text-muted">
+                Set each option&apos;s points beside it above. A negative value
+                takes points away for a wrong pick.
+              </p>
+            )}
             <Field id={displayId} label="Answer display on the big screen">
               <div className="max-w-md">
                 <SegmentedControl<DisplayChoice>
@@ -195,7 +214,11 @@ function OptionsEditor({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <legend className="text-sm font-medium text-muted">Options</legend>
         <p className="text-sm text-subtle">
-          Tap a letter to mark the right answer.
+          {draft.poll
+            ? draft.questionType === "MULTI_SELECT"
+              ? "Players vote for every one they like."
+              : "Players vote for the one they like."
+            : "Tap a letter to mark the right answer."}
         </p>
       </div>
 
@@ -210,20 +233,26 @@ function OptionsEditor({
               data-state={correct ? "correct" : undefined}
               style={{ "--option": optionColor(index) } as CSSProperties}
             >
-              <button
-                type="button"
-                onClick={() => onChange(toggleCorrect(draft, index))}
-                aria-pressed={correct}
-                aria-label={
-                  correct
-                    ? `Option ${letter} is correct. Unmark it`
-                    : `Mark option ${letter} correct`
-                }
-                title={correct ? "Correct answer" : "Mark correct"}
-                className="option-letter mt-1.5 size-8 transition-transform hover:scale-105"
-              >
-                {correct ? <Icon name="check" size={14} /> : letter}
-              </button>
+              {draft.poll ? (
+                <span aria-hidden className="option-letter mt-1.5 size-8">
+                  {letter}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onChange(toggleCorrect(draft, index))}
+                  aria-pressed={correct}
+                  aria-label={
+                    correct
+                      ? `Option ${letter} is correct. Unmark it`
+                      : `Mark option ${letter} correct`
+                  }
+                  title={correct ? "Correct answer" : "Mark correct"}
+                  className="option-letter mt-1.5 size-8 transition-transform hover:scale-105"
+                >
+                  {correct ? <Icon name="check" size={14} /> : letter}
+                </button>
+              )}
               <textarea
                 value={option.text}
                 onChange={(event) =>

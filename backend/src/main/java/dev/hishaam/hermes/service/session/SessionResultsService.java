@@ -141,7 +141,8 @@ public class SessionResultsService {
                       q.correctOptionIds(),
                       options,
                       isCorrect,
-                      pointsEarned);
+                      pointsEarned,
+                      q.votesOnly());
                 })
             .toList();
 
@@ -213,7 +214,8 @@ public class SessionResultsService {
                       passageText,
                       snapshot.wasAsked(q.id(), session.getOpenedQuestionCount()),
                       totalAnswers,
-                      options);
+                      options,
+                      q.votesOnly());
                 })
             .toList();
 

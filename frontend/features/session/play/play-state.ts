@@ -37,6 +37,8 @@ export interface PlayQuestion {
   number: number;
   text: string;
   questionType: QuestionType;
+  /** No right answer: the player votes and nobody scores. */
+  poll: boolean;
   options: OptionInfo[];
   selected: number[];
   lockedIn: boolean;
@@ -135,12 +137,14 @@ function fresh(
   text: string,
   questionType: QuestionType,
   options: OptionInfo[],
+  poll = false,
 ): PlayQuestion {
   return {
     id,
     number,
     text,
     questionType,
+    poll,
     options: byOrderIndex(options),
     selected: [],
     lockedIn: false,
@@ -162,6 +166,7 @@ function fromRejoin(
       question.text,
       question.questionType,
       question.options,
+      question.poll,
     ),
     selected: question.selectedOptionIds.map(Number),
     lockedIn: question.lockedIn,
@@ -278,6 +283,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
             message.text,
             message.questionType,
             message.options,
+            message.poll,
           ),
         ],
         passage: message.passage
@@ -304,6 +310,7 @@ export function playReducer(state: PlayState, action: PlayAction): PlayState {
             question.text,
             question.questionType,
             question.options,
+            question.poll,
           ),
         ),
         passage: {

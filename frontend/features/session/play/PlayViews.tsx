@@ -120,6 +120,10 @@ function optionState(
   optionId: number,
 ): OptionState | undefined {
   const selected = question.selected.includes(optionId);
+  // A poll has no key to reveal: a vote stays a vote.
+  if (question.stats.reviewed && question.poll) {
+    return selected ? "selected" : undefined;
+  }
   if (question.stats.reviewed) {
     const correct = question.stats.correctOptionIds.includes(optionId);
     if (selected) return correct ? "correct" : "wrong";
@@ -341,22 +345,30 @@ function reviewSummary(
       correctOptionIds: question.stats.correctOptionIds,
       earned: question.earned ?? 0,
       multiSelect: question.questionType === "MULTI_SELECT",
+      poll: question.poll,
     }),
   );
+  // Votes say nothing about how the scored questions went.
+  const scored = verdicts.filter((v) => v !== "voted");
   const earned = questions.reduce((sum, q) => sum + (q.earned ?? 0), 0);
   const verdict: Verdict =
-    verdicts.length === 1
-      ? verdicts[0]
-      : verdicts.every((v) => v === "correct")
-        ? "correct"
-        : verdicts.every((v) => v === "none")
-          ? "none"
-          : earned > 0
-            ? "partial"
-            : "wrong";
+    scored.length === 0
+      ? verdicts.includes("voted")
+        ? "voted"
+        : "none"
+      : scored.length === 1
+        ? scored[0]
+        : scored.every((v) => v === "correct")
+          ? "correct"
+          : scored.every((v) => v === "none")
+            ? "none"
+            : earned > 0
+              ? "partial"
+              : "wrong";
+  const allPolls = questions.every((question) => question.poll);
   const parts = [
     VERDICT_LABEL[verdict],
-    `${earned > 0 ? "+" : ""}${earned} pts`,
+    allPolls ? null : `${earned > 0 ? "+" : ""}${earned} pts`,
     me && me.score > 0 ? `${ordinal(me.rank)} overall` : null,
   ].filter(Boolean);
   return { verdict, text: parts.join(" · ") };
@@ -369,6 +381,7 @@ const SUMMARY_ICON: Record<
   correct: { name: "check", className: "text-success" },
   partial: { name: "check", className: "text-warning" },
   wrong: { name: "close", className: "text-danger" },
+  voted: { name: "poll", className: "text-accent" },
   none: null,
 };
 
@@ -500,7 +513,13 @@ function PlayQuestionBlock({
         {question.text}
       </h2>
       <p className="mt-2 flex items-center gap-2 text-sm text-subtle">
-        {multi ? "Pick every answer you think is right" : "Pick one answer"}
+        {question.poll
+          ? multi
+            ? "A poll: pick any you like. There's no right answer."
+            : "A poll: pick one. There's no right answer."
+          : multi
+            ? "Pick every answer you think is right"
+            : "Pick one answer"}
         {question.lockedIn && !reviewed && (
           <Badge tone="success" className="ml-1">
             Locked
@@ -557,6 +576,11 @@ const VERDICT_STYLE: Record<
     icon: "close",
     iconClass: "text-danger",
   },
+  voted: {
+    tone: "border-accent/40 bg-accent/10",
+    icon: "poll",
+    iconClass: "text-accent",
+  },
   none: { tone: "border-border-strong bg-surface", icon: null, iconClass: "" },
 };
 
@@ -572,12 +596,14 @@ function ResultBanner({ question }: { question: PlayQuestion }) {
     correctOptionIds: question.stats.correctOptionIds,
     earned,
     multiSelect: question.questionType === "MULTI_SELECT",
+    poll: question.poll,
   });
   const style = VERDICT_STYLE[verdict];
 
-  // The verdict lands in the hand on the same frame it lands on screen.
+  // The verdict lands in the hand on the same frame it lands on screen. A
+  // vote is neither won nor lost, so it stays quiet.
   useEffect(() => {
-    if (verdict !== "none") haptics.result(earned > 0);
+    if (verdict !== "none" && verdict !== "voted") haptics.result(earned > 0);
   }, [verdict, earned]);
 
   return (
@@ -595,11 +621,13 @@ function ResultBanner({ question }: { question: PlayQuestion }) {
         )}
         {VERDICT_LABEL[verdict]}
       </p>
-      <p className="font-mono text-2xl font-semibold text-foreground">
-        {earned > 0 ? "+" : ""}
-        <CountUp value={earned} seconds={0.7} />
-        <span className="ml-1.5 text-sm font-medium text-subtle">pts</span>
-      </p>
+      {!question.poll && (
+        <p className="font-mono text-2xl font-semibold text-foreground">
+          {earned > 0 ? "+" : ""}
+          <CountUp value={earned} seconds={0.7} />
+          <span className="ml-1.5 text-sm font-medium text-subtle">pts</span>
+        </p>
+      )}
     </motion.div>
   );
 }

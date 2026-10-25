@@ -114,10 +114,14 @@ export function QuestionBreakdown({
       asked={question.asked}
       meta={
         question.asked ? (
-          <span>
-            {formatNumber(question.totalAnswers)} of{" "}
-            {countLabel(participantCount, "player", "players")} answered
-          </span>
+          <>
+            {question.poll && <span>Poll</span>}
+            <span>
+              {formatNumber(question.totalAnswers)} of{" "}
+              {countLabel(participantCount, "player", "players")}{" "}
+              {question.poll ? "voted" : "answered"}
+            </span>
+          </>
         ) : (
           <span>
             <Badge>Not asked</Badge>
@@ -126,6 +130,7 @@ export function QuestionBreakdown({
       }
       action={
         question.asked &&
+        !question.poll &&
         onEditScoring && (
           <Button size="sm" icon="pencil" onClick={onEditScoring}>
             Edit scoring
@@ -166,7 +171,9 @@ export function QuestionBreakdown({
 function stateFor(
   selected: boolean,
   correct: boolean,
+  poll: boolean,
 ): OptionState | undefined {
+  if (poll) return selected ? "selected" : undefined;
   if (selected) return correct ? "correct" : "wrong";
   return correct ? "missed" : undefined;
 }
@@ -175,6 +182,7 @@ const VERDICT_TONE: Record<Verdict, BadgeTone> = {
   correct: "success",
   partial: "warning",
   wrong: "danger",
+  voted: "neutral",
   none: "neutral",
 };
 
@@ -189,6 +197,7 @@ export function MyQuestionBreakdown({
     correctOptionIds: question.correctOptionIds,
     earned: question.pointsEarned,
     multiSelect: question.questionType === "MULTI_SELECT",
+    poll: question.poll,
   });
   return (
     <QuestionShell
@@ -203,9 +212,13 @@ export function MyQuestionBreakdown({
                 {VERDICT_LABEL[verdict]}
               </Badge>
             </span>
-            <span className="font-mono text-foreground">
-              {formatPoints(question.pointsEarned)} pts
-            </span>
+            {question.poll ? (
+              <span>Poll</span>
+            ) : (
+              <span className="font-mono text-foreground">
+                {formatPoints(question.pointsEarned)} pts
+              </span>
+            )}
           </>
         ) : (
           <span>
@@ -222,7 +235,7 @@ export function MyQuestionBreakdown({
             <AnswerOption
               index={index}
               text={option.text}
-              state={stateFor(selected, correct)}
+              state={stateFor(selected, correct, question.poll)}
               aside={
                 option.pointValue !== 0 && (
                   <span

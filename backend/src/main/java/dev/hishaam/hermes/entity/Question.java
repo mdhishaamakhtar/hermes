@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
@@ -52,6 +53,12 @@ public class Question {
 
   @Column(name = "time_limit_seconds", nullable = false)
   private int timeLimitSeconds;
+
+  /** A question with no right answer: players vote, nobody scores, and the room sees the split. */
+  @Column(name = "poll", nullable = false)
+  @ColumnDefault("false")
+  @Builder.Default
+  private boolean poll = false;
 
   @Column(name = "created_at")
   private OffsetDateTime createdAt;

@@ -474,6 +474,9 @@ export function ScreenStage({ session }: { session: HostSession }) {
               : `Question ${first?.number ?? "–"}`}
           </span>{" "}
           of {totalQuestions}
+          {questions.length === 1 && first?.poll && (
+            <span className="text-accent"> · Poll</span>
+          )}
         </p>
         <CountdownClock
           countdown={countdown}
@@ -631,7 +634,8 @@ function ScreenQuestion({
                 text={option.text}
                 size={tight ? "screen-sm" : "screen"}
                 state={
-                  stats.reviewed
+                  // A poll has no key: its reveal is the split alone.
+                  stats.reviewed && !question.poll
                     ? stats.correctOptionIds.includes(option.id)
                       ? "correct"
                       : "dimmed"

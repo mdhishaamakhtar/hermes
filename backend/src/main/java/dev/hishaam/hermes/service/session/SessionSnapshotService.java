@@ -56,12 +56,14 @@ public class SessionSnapshotService {
                       q.getPassage() != null ? q.getPassage().getId() : null,
                       resolveEffectiveDisplayMode(quiz, q),
                       options,
-                      null);
+                      null,
+                      q.isPoll());
                 })
             .toList();
     List<QuizSnapshot.PassageSnapshot> passages =
         quiz.getPassages().stream().map(this::toPassageSnapshot).toList();
-    return new QuizSnapshot(quiz.getId(), quiz.getTitle(), questions, passages);
+    return new QuizSnapshot(
+        quiz.getId(), quiz.getTitle(), questions, passages, quiz.isSpeedScoring());
   }
 
   public String serialize(QuizSnapshot snapshot) {

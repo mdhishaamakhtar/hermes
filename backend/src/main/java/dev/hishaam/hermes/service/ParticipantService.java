@@ -315,7 +315,8 @@ public class ParticipantService {
         passageInfo,
         OptionInfo.of(question),
         selectedOptionIds(answer),
-        answer != null && answer.isLockedIn());
+        answer != null && answer.isLockedIn(),
+        question.votesOnly());
   }
 
   private RejoinResponse.QuestionInfo buildQuestionInfo(
@@ -330,7 +331,8 @@ public class ParticipantService {
         question.effectiveDisplayMode().name(),
         OptionInfo.of(question),
         selectedOptionIds(answer),
-        answer != null && answer.isLockedIn());
+        answer != null && answer.isLockedIn(),
+        question.votesOnly());
   }
 
   private ParticipantAnswer currentAnswer(Long participantId, Long questionId) {

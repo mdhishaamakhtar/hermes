@@ -75,6 +75,7 @@ export interface HostSyncQuestion {
   effectiveDisplayMode: DisplayMode;
   passage: { id: number; text: string } | null;
   options: OptionInfo[];
+  poll: boolean;
 }
 
 export interface HostSessionSync {
@@ -124,6 +125,7 @@ export interface RejoinQuestion {
   options: OptionInfo[];
   selectedOptionIds: number[];
   lockedIn: boolean;
+  poll: boolean;
 }
 
 export interface RejoinResponse {
@@ -188,6 +190,7 @@ export interface QuestionResult {
   asked: boolean;
   options: ResultOption[];
   totalAnswers: number;
+  poll: boolean;
 }
 
 export interface SessionResults {
@@ -216,6 +219,7 @@ export interface MyQuestionResult {
   options: Array<OptionInfo & { isCorrect: boolean; pointValue: number }>;
   isCorrect: boolean;
   pointsEarned: number;
+  poll: boolean;
 }
 
 export interface MyResults {
@@ -243,6 +247,7 @@ export interface QuestionDisplayedMsg {
   totalQuestions: number;
   passage: { id: number; text: string } | null;
   effectiveDisplayMode: DisplayMode;
+  poll: boolean;
 }
 
 /** An ENTIRE_PASSAGE block: every sub-question shown and timed together. */
@@ -256,6 +261,7 @@ export interface PassageDisplayedMsg {
     text: string;
     questionType: QuestionType;
     options: OptionInfo[];
+    poll: boolean;
   }>;
   questionIndex: number;
   totalQuestions: number;

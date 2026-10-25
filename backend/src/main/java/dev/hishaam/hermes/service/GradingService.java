@@ -65,13 +65,14 @@ public class GradingService {
       List<ParticipantAnswer> answers =
           answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, question.id());
       for (ParticipantAnswer answer : answers) {
-        answer.setScore(scoreCalculator.computeScore(answer, question));
-        answer.setGradedAt(gradedAt);
+        // Time first: speed scoring reads it.
         if (answer.getAnsweredAt() != null && timerStartedAt != null) {
           answer.setAnswerTimeMs(
               scoreCalculator.computeAnswerTimeMs(
                   answer.getAnsweredAt(), timerStartedAt, question.timeLimitSeconds()));
         }
+        answer.setScore(scoreCalculator.computeScore(answer, question, snapshot.scoresSpeed()));
+        answer.setGradedAt(gradedAt);
       }
       answerRepository.saveAll(answers);
       scoresByQuestion.put(question.id(), scoresByParticipant(answers));
@@ -121,7 +122,7 @@ public class GradingService {
         answerRepository.findFrozenBySessionIdAndQuestionId(sessionId, questionId);
     OffsetDateTime regradedAt = OffsetDateTime.now();
     for (ParticipantAnswer answer : answers) {
-      answer.setScore(scoreCalculator.computeScore(answer, question));
+      answer.setScore(scoreCalculator.computeScore(answer, question, corrected.scoresSpeed()));
       answer.setGradedAt(regradedAt);
     }
     answerRepository.saveAll(answers);

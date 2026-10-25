@@ -89,7 +89,8 @@ public class SessionEventPublisher {
             snapshot.questionPosition(question.id()),
             snapshot.questions().size(),
             passageContext,
-            question.effectiveDisplayMode().name()));
+            question.effectiveDisplayMode().name(),
+            question.votesOnly()));
   }
 
   public void publishPassageDisplayed(
@@ -102,7 +103,7 @@ public class SessionEventPublisher {
             .map(
                 q ->
                     new WsPayloads.SubQuestion(
-                        q.id(), q.text(), q.questionType().name(), OptionInfo.of(q)))
+                        q.id(), q.text(), q.questionType().name(), OptionInfo.of(q), q.votesOnly()))
             .toList();
 
     send(

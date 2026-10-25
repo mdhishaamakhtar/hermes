@@ -8,6 +8,6 @@ package dev.hishaam.hermes.dto.session;
 public record ScoringRules(boolean penalties, boolean speedScoring) {
 
   public static ScoringRules of(QuizSnapshot snapshot) {
-    return new ScoringRules(snapshot.hasPenalties(), false);
+    return new ScoringRules(snapshot.hasPenalties(), snapshot.scoresSpeed());
   }
 }

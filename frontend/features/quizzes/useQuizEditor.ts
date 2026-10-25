@@ -3,13 +3,7 @@
 import useSWR, { useSWRConfig } from "swr";
 import { sessionsApi } from "@/features/session/session-api";
 import { storeJoinCode } from "@/lib/session-storage";
-import type {
-  DisplayMode,
-  Passage,
-  Question,
-  Quiz,
-  SessionSummary,
-} from "@/lib/types";
+import type { Passage, Question, Quiz, SessionSummary } from "@/lib/types";
 import {
   nextOrderIndex,
   passagePayload,
@@ -71,17 +65,25 @@ export function useQuizEditor(quizId: string) {
     /** A session still in the lobby or live. The quiz is read-only meanwhile. */
     runningSession: sessions.find((session) => session.status !== "ENDED"),
 
-    async setDisplayMode(displayMode: DisplayMode) {
+    /** Saves a quiz-wide setting, showing it at once and undoing it if refused. */
+    async setSettings(
+      change: Partial<Pick<Quiz, "displayMode" | "speedScoring">>,
+    ) {
       const current = requireQuiz();
-      await patch((q) => ({ ...q, displayMode }));
+      await patch((q) => ({ ...q, ...change }));
       try {
         await quizApi.update(quizId, {
           title: current.title,
           orderIndex: current.orderIndex,
-          displayMode,
+          displayMode: change.displayMode ?? current.displayMode,
+          speedScoring: change.speedScoring ?? current.speedScoring,
         });
       } catch (error) {
-        await patch((q) => ({ ...q, displayMode: current.displayMode }));
+        await patch((q) => ({
+          ...q,
+          displayMode: current.displayMode,
+          speedScoring: current.speedScoring,
+        }));
         throw error;
       }
     },

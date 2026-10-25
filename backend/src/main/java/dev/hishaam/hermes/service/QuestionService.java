@@ -73,22 +73,25 @@ public class QuestionService {
     int normalizedTimeLimitSeconds =
         resolveTimeLimitSeconds(question.getPassage(), request.timeLimitSeconds(), true);
 
+    List<OptionRequest> options = normalizedOptions(request.options(), request.asPoll());
     validateQuestionRequest(
         question.getQuiz(),
         question.getPassage(),
         normalizedOrderIndex,
         questionType,
         normalizedTimeLimitSeconds,
-        request.options(),
-        question.getId());
+        options,
+        question.getId(),
+        request.asPoll());
 
     question.setText(request.text());
+    question.setPoll(request.asPoll());
     question.setOrderIndex(normalizedOrderIndex);
     question.setTimeLimitSeconds(normalizedTimeLimitSeconds);
     question.setQuestionType(questionType);
     question.setDisplayModeOverride(request.displayModeOverride());
 
-    mergeOptions(question, request.options());
+    mergeOptions(question, options);
 
     question = questionRepository.save(question);
     return toResponse(question);
@@ -126,7 +129,16 @@ public class QuestionService {
         question.getTimeLimitSeconds(),
         displayModeOverride,
         effectiveDisplayMode,
-        options);
+        options,
+        question.isPoll());
+  }
+
+  /** A poll has no right answer, so whatever points its options were sent with, they score 0. */
+  private static List<OptionRequest> normalizedOptions(List<OptionRequest> options, boolean poll) {
+    if (!poll) return options;
+    return options.stream()
+        .map(option -> new OptionRequest(option.text(), option.orderIndex(), 0))
+        .toList();
   }
 
   Question buildQuestionEntity(
@@ -138,14 +150,16 @@ public class QuestionService {
     int normalizedTimeLimitSeconds =
         resolveTimeLimitSeconds(passage, request.timeLimitSeconds(), passageSubQuestion);
 
+    List<OptionRequest> options = normalizedOptions(request.options(), request.asPoll());
     validateQuestionRequest(
         quiz,
         passage,
         normalizedOrderIndex,
         questionType,
         normalizedTimeLimitSeconds,
-        request.options(),
-        null);
+        options,
+        null,
+        request.asPoll());
 
     Question question =
         Question.builder()
@@ -156,8 +170,9 @@ public class QuestionService {
             .timeLimitSeconds(normalizedTimeLimitSeconds)
             .questionType(questionType)
             .displayModeOverride(request.displayModeOverride())
+            .poll(request.asPoll())
             .build();
-    question.getOptions().addAll(buildOptions(question, request.options()));
+    question.getOptions().addAll(buildOptions(question, options));
     return question;
   }
 
@@ -230,7 +245,8 @@ public class QuestionService {
       QuestionType questionType,
       int timeLimitSeconds,
       List<OptionRequest> optionRequests,
-      Long currentQuestionId) {
+      Long currentQuestionId,
+      boolean poll) {
     if (optionRequests.size() < 2) {
       throw AppException.badRequest("Questions must have at least 2 options");
     }
@@ -240,11 +256,12 @@ public class QuestionService {
     }
 
     long positiveOptionCount = optionRequests.stream().filter(o -> o.pointValue() > 0).count();
-    if (questionType == QuestionType.SINGLE_SELECT && positiveOptionCount != 1) {
+    // A poll has no answer key to check.
+    if (!poll && questionType == QuestionType.SINGLE_SELECT && positiveOptionCount != 1) {
       throw AppException.badRequest(
           "SINGLE_SELECT questions must have exactly one option with pointValue > 0");
     }
-    if (questionType == QuestionType.MULTI_SELECT && positiveOptionCount < 1) {
+    if (!poll && questionType == QuestionType.MULTI_SELECT && positiveOptionCount < 1) {
       throw AppException.badRequest(
           "MULTI_SELECT questions must have at least one option with pointValue > 0");
     }

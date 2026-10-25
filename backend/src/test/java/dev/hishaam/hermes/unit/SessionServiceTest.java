@@ -79,7 +79,7 @@ class SessionServiceTest {
               .build();
       when(quizRepository.findByIdWithQuestions(QUIZ_ID)).thenReturn(Optional.of(quiz));
       when(snapshotService.buildSnapshot(quiz))
-          .thenReturn(new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of()));
+          .thenReturn(new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of(), false));
       when(snapshotService.serialize(any())).thenReturn("{}");
       when(sessionRepository.save(any()))
           .thenAnswer(invocation -> invocation.<QuizSession>getArgument(0));
@@ -116,7 +116,7 @@ class SessionServiceTest {
               .build();
       when(quizRepository.findByIdWithQuestions(QUIZ_ID)).thenReturn(Optional.of(quiz));
       when(snapshotService.buildSnapshot(quiz))
-          .thenReturn(new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of()));
+          .thenReturn(new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of(), false));
       when(snapshotService.serialize(any())).thenReturn("{}");
       when(stateStore.tryReserveJoinCode(anyString())).thenReturn(false);
 
@@ -170,7 +170,7 @@ class SessionServiceTest {
     /** With Redis healthy, both the state and scoring key sets are cleaned before the rows go. */
     @Test
     void abandonCleansRedisStateAndScoringKeysWhenTheSnapshotLoads() {
-      QuizSnapshot snapshot = new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of());
+      QuizSnapshot snapshot = new QuizSnapshot(QUIZ_ID, "Quiz", List.of(), List.of(), false);
       when(snapshotService.loadSnapshot(SESSION_ID)).thenReturn(snapshot);
 
       sessionService.abandonSession(SESSION_ID, USER_ID);

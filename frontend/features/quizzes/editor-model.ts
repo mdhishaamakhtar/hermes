@@ -22,6 +22,8 @@ export interface OptionDraft {
 
 export interface QuestionDraft {
   text: string;
+  /** No right answer: players vote and nobody scores. */
+  poll: boolean;
   questionType: QuestionType;
   timeLimitSeconds: string;
   displayModeOverride: DisplayMode | null;
@@ -46,12 +48,12 @@ export const QUESTION_TYPES: Segment<QuestionType>[] = [
   {
     value: "SINGLE_SELECT",
     label: "One answer",
-    description: "Players pick one option. Exactly one option scores.",
+    description: "Players pick one option.",
   },
   {
     value: "MULTI_SELECT",
     label: "Several answers",
-    description: "Players pick every option they think is right.",
+    description: "Players pick every option that applies.",
   },
 ];
 
@@ -60,6 +62,35 @@ export const QUESTION_TYPES: Segment<QuestionType>[] = [
  * big screen all quiz long now, so the old code display behaves exactly
  * like hidden, and is shown and saved as hidden.
  */
+/** Whether a question has a right answer, in the editor's words. */
+export const QUESTION_KINDS: Segment<"QUIZ" | "POLL">[] = [
+  {
+    value: "QUIZ",
+    label: "Quiz",
+    description: "One or more answers are right, and they score.",
+  },
+  {
+    value: "POLL",
+    label: "Poll",
+    description:
+      "No right answer. Players vote, nobody scores, and the big screen shows how the room split.",
+  },
+];
+
+export const SPEED_SCORING: Segment<"OFF" | "ON">[] = [
+  {
+    value: "OFF",
+    label: "Off",
+    description: "A right answer scores its full points, however long it took.",
+  },
+  {
+    value: "ON",
+    label: "On",
+    description:
+      "Faster right answers score more. An instant one keeps every point; one at the buzzer keeps half.",
+  },
+];
+
 export const DISPLAY_MODES: Segment<DisplayMode>[] = [
   {
     value: "LIVE",
@@ -116,6 +147,7 @@ export function questionTypeLabel(type: QuestionType): string {
 export function newQuestionDraft(): QuestionDraft {
   return {
     text: "",
+    poll: false,
     questionType: "SINGLE_SELECT",
     timeLimitSeconds: DEFAULT_TIMER,
     displayModeOverride: null,
@@ -131,6 +163,7 @@ export function newQuestionDraft(): QuestionDraft {
 export function draftFromQuestion(question: Question): QuestionDraft {
   return {
     text: question.text,
+    poll: question.poll ?? false,
     questionType: question.questionType,
     timeLimitSeconds: String(
       question.timeLimitSeconds > 0 ? question.timeLimitSeconds : DEFAULT_TIMER,
@@ -221,17 +254,39 @@ export function withQuestionType(
 export function usesCustomScoring(draft: QuestionDraft): boolean {
   return (
     draft.displayModeOverride !== null ||
-    draft.options.some(
-      (option) => option.points !== "0" && option.points !== CORRECT_POINTS,
-    )
+    (!draft.poll &&
+      draft.options.some(
+        (option) => option.points !== "0" && option.points !== CORRECT_POINTS,
+      ))
   );
 }
 
 /** The scoring in a few words, for when its fields are folded away. */
 export function scoringSummary(draft: QuestionDraft): string {
+  if (draft.poll) {
+    return draft.displayModeOverride
+      ? displayModeLabel(draft.displayModeOverride)
+      : "Follows the quiz";
+  }
   return usesCustomScoring(draft)
     ? "Custom"
     : `${CORRECT_POINTS} points for a right answer`;
+}
+
+/**
+ * Turning a question into a poll clears its key, since a poll has none;
+ * turning it back marks the first option right, so the draft stays valid.
+ */
+export function withPoll(draft: QuestionDraft, poll: boolean): QuestionDraft {
+  if (poll === draft.poll) return draft;
+  return {
+    ...draft,
+    poll,
+    options: draft.options.map((option, index) => ({
+      ...option,
+      points: !poll && index === 0 ? CORRECT_POINTS : "0",
+    })),
+  };
 }
 
 export function sameDraft(a: QuestionDraft, b: QuestionDraft): boolean {
@@ -255,6 +310,7 @@ export function validateQuestion(
   if (draft.options.some((option) => !option.text.trim())) {
     return "Fill in every option, or remove the empty ones.";
   }
+  if (draft.poll) return null;
   const correct = draft.options.filter(isCorrect).length;
   if (draft.questionType === "SINGLE_SELECT" && correct !== 1) {
     return "Mark exactly one option correct.";
@@ -278,6 +334,7 @@ export function validatePassage(draft: PassageDraft): string | null {
 
 export interface QuestionPayload {
   text: string;
+  poll: boolean;
   orderIndex: number;
   timeLimitSeconds?: number;
   questionType: QuestionType;
@@ -292,6 +349,7 @@ export function questionPayload(
 ): QuestionPayload {
   return {
     text: draft.text.trim(),
+    poll: draft.poll,
     orderIndex,
     timeLimitSeconds: ownTimer ? toInt(draft.timeLimitSeconds) : undefined,
     questionType: draft.questionType,

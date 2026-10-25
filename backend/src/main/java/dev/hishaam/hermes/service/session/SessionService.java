@@ -368,7 +368,8 @@ public class SessionService {
         question.timeLimitSeconds(),
         question.effectiveDisplayMode().name(),
         passageInfo,
-        OptionInfo.of(question));
+        OptionInfo.of(question),
+        question.votesOnly());
   }
 
   private SessionResponse toResponse(QuizSession session) {

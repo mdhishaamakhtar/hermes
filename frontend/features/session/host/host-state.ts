@@ -46,6 +46,8 @@ export interface StageQuestion {
   text: string;
   questionType: QuestionType;
   options: OptionInfo[];
+  /** No right answer: the reveal shows the split, not a key. */
+  poll: boolean;
 }
 
 export interface StagePassage {
@@ -134,6 +136,7 @@ function toStage(question: HostSyncQuestion): StageQuestion {
     text: question.text,
     questionType: question.questionType,
     options: byOrderIndex(question.options),
+    poll: question.poll ?? false,
   };
 }
 
@@ -232,6 +235,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         text: message.text,
         questionType: message.questionType,
         options: byOrderIndex(message.options),
+        poll: message.poll ?? false,
       };
       return {
         ...state,
@@ -246,7 +250,6 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         countdown: { ...IDLE_COUNTDOWN, run: state.countdown.run },
         stats: withEmptyStats(state.stats, [question], true),
         scene: "QUESTION",
-        rehearsal: false,
       };
     }
 
@@ -258,6 +261,7 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         text: question.text,
         questionType: question.questionType,
         options: byOrderIndex(question.options),
+        poll: question.poll ?? false,
       }));
       return {
         ...state,
@@ -274,7 +278,6 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         countdown: { ...IDLE_COUNTDOWN, run: state.countdown.run },
         stats: withEmptyStats(state.stats, questions, false),
         scene: "QUESTION",
-        rehearsal: false,
       };
     }
 

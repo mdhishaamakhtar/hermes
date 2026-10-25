@@ -24,7 +24,8 @@ public record SessionResultsResponse(
       String passageText,
       boolean asked,
       long totalAnswers,
-      List<OptionInfo> options) {}
+      List<OptionInfo> options,
+      boolean poll) {}
 
   public record OptionInfo(
       Long id, String text, boolean isCorrect, int orderIndex, long count, int pointValue) {}

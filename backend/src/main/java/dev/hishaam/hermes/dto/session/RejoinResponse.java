@@ -40,7 +40,8 @@ public record RejoinResponse(
       PassageInfo passage,
       List<OptionInfo> options,
       List<Long> selectedOptionIds,
-      boolean lockedIn) {}
+      boolean lockedIn,
+      boolean poll) {}
 
   public record CurrentPassage(
       Long id,
@@ -61,7 +62,8 @@ public record RejoinResponse(
       String effectiveDisplayMode,
       List<OptionInfo> options,
       List<Long> selectedOptionIds,
-      boolean lockedIn) {}
+      boolean lockedIn,
+      boolean poll) {}
 
   public record PassageInfo(Long id, String text, String timerMode) {}
 }

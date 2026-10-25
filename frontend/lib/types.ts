@@ -26,6 +26,8 @@ export interface Question {
   displayModeOverride: DisplayMode | null;
   effectiveDisplayMode: DisplayMode;
   options: QuestionOption[];
+  /** No right answer: players vote and nobody scores. */
+  poll: boolean;
 }
 
 export interface Passage {
@@ -47,6 +49,8 @@ export interface Quiz {
   title: string;
   orderIndex: number;
   displayMode: DisplayMode;
+  /** Faster right answers score more. */
+  speedScoring: boolean;
   questions: Question[];
   passages: Passage[];
 }

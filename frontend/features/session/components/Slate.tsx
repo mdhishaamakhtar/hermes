@@ -18,11 +18,13 @@ export function segmentLabel(first: number, last: number) {
 }
 
 /** What a segment asks of the room, said on its slate. */
-export function slateDetail(questions: { questionType: string }[]): string {
+export function slateDetail(
+  questions: { questionType: string; poll?: boolean }[],
+): string {
   if (questions.length > 1) return `${questions.length} questions, one passage`;
-  return questions[0]?.questionType === "MULTI_SELECT"
-    ? "Pick every right answer"
-    : "One answer";
+  const multi = questions[0]?.questionType === "MULTI_SELECT";
+  if (questions[0]?.poll) return multi ? "Poll, pick any" : "Poll, one vote";
+  return multi ? "Pick every right answer" : "One answer";
 }
 
 /*

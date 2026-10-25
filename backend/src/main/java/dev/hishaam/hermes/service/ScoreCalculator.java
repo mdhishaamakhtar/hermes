@@ -17,11 +17,21 @@ import org.springframework.stereotype.Service;
 @Service
 public class ScoreCalculator {
 
+  /** The share of a right answer's points that speed scoring can take away, over the timer. */
+  static final double SPEED_SHARE = 0.5;
+
   /**
    * Computes the total score for a single answer by summing the point values of all selected
-   * options. Negative raw scores (e.g., penalty options) are clamped to zero.
+   * options. Negative raw scores (e.g., penalty options) are clamped to zero, and a poll scores
+   * nothing. With speed scoring, a positive score keeps all its points if given at once and loses
+   * up to half of them by the end of the timer: {@code raw × (1 − 0.5 × elapsed / limit)}. Needs
+   * the answer's time set first.
    */
-  public int computeScore(ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
+  public int computeScore(
+      ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question, boolean speedScoring) {
+    if (question.votesOnly()) {
+      return 0;
+    }
     Map<Long, Integer> pointsByOptionId = question.optionPoints();
 
     int rawScore =
@@ -31,18 +41,26 @@ public class ScoreCalculator {
             .mapToInt(Integer::intValue)
             .sum();
 
-    return Math.max(rawScore, 0);
+    if (rawScore <= 0) {
+      return 0;
+    }
+    if (!speedScoring || answer.getAnswerTimeMs() == null || question.timeLimitSeconds() <= 0) {
+      return rawScore;
+    }
+    double elapsed =
+        Math.min(1.0, answer.getAnswerTimeMs() / (question.timeLimitSeconds() * 1000.0));
+    return (int) Math.round(rawScore * (1 - SPEED_SHARE * elapsed));
   }
 
   /**
    * Whether an answer counts as right. On a multi-select question that means picking exactly the
    * options with a positive point value. On a single-select question it means picking one of them:
    * a scoring correction can leave more than one option worth points, and a player can only ever
-   * choose one. An empty selection is never correct.
+   * choose one. An empty selection is never correct, and neither is a vote in a poll.
    */
   public boolean isCorrectSelection(
       ParticipantAnswer answer, QuizSnapshot.QuestionSnapshot question) {
-    if (answer == null || question == null) {
+    if (answer == null || question == null || question.votesOnly()) {
       return false;
     }
 

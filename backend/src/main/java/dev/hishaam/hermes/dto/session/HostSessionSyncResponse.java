@@ -30,7 +30,8 @@ public record HostSessionSyncResponse(
       int timeLimitSeconds,
       String effectiveDisplayMode,
       PassageInfo passage,
-      List<OptionInfo> options) {}
+      List<OptionInfo> options,
+      boolean poll) {}
 
   public record CurrentPassage(
       Long id,

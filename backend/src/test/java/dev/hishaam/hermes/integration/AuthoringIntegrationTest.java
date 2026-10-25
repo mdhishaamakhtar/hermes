@@ -50,7 +50,7 @@ class AuthoringIntegrationTest extends BaseIntegrationTest {
   void theSampleQuizIsReadyToRun() throws Exception {
     Auth organiser = organiser();
     JsonNode sample = postJson("/api/quizzes/sample", organiser, Map.of(), 201).path("data");
-    assertThat(sample.path("questions")).hasSize(4);
+    assertThat(sample.path("questions")).hasSize(5);
     assertThat(sample.path("passages")).hasSize(1);
     assertThat(sample.path("passages").get(0).path("subQuestions")).hasSize(2);
 

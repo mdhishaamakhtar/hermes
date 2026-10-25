@@ -165,6 +165,7 @@ export function QuestionBlock({
       <div className="flex items-start justify-between gap-4">
         <p className="meta-line min-w-0 pt-2 text-sm text-subtle">
           <span className="font-mono font-medium text-muted">Q{number}</span>
+          {question.poll && <span className="text-accent">Poll</span>}
           <span>{questionTypeLabel(question.questionType)}</span>
           {ownTimer && !missingTimer && (
             <span className="font-mono">{question.timeLimitSeconds} sec</span>

@@ -30,6 +30,7 @@ import {
   newQuestionDraft,
   questionCount,
   quizBlocks,
+  SPEED_SCORING,
   type QuizBlock,
 } from "./editor-model";
 import { QuestionEditor } from "./QuestionEditor";
@@ -61,6 +62,7 @@ export function QuizEditorClient({
   const editor = useQuizEditor(quizId);
   const { quiz, runningSession } = editor;
   const displayId = useId();
+  const speedId = useId();
 
   const [composer, setComposer] = useState<Composer>(null);
   // The running order while a block is being dragged, before it is saved.
@@ -173,11 +175,13 @@ export function QuizEditorClient({
     void saveOrder(next);
   };
 
-  const changeDisplayMode = async (mode: DisplayMode) => {
+  const changeSettings = async (
+    change: Parameters<typeof editor.setSettings>[0],
+  ) => {
     try {
-      await editor.setDisplayMode(mode);
+      await editor.setSettings(change);
     } catch (err) {
-      toast.error(describeError(err, "Couldn't change the answer display."));
+      toast.error(describeError(err, "Couldn't change the quiz settings."));
     }
   };
 
@@ -256,18 +260,27 @@ export function QuizEditorClient({
 
       <section
         aria-label="Quiz settings"
-        className="mb-12 border border-border bg-surface p-5 sm:p-6"
+        className="mb-12 grid gap-6 border border-border bg-surface p-5 sm:p-6 lg:grid-cols-2"
       >
         <Field id={displayId} label="Answer display on the big screen">
-          <div className="max-w-md">
-            <SegmentedControl<DisplayMode>
-              id={displayId}
-              value={displayChoice(quiz.displayMode)}
-              options={DISPLAY_MODES}
-              onChange={changeDisplayMode}
-              disabled={locked}
-            />
-          </div>
+          <SegmentedControl<DisplayMode>
+            id={displayId}
+            value={displayChoice(quiz.displayMode)}
+            options={DISPLAY_MODES}
+            onChange={(displayMode) => void changeSettings({ displayMode })}
+            disabled={locked}
+          />
+        </Field>
+        <Field id={speedId} label="Speed scoring">
+          <SegmentedControl<"OFF" | "ON">
+            id={speedId}
+            value={quiz.speedScoring ? "ON" : "OFF"}
+            options={SPEED_SCORING}
+            onChange={(choice) =>
+              void changeSettings({ speedScoring: choice === "ON" })
+            }
+            disabled={locked}
+          />
         </Field>
       </section>
 

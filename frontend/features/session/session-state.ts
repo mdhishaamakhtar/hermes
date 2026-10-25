@@ -149,21 +149,25 @@ export function groupByPassage<
  * the right answers can still score, and calling that wrong beside "+5 pts"
  * would contradict itself. One rule for the reveal, the results page and the
  * organiser's review, so a player never reads two verdicts for one answer.
+ * A poll has no right answer, so a pick in one is only ever a vote.
  */
-export type Verdict = "correct" | "partial" | "wrong" | "none";
+export type Verdict = "correct" | "partial" | "wrong" | "voted" | "none";
 
 export function verdictOf({
   selected,
   correctOptionIds,
   earned,
   multiSelect,
+  poll = false,
 }: {
   selected: number[];
   correctOptionIds: number[];
   earned: number;
   multiSelect: boolean;
+  poll?: boolean;
 }): Verdict {
   if (selected.length === 0) return "none";
+  if (poll) return "voted";
   const correct = multiSelect
     ? selected.length === correctOptionIds.length &&
       selected.every((id) => correctOptionIds.includes(id))
@@ -176,5 +180,6 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   correct: "Correct",
   partial: "Partly right",
   wrong: "Incorrect",
+  voted: "Vote counted",
   none: "No answer",
 };

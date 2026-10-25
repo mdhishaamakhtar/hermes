@@ -13,4 +13,11 @@ public record UpdateQuestionRequest(
     Integer timeLimitSeconds,
     QuestionType questionType,
     DisplayMode displayModeOverride,
-    @NotEmpty @Valid List<OptionRequest> options) {}
+    @NotEmpty @Valid List<OptionRequest> options,
+    Boolean poll) {
+
+  /** Whether the question is a poll; left out, it isn't. */
+  public boolean asPoll() {
+    return Boolean.TRUE.equals(poll);
+  }
+}

@@ -48,7 +48,8 @@ public final class WsPayloads {
       int questionIndex,
       int totalQuestions,
       PassageContext passage,
-      String effectiveDisplayMode) {
+      String effectiveDisplayMode,
+      boolean poll) {
     public QuestionDisplayed(
         Long questionId,
         String text,
@@ -57,7 +58,8 @@ public final class WsPayloads {
         int questionIndex,
         int totalQuestions,
         PassageContext passage,
-        String effectiveDisplayMode) {
+        String effectiveDisplayMode,
+        boolean poll) {
       this(
           EventType.QUESTION_DISPLAYED,
           questionId,
@@ -67,7 +69,8 @@ public final class WsPayloads {
           questionIndex,
           totalQuestions,
           passage,
-          effectiveDisplayMode);
+          effectiveDisplayMode,
+          poll);
     }
   }
 
@@ -105,7 +108,7 @@ public final class WsPayloads {
   }
 
   public record SubQuestion(
-      Long questionId, String text, String questionType, List<OptionInfo> options) {}
+      Long questionId, String text, String questionType, List<OptionInfo> options, boolean poll) {}
 
   /**
    * Host started the timer. {@code questionId} is set for standalone / PER_SUB_QUESTION questions;

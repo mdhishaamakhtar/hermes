@@ -37,9 +37,48 @@ class ScoreCalculatorTest {
             new QuizSnapshot.OptionSnapshot(11L, "Penalty", -12, 1),
             new QuizSnapshot.OptionSnapshot(12L, "Neutral", 0, 2));
 
-    assertThat(scoreCalculator.computeScore(answer(1L, 10L), question)).isEqualTo(8);
-    assertThat(scoreCalculator.computeScore(answer(1L, 10L, 11L), question)).isZero();
-    assertThat(scoreCalculator.computeScore(answer(1L, 99L), question)).isZero();
+    assertThat(scoreCalculator.computeScore(answer(1L, 10L), question, false)).isEqualTo(8);
+    assertThat(scoreCalculator.computeScore(answer(1L, 10L, 11L), question, false)).isZero();
+    assertThat(scoreCalculator.computeScore(answer(1L, 99L), question, false)).isZero();
+  }
+
+  /**
+   * Verifies speed scoring: an instant right answer keeps every point, one at the buzzer keeps
+   * half, one halfway through keeps three quarters, and a zero score stays zero.
+   */
+  @Test
+  void speedScoringTakesUpToHalfOfARightAnswerOverTheTimer() {
+    QuizSnapshot.QuestionSnapshot question =
+        question(
+            QuestionType.SINGLE_SELECT,
+            new QuizSnapshot.OptionSnapshot(10L, "Correct", 20, 0),
+            new QuizSnapshot.OptionSnapshot(11L, "Wrong", 0, 1));
+
+    assertThat(scoreCalculator.computeScore(timed(0L, 10L), question, true)).isEqualTo(20);
+    assertThat(scoreCalculator.computeScore(timed(15_000L, 10L), question, true)).isEqualTo(15);
+    assertThat(scoreCalculator.computeScore(timed(30_000L, 10L), question, true)).isEqualTo(10);
+    assertThat(scoreCalculator.computeScore(timed(15_000L, 11L), question, true)).isZero();
+    assertThat(scoreCalculator.computeScore(timed(30_000L, 10L), question, false)).isEqualTo(20);
+  }
+
+  /** Verifies that a poll scores nothing, whatever its options carry. */
+  @Test
+  void aPollScoresNothing() {
+    QuizSnapshot.QuestionSnapshot poll =
+        new QuizSnapshot.QuestionSnapshot(
+            100L,
+            "Poll",
+            QuestionType.SINGLE_SELECT,
+            1,
+            30,
+            null,
+            DisplayMode.LIVE,
+            List.of(new QuizSnapshot.OptionSnapshot(10L, "Either", 10, 0)),
+            null,
+            true);
+
+    assertThat(scoreCalculator.computeScore(answer(1L, 10L), poll, false)).isZero();
+    assertThat(scoreCalculator.isCorrectSelection(answer(1L, 10L), poll)).isFalse();
   }
 
   /**
@@ -112,7 +151,13 @@ class ScoreCalculatorTest {
   private QuizSnapshot.QuestionSnapshot question(
       QuestionType type, QuizSnapshot.OptionSnapshot... options) {
     return new QuizSnapshot.QuestionSnapshot(
-        100L, "Question", type, 1, 30, null, DisplayMode.LIVE, List.of(options), null);
+        100L, "Question", type, 1, 30, null, DisplayMode.LIVE, List.of(options), null, false);
+  }
+
+  private ParticipantAnswer timed(Long answerTimeMs, Long... selectedOptionIds) {
+    ParticipantAnswer answer = answer(1L, selectedOptionIds);
+    answer.setAnswerTimeMs(answerTimeMs);
+    return answer;
   }
 
   private ParticipantAnswer answer(Long participantId, Long... selectedOptionIds) {

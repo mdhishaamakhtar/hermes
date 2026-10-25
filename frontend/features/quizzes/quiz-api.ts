@@ -37,7 +37,12 @@ export const quizApi = {
 
   update: (
     quizId: string,
-    data: { title: string; orderIndex: number; displayMode: DisplayMode },
+    data: {
+      title: string;
+      orderIndex: number;
+      displayMode: DisplayMode;
+      speedScoring: boolean;
+    },
   ) => api.put<void>(`/api/quizzes/${quizId}`, data),
 
   createQuestion: (quizId: string, data: QuestionPayload) =>

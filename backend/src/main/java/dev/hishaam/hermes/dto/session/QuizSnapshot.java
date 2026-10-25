@@ -1,6 +1,7 @@
 package dev.hishaam.hermes.dto.session;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.hishaam.hermes.entity.enums.DisplayMode;
 import dev.hishaam.hermes.entity.enums.PassageTimerMode;
 import dev.hishaam.hermes.entity.enums.QuestionType;
@@ -11,8 +12,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The quiz as it stood when the session opened. Fields added later ({@code speedScoring}, a
+ * question's {@code poll}) are boxed, so snapshots written before them still load, reading as off,
+ * and are left out while unset, so such a snapshot is rewritten exactly as it was.
+ */
 public record QuizSnapshot(
-    Long quizId, String title, List<QuestionSnapshot> questions, List<PassageSnapshot> passages) {
+    Long quizId,
+    String title,
+    List<QuestionSnapshot> questions,
+    List<PassageSnapshot> passages,
+    @JsonInclude(JsonInclude.Include.NON_NULL) Boolean speedScoring) {
+
+  /** Whether faster right answers score more. */
+  @JsonIgnore
+  public boolean scoresSpeed() {
+    return Boolean.TRUE.equals(speedScoring);
+  }
 
   public record QuestionSnapshot(
       Long id,
@@ -23,7 +39,14 @@ public record QuizSnapshot(
       Long passageId,
       DisplayMode effectiveDisplayMode,
       List<OptionSnapshot> options,
-      OffsetDateTime correctedAt) {
+      OffsetDateTime correctedAt,
+      @JsonInclude(JsonInclude.Include.NON_NULL) Boolean poll) {
+
+    /** A poll has no right answer and scores nothing. */
+    @JsonIgnore
+    public boolean votesOnly() {
+      return Boolean.TRUE.equals(poll);
+    }
 
     /** The answer key: every option that scores. */
     @JsonIgnore
@@ -171,9 +194,10 @@ public record QuizSnapshot(
                       q.passageId(),
                       q.effectiveDisplayMode(),
                       updatedOptions,
-                      correctedAt);
+                      correctedAt,
+                      q.poll());
                 })
             .toList();
-    return new QuizSnapshot(quizId, title, updatedQuestions, passages);
+    return new QuizSnapshot(quizId, title, updatedQuestions, passages, speedScoring);
   }
 }

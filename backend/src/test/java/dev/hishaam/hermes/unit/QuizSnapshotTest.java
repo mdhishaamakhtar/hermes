@@ -40,7 +40,8 @@ class QuizSnapshotTest {
                 question(4L, 20, null)),
             List.of(
                 new QuizSnapshot.PassageSnapshot(
-                    50L, "Passage", 5, PassageTimerMode.PER_SUB_QUESTION, null, List.of(2L, 3L))));
+                    50L, "Passage", 5, PassageTimerMode.PER_SUB_QUESTION, null, List.of(2L, 3L))),
+            false);
 
     assertThat(Objects.requireNonNull(snapshot.findNextQuestion(null)).id()).isEqualTo(2L);
     assertThat(Objects.requireNonNull(snapshot.findNextQuestion(2L)).id()).isEqualTo(3L);
@@ -60,7 +61,11 @@ class QuizSnapshotTest {
     OffsetDateTime correctedAt = OffsetDateTime.parse("2026-01-01T00:00:00Z");
     QuizSnapshot snapshot =
         new QuizSnapshot(
-            1L, "Correction", List.of(question(1L, 1, null), question(2L, 2, null)), List.of());
+            1L,
+            "Correction",
+            List.of(question(1L, 1, null), question(2L, 2, null)),
+            List.of(),
+            false);
     long targetOption = snapshot.findQuestion(1L).options().getFirst().id();
     long untouchedOption = snapshot.findQuestion(2L).options().getFirst().id();
 
@@ -86,7 +91,8 @@ class QuizSnapshotTest {
         List.of(
             new QuizSnapshot.OptionSnapshot(id * 10, "Correct", 10, 0),
             new QuizSnapshot.OptionSnapshot(id * 10 + 1, "Wrong", 0, 1)),
-        null);
+        null,
+        false);
   }
 
   /**
@@ -104,7 +110,8 @@ class QuizSnapshotTest {
             List.of(question(1L, 1, 50L)),
             List.of(
                 new QuizSnapshot.PassageSnapshot(
-                    50L, "Passage", 1, PassageTimerMode.ENTIRE_PASSAGE, 60, List.of(1L))));
+                    50L, "Passage", 1, PassageTimerMode.ENTIRE_PASSAGE, 60, List.of(1L))),
+            false);
 
     assertThat(snapshot.requireQuestion(1L).id()).isEqualTo(1L);
     assertThat(snapshot.requirePassage(50L).id()).isEqualTo(50L);
@@ -128,7 +135,8 @@ class QuizSnapshotTest {
             1L,
             "Sub-questions",
             List.of(question(1L, 0, 50L), question(2L, 1, 50L), question(3L, 2, 50L)),
-            List.of(passage));
+            List.of(passage),
+            false);
 
     assertThat(snapshot.subQuestionsOf(passage))
         .extracting(QuizSnapshot.QuestionSnapshot::id)
@@ -142,7 +150,7 @@ class QuizSnapshotTest {
   @Test
   void orderingHelpersTolerateIdsThatAreNotInTheSnapshot() {
     QuizSnapshot snapshot =
-        new QuizSnapshot(1L, "Tolerant", List.of(question(1L, 1, null)), List.of());
+        new QuizSnapshot(1L, "Tolerant", List.of(question(1L, 1, null)), List.of(), false);
 
     assertThat(snapshot.findNextQuestion(999L))
         .as("advancing from an unknown question has no successor")
@@ -159,7 +167,7 @@ class QuizSnapshotTest {
   @Test
   void globalSortKeyFallsBackToTheQuestionIndexWhenThePassageIsMissing() {
     QuizSnapshot.QuestionSnapshot orphan = question(1L, 7, 999L);
-    QuizSnapshot snapshot = new QuizSnapshot(1L, "Orphan", List.of(orphan), List.of());
+    QuizSnapshot snapshot = new QuizSnapshot(1L, "Orphan", List.of(orphan), List.of(), false);
 
     assertThat(snapshot.globalSortKey(orphan)).isEqualTo(7.0);
   }

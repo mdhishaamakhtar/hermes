@@ -400,6 +400,9 @@ export function HostStage({ session }: { session: HostSession }) {
                     : `Question ${first?.number ?? "–"}`}
                 </span>{" "}
                 of {totalQuestions}
+                {questions.length === 1 && first?.poll && (
+                  <span className="text-accent"> · Poll</span>
+                )}
                 <span className="max-sm:block">
                   <span className="max-sm:hidden"> · </span>
                   {displayModeNote(displayMode)}
@@ -432,6 +435,7 @@ export function HostStage({ session }: { session: HostSession }) {
                       countsVisible={lifecycle !== "DISPLAYED"}
                       onEditScoring={
                         lifecycle === "REVIEWING" &&
+                        !question.poll &&
                         stats[question.id]?.reviewed
                           ? () => openScoring(question)
                           : undefined
@@ -649,7 +653,8 @@ function ControllerQuestion({
                 index={index}
                 text={option.text}
                 state={
-                  stats.reviewed
+                  // A poll has no key: its reveal is the split alone.
+                  stats.reviewed && !question.poll
                     ? stats.correctOptionIds.includes(option.id)
                       ? "correct"
                       : "dimmed"

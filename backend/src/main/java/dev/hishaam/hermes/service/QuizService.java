@@ -132,6 +132,7 @@ public class QuizService {
     quiz.setTitle(request.title());
     quiz.setOrderIndex(request.orderIndex() != null ? request.orderIndex() : 0);
     quiz.setDisplayMode(request.displayMode() != null ? request.displayMode() : DisplayMode.BLIND);
+    if (request.speedScoring() != null) quiz.setSpeedScoring(request.speedScoring());
     return toResponse(quizRepository.save(quiz));
   }
 
@@ -146,6 +147,7 @@ public class QuizService {
             .title(copyTitle(source.getTitle()))
             .orderIndex(nextQuizIndex(event))
             .displayMode(source.getDisplayMode())
+            .speedScoring(source.isSpeedScoring())
             .build();
     for (Passage passage : source.getPassages()) {
       Passage passageCopy =
@@ -305,6 +307,7 @@ public class QuizService {
             .questionType(source.getQuestionType())
             .displayModeOverride(source.getDisplayModeOverride())
             .timeLimitSeconds(source.getTimeLimitSeconds())
+            .poll(source.isPoll())
             .build();
     for (AnswerOption option : source.getOptions()) {
       copy.getOptions()
@@ -352,6 +355,7 @@ public class QuizService {
         quiz.getTitle(),
         quiz.getOrderIndex(),
         quiz.getDisplayMode().name(),
+        quiz.isSpeedScoring(),
         quiz.getCreatedAt(),
         questions,
         passages);

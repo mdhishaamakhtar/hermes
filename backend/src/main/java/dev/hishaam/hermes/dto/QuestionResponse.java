@@ -12,4 +12,5 @@ public record QuestionResponse(
     int timeLimitSeconds,
     String displayModeOverride,
     String effectiveDisplayMode,
-    List<OptionResponse> options) {}
+    List<OptionResponse> options,
+    boolean poll) {}

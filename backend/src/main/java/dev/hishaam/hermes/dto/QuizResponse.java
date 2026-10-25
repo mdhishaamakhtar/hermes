@@ -11,6 +11,7 @@ public record QuizResponse(
     String title,
     int orderIndex,
     String displayMode,
+    boolean speedScoring,
     OffsetDateTime createdAt,
     List<QuestionResponse> questions,
     List<PassageResponse> passages) {}
