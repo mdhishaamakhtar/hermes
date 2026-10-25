@@ -3,9 +3,11 @@ package dev.hishaam.hermes.controller;
 import dev.hishaam.hermes.dto.ApiResponse;
 import dev.hishaam.hermes.dto.CreateEventRequest;
 import dev.hishaam.hermes.dto.EventResponse;
+import dev.hishaam.hermes.dto.EventStandingsResponse;
 import dev.hishaam.hermes.dto.UpdateEventRequest;
 import dev.hishaam.hermes.security.AuthenticatedUser;
 import dev.hishaam.hermes.service.EventService;
+import dev.hishaam.hermes.service.session.SessionResultsService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -18,9 +20,17 @@ import org.springframework.web.bind.annotation.*;
 public class EventController {
 
   private final EventService eventService;
+  private final SessionResultsService resultsService;
 
-  public EventController(EventService eventService) {
+  public EventController(EventService eventService, SessionResultsService resultsService) {
     this.eventService = eventService;
+    this.resultsService = resultsService;
+  }
+
+  @GetMapping("/{id}/standings")
+  public ResponseEntity<ApiResponse<EventStandingsResponse>> getStandings(
+      @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+    return ResponseEntity.ok(ApiResponse.ok(resultsService.eventStandings(id, user.getId())));
   }
 
   @GetMapping

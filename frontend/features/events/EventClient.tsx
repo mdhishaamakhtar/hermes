@@ -18,6 +18,8 @@ import { describeError } from "@/lib/api";
 import { rise } from "@/lib/motion";
 import { byOrderIndex } from "@/lib/options";
 import type { EventSummary, QuizSummary } from "@/lib/types";
+import type { EventStandings } from "@/features/session/session-types";
+import { formatNumber } from "@/lib/format";
 
 const CRUMBS = [{ href: "/dashboard", label: "Quizzes" }];
 
@@ -30,6 +32,9 @@ export function EventClient({ eventId }: { eventId: string }) {
   const [composing, setComposing] = useState(false);
   const [target, setTarget] = useState<QuizSummary | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { data: standings } = useSWR<EventStandings>(
+    `/api/events/${eventId}/standings`,
+  );
 
   if (!event) {
     return error ? (
@@ -160,6 +165,10 @@ export function EventClient({ eventId }: { eventId: string }) {
         )}
       </section>
 
+      {standings && standings.rounds.length > 0 && (
+        <EventStandingsTable standings={standings} />
+      )}
+
       <ConfirmDialog
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -229,6 +238,97 @@ function NewQuizForm({
         </div>
       </div>
     </motion.form>
+  );
+}
+
+/**
+ * The night so far: each round's latest finished session added up. Players
+ * are matched across rounds by the name they joined with.
+ */
+function EventStandingsTable({ standings }: { standings: EventStandings }) {
+  return (
+    <section aria-labelledby="standings-heading" className="mt-16">
+      <h2
+        id="standings-heading"
+        className="mb-1 text-xl font-semibold text-foreground"
+      >
+        Standings across rounds
+      </h2>
+      <p className="mb-4 text-sm text-subtle">
+        Each round counts its latest session. Players are matched by the name
+        they joined with, so ask teams to keep theirs.
+      </p>
+      <div className="overflow-x-auto border border-border">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border bg-surface text-left text-subtle">
+              <th scope="col" className="w-14 px-4 py-3 font-medium">
+                Rank
+              </th>
+              <th scope="col" className="px-4 py-3 font-medium">
+                Player
+              </th>
+              {standings.rounds.map((round, index) => (
+                <th
+                  key={round.sessionId}
+                  scope="col"
+                  title={round.quizTitle}
+                  className="w-16 px-2 py-3 text-right font-mono text-xs font-medium"
+                >
+                  R{index + 1}
+                </th>
+              ))}
+              <th scope="col" className="px-4 py-3 text-right font-medium">
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {standings.standings.map((entry) => (
+              <tr
+                key={entry.displayName}
+                className="border-b border-border last:border-b-0"
+              >
+                <td
+                  className={`px-4 py-3 font-mono tabular-nums ${
+                    entry.rank === 1 && entry.total > 0
+                      ? "text-accent"
+                      : "text-subtle"
+                  }`}
+                >
+                  {entry.rank}
+                </td>
+                <td className="max-w-48 truncate px-4 py-3 text-foreground">
+                  {entry.displayName}
+                </td>
+                {entry.roundScores.map((score, index) => (
+                  <td
+                    key={standings.rounds[index].sessionId}
+                    className="px-2 py-3 text-right font-mono text-muted tabular-nums"
+                  >
+                    {score === null ? (
+                      <span className="text-subtle">–</span>
+                    ) : (
+                      formatNumber(score)
+                    )}
+                  </td>
+                ))}
+                <td className="px-4 py-3 text-right font-mono font-semibold text-foreground tabular-nums">
+                  {formatNumber(entry.total)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ol className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-subtle">
+        {standings.rounds.map((round, index) => (
+          <li key={round.sessionId}>
+            <span className="font-mono">R{index + 1}</span> {round.quizTitle}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

@@ -6,16 +6,19 @@ import useSWR from "swr";
 import { LoadError } from "@/components/LoadError";
 import { TopBar } from "@/components/TopBar";
 import { CountUp } from "@/components/ui/AnimatedNumber";
-import { ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { StatusScreen } from "@/components/ui/StatusScreen";
+import { toast } from "@/components/ui/Toast";
 import { useIsClient } from "@/lib/client";
 import { countLabel, formatNumber, ordinal } from "@/lib/format";
 import { duration, ease } from "@/lib/motion";
+import { saveFile } from "@/lib/save-file";
 import { getStoredRejoinToken } from "@/lib/session-storage";
 import { MyQuestionBreakdown, ResultGroups } from "../components/Breakdown";
 import { sessionsApi } from "../session-api";
 import type { MyResults } from "../session-types";
+import { drawShareCard, scoredCount } from "./share-card";
 
 /** A player's own results. Their rejoin token on this device is the key. */
 export function ResultsClient({ sessionId }: { sessionId: string }) {
@@ -90,6 +93,7 @@ function Results({ sessionId }: { sessionId: string }) {
       className="mx-auto w-full max-w-4xl flex-1 px-4 pt-12 pb-24 sm:px-6 sm:pt-16"
     >
       <Verdict results={results} />
+      {results.score > 0 && <ShareResult results={results} />}
 
       <section aria-labelledby="answers-heading" className="mt-16">
         <h2
@@ -131,6 +135,7 @@ function Verdict({ results }: { results: MyResults }) {
   const won =
     results.rank === 1 && results.score > 0 && results.totalParticipants > 1;
   const asked = results.questionsAsked ?? results.totalQuestions;
+  const scored = scoredCount(results);
   return (
     <motion.header
       initial={{ opacity: 0, y: 12 }}
@@ -169,7 +174,7 @@ function Verdict({ results }: { results: MyResults }) {
       </h1>
       <p className="mt-5 text-lg text-muted">
         You got {formatNumber(results.correctCount)} of{" "}
-        {countLabel(asked, "question", "questions")} right
+        {countLabel(scored, "question", "questions")} right
         {asked < results.totalQuestions
           ? `. The quiz ended with ${countLabel(
               results.totalQuestions - asked,
@@ -179,6 +184,38 @@ function Verdict({ results }: { results: MyResults }) {
           : "."}
       </p>
     </motion.header>
+  );
+}
+
+/**
+ * The result as a picture: shared straight from the phone where it can be,
+ * saved as a file where it can't.
+ */
+function ShareResult({ results }: { results: MyResults }) {
+  const [pending, setPending] = useState(false);
+  const share = async () => {
+    setPending(true);
+    try {
+      const blob = await drawShareCard(results);
+      const file = new File([blob], "hermes-result.png", { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: results.quizTitle });
+      } else {
+        saveFile(file.name, blob);
+      }
+    } catch (err) {
+      // Closing the share sheet isn't a failure.
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        toast.error("Couldn't make the picture. Try again.");
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <Button icon="share" pending={pending} onClick={share} className="mt-8">
+      {pending ? "Making the picture…" : "Share your result"}
+    </Button>
   );
 }
 

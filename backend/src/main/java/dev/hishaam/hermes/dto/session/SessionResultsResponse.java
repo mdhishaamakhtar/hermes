@@ -13,7 +13,8 @@ public record SessionResultsResponse(
     long participantCount,
     int questionsAsked,
     List<QuestionResult> questions,
-    List<LeaderboardEntry> leaderboard) {
+    List<LeaderboardEntry> leaderboard,
+    List<PlayerResult> players) {
 
   public record QuestionResult(
       Long id,
@@ -31,4 +32,24 @@ public record SessionResultsResponse(
       Long id, String text, boolean isCorrect, int orderIndex, long count, int pointValue) {}
 
   public record LeaderboardEntry(int rank, Long participantId, String displayName, long score) {}
+
+  /**
+   * One player's session: their standing, how many they got right of the questions asked, and every
+   * answer they gave, for the organiser's per-player view and its export.
+   */
+  public record PlayerResult(
+      Long participantId,
+      String displayName,
+      int rank,
+      long score,
+      int correctCount,
+      int answeredCount,
+      List<PlayerAnswer> answers) {}
+
+  public record PlayerAnswer(
+      Long questionId,
+      List<Long> selectedOptionIds,
+      int score,
+      boolean correct,
+      Long answerTimeMs) {}
 }

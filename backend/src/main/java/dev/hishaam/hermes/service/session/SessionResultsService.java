@@ -1,8 +1,11 @@
 package dev.hishaam.hermes.service.session;
 
+import dev.hishaam.hermes.dto.EventStandingsResponse;
 import dev.hishaam.hermes.dto.session.*;
+import dev.hishaam.hermes.entity.Event;
 import dev.hishaam.hermes.entity.Participant;
 import dev.hishaam.hermes.entity.ParticipantAnswer;
+import dev.hishaam.hermes.entity.Quiz;
 import dev.hishaam.hermes.entity.QuizSession;
 import dev.hishaam.hermes.entity.enums.SessionStatus;
 import dev.hishaam.hermes.exception.AppException;
@@ -14,10 +17,14 @@ import dev.hishaam.hermes.service.OwnershipService;
 import dev.hishaam.hermes.service.ParticipantService;
 import dev.hishaam.hermes.service.ScoreCalculator;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -155,7 +162,8 @@ public class SessionResultsService {
         questionsAsked(snapshot, session),
         rank,
         standings.size(),
-        questions);
+        questions,
+        session.getQuiz().getTitle());
   }
 
   private SessionResultsResponse computeResults(QuizSession session) {
@@ -229,7 +237,133 @@ public class SessionResultsService {
         leaderboard.size(),
         questionsAsked(snapshot, session),
         questionResults,
-        leaderboard);
+        leaderboard,
+        playerResults(sessionId, snapshot, allAnswers, leaderboard));
+  }
+
+  /** Every player in standings order, each with their answers in running order. */
+  private List<SessionResultsResponse.PlayerResult> playerResults(
+      Long sessionId,
+      QuizSnapshot snapshot,
+      List<ParticipantAnswer> allAnswers,
+      List<SessionResultsResponse.LeaderboardEntry> leaderboard) {
+    Map<Long, SessionResultsResponse.LeaderboardEntry> standing = new LinkedHashMap<>();
+    leaderboard.forEach(entry -> standing.put(entry.participantId(), entry));
+    Map<Long, List<ParticipantAnswer>> answersByPlayer =
+        allAnswers.stream().collect(Collectors.groupingBy(ParticipantAnswer::getParticipantId));
+
+    return participantRepository.findBySessionIdOrderByIdAsc(sessionId).stream()
+        .map(
+            participant -> {
+              List<ParticipantAnswer> answers =
+                  answersByPlayer.getOrDefault(participant.getId(), List.of()).stream()
+                      .sorted(
+                          Comparator.comparingDouble(
+                              answer ->
+                                  snapshot.globalSortKey(
+                                      snapshot.requireQuestion(answer.getQuestionId()))))
+                      .toList();
+              SessionResultsResponse.LeaderboardEntry entry = standing.get(participant.getId());
+              return new SessionResultsResponse.PlayerResult(
+                  participant.getId(),
+                  participant.getDisplayName(),
+                  entry != null ? entry.rank() : leaderboard.size(),
+                  entry != null ? entry.score() : 0,
+                  (int)
+                      answers.stream()
+                          .filter(
+                              answer ->
+                                  scoreCalculator.isCorrectSelection(
+                                      answer, snapshot.findQuestion(answer.getQuestionId())))
+                          .count(),
+                  (int) answers.stream().filter(answer -> answer.getAnsweredAt() != null).count(),
+                  answers.stream()
+                      .map(
+                          answer ->
+                              new SessionResultsResponse.PlayerAnswer(
+                                  answer.getQuestionId(),
+                                  selectedOptionIds(answer),
+                                  answer.getScore(),
+                                  scoreCalculator.isCorrectSelection(
+                                      answer, snapshot.findQuestion(answer.getQuestionId())),
+                                  answer.getAnswerTimeMs()))
+                      .toList());
+            })
+        .sorted(Comparator.comparingInt(SessionResultsResponse.PlayerResult::rank))
+        .toList();
+  }
+
+  /**
+   * Standings across an event's rounds: for each quiz, its latest finished session that wasn't a
+   * rehearsal, added up per player. Players are matched by the name they joined with, ignoring case
+   * and surrounding space, since nothing else follows a player between sessions.
+   */
+  @Transactional(readOnly = true)
+  public EventStandingsResponse eventStandings(Long eventId, Long userId) {
+    Event event = ownershipService.requireEventOwner(eventId, userId);
+    List<Quiz> quizzes = event.getQuizzes();
+    Map<Long, QuizSession> latestByQuiz = new LinkedHashMap<>();
+    sessionRepository
+        .findByQuizIdInAndStatusAndRehearsalFalseOrderByEndedAtDesc(
+            quizzes.stream().map(Quiz::getId).toList(), SessionStatus.ENDED)
+        .forEach(session -> latestByQuiz.putIfAbsent(session.getQuiz().getId(), session));
+
+    List<EventStandingsResponse.Round> rounds = new ArrayList<>();
+    Map<String, String> names = new LinkedHashMap<>();
+    Map<String, Long[]> scores = new LinkedHashMap<>();
+    List<QuizSession> played =
+        quizzes.stream()
+            .map(quiz -> latestByQuiz.get(quiz.getId()))
+            .filter(Objects::nonNull)
+            .toList();
+    for (int round = 0; round < played.size(); round++) {
+      QuizSession session = played.get(round);
+      rounds.add(
+          new EventStandingsResponse.Round(
+              session.getQuiz().getId(),
+              session.getQuiz().getTitle(),
+              session.getId(),
+              session.getEndedAt()));
+      for (SessionResultsResponse.LeaderboardEntry entry :
+          leaderboardService.standings(session.getId())) {
+        String key = entry.displayName().trim().toLowerCase(Locale.ROOT);
+        names.putIfAbsent(key, entry.displayName().trim());
+        Long[] row = scores.computeIfAbsent(key, k -> new Long[played.size()]);
+        row[round] = (row[round] == null ? 0 : row[round]) + entry.score();
+      }
+    }
+
+    List<Map.Entry<String, Long>> totals =
+        scores.entrySet().stream()
+            .map(
+                row ->
+                    Map.entry(
+                        row.getKey(),
+                        Arrays.stream(row.getValue())
+                            .filter(Objects::nonNull)
+                            .mapToLong(Long::longValue)
+                            .sum()))
+            .sorted(
+                Comparator.<Map.Entry<String, Long>>comparingLong(Map.Entry::getValue)
+                    .reversed()
+                    .thenComparing(row -> names.get(row.getKey()), String.CASE_INSENSITIVE_ORDER))
+            .toList();
+    List<EventStandingsResponse.Entry> standings = new ArrayList<>();
+    for (int index = 0; index < totals.size(); index++) {
+      Map.Entry<String, Long> row = totals.get(index);
+      // Level on points means level in the standings: 1, 1, 3.
+      int rank =
+          index > 0 && row.getValue().equals(totals.get(index - 1).getValue())
+              ? standings.get(index - 1).rank()
+              : index + 1;
+      standings.add(
+          new EventStandingsResponse.Entry(
+              rank,
+              names.get(row.getKey()),
+              row.getValue(),
+              Arrays.asList(scores.get(row.getKey()))));
+    }
+    return new EventStandingsResponse(eventId, rounds, standings);
   }
 
   private static int questionsAsked(QuizSnapshot snapshot, QuizSession session) {

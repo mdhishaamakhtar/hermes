@@ -3,13 +3,18 @@
 import useSWR from "swr";
 import { LoadError } from "@/components/LoadError";
 import { Page, PageHeader, PageHeaderSkeleton } from "@/components/Page";
+import { Button } from "@/components/ui/Button";
 import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { countLabel, formatDateTime } from "@/lib/format";
+import { saveFile } from "@/lib/save-file";
 import { sessionsApi } from "../session-api";
 import type { SessionResults } from "../session-types";
 import { LeaderboardSkeleton } from "../components/Leaderboard";
 import { WrapUp } from "../components/WrapUp";
+import { resultsCsv, resultsFileName } from "./results-model";
+import { Insights, PlayersTable } from "./ResultsDetail";
+import { RunAgainButton } from "./RunAgain";
 
 /** A finished session, reviewed from the organiser's side at any later time. */
 export function ReviewClient({ sessionId }: { sessionId: string }) {
@@ -25,7 +30,7 @@ export function ReviewClient({ sessionId }: { sessionId: string }) {
         <LoadError
           error={error}
           resource="session"
-          back={{ href: "/dashboard", label: "Back to your events" }}
+          back={{ href: "/dashboard", label: "Back to your quizzes" }}
           onRetry={() => void mutate()}
         />
       </Page>
@@ -40,7 +45,7 @@ export function ReviewClient({ sessionId }: { sessionId: string }) {
     <Page>
       <PageHeader
         crumbs={[
-          { href: "/dashboard", label: "Events" },
+          { href: "/dashboard", label: "Quizzes" },
           {
             href: `/events/${results.eventId}/quizzes/${results.quizId}`,
             label: results.quizTitle,
@@ -54,11 +59,30 @@ export function ReviewClient({ sessionId }: { sessionId: string }) {
               {countLabel(results.participantCount, "player", "players")}
             </span>
             <span>
-              {countLabel(results.questions.length, "question", "questions")}
+              {countLabel(results.questionsAsked, "question", "questions")}
             </span>
           </>
         }
+        actions={
+          <>
+            <Button
+              icon="download"
+              onClick={() =>
+                saveFile(
+                  resultsFileName(results),
+                  new Blob([resultsCsv(results)], {
+                    type: "text/csv;charset=utf-8",
+                  }),
+                )
+              }
+            >
+              Export CSV
+            </Button>
+            <RunAgainButton quizId={results.quizId} />
+          </>
+        }
       />
+      <Insights results={results} />
       <WrapUp
         results={results}
         onCorrectScoring={async (questionId, points) => {
@@ -67,6 +91,7 @@ export function ReviewClient({ sessionId }: { sessionId: string }) {
           toast.success("Scoring updated. Standings recalculated.");
         }}
       />
+      <PlayersTable results={results} />
     </Page>
   );
 }

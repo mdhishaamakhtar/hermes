@@ -204,6 +204,44 @@ export interface SessionResults {
   questionsAsked: number;
   leaderboard: LeaderboardEntry[];
   questions: QuestionResult[];
+  /** Every player in standings order, with each answer they gave. */
+  players: PlayerResult[];
+}
+
+export interface PlayerAnswer {
+  questionId: number;
+  selectedOptionIds: number[];
+  score: number;
+  correct: boolean;
+  answerTimeMs: number | null;
+}
+
+export interface PlayerResult {
+  participantId: number;
+  displayName: string;
+  rank: number;
+  score: number;
+  correctCount: number;
+  answeredCount: number;
+  answers: PlayerAnswer[];
+}
+
+/** An event's rounds added up, matching players across rounds by name. */
+export interface EventStandings {
+  eventId: number;
+  rounds: Array<{
+    quizId: number;
+    quizTitle: string;
+    sessionId: number;
+    endedAt: string | null;
+  }>;
+  standings: Array<{
+    rank: number;
+    displayName: string;
+    total: number;
+    /** Follows `rounds`; null where the player sat a round out. */
+    roundScores: Array<number | null>;
+  }>;
 }
 
 export interface MyQuestionResult {
@@ -232,6 +270,7 @@ export interface MyResults {
   rank: number;
   totalParticipants: number;
   questions: MyQuestionResult[];
+  quizTitle: string;
 }
 
 /* ── STOMP ────────────────────────────────────────────────────────────────── */

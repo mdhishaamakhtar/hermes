@@ -11,7 +11,8 @@ public record MyResultsResponse(
     int questionsAsked,
     int rank,
     long totalParticipants,
-    List<QuestionResult> questions) {
+    List<QuestionResult> questions,
+    String quizTitle) {
 
   public record QuestionResult(
       Long questionId,

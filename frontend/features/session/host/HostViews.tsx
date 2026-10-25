@@ -20,6 +20,7 @@ import { ScoringRules } from "../components/ScoringRules";
 import { Rundown } from "../components/Rundown";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
 import { WrapUp } from "../components/WrapUp";
+import { RunAgainButton } from "../results/RunAgain";
 import { emptyStats } from "../session-state";
 import type { QuestionStats } from "../session-types";
 import type { StageQuestion } from "./host-state";
@@ -796,6 +797,9 @@ export function HostEnded({ session }: { session: HostSession }) {
               >
                 Back to the quiz
               </ButtonLink>
+            )}
+            {!session.rehearsal && results && (
+              <RunAgainButton quizId={results.quizId} variant="secondary" />
             )}
             {!session.rehearsal && (
               <ButtonLink
