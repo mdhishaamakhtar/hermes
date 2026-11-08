@@ -17,8 +17,7 @@ public record HostSessionSyncResponse(
     List<SessionResultsResponse.LeaderboardEntry> leaderboard,
     Integer timeLeftSeconds,
     ScoringRules scoring,
-    StageScene scene,
-    boolean rehearsal) {
+    StageScene scene) {
 
   /** A question as the host sees it — standalone, or one sub-question of the current passage. */
   public record Question(

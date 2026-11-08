@@ -23,8 +23,8 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, Long> 
 
   boolean existsByQuizIdAndStatusIn(Long quizId, List<SessionStatus> statuses);
 
-  /** Finished sessions that count, newest first: rehearsals never do. */
-  List<QuizSession> findByQuizIdInAndStatusAndRehearsalFalseOrderByEndedAtDesc(
+  /** Finished sessions of these quizzes, the most recently ended first. */
+  List<QuizSession> findByQuizIdInAndStatusOrderByEndedAtDesc(
       List<Long> quizIds, SessionStatus status);
 
   @Query(

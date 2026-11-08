@@ -10,7 +10,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Integration tests for writing quizzes: quizzes that need no event, the sample quiz, duplicating a
- * question or a whole quiz, reordering, and rehearsals staying out of the quiz's history.
+ * question or a whole quiz, reordering, and a discarded run leaving the quiz's history.
  */
 class AuthoringIntegrationTest extends BaseIntegrationTest {
 
@@ -114,32 +114,28 @@ class AuthoringIntegrationTest extends BaseIntegrationTest {
         409);
   }
 
-  /** Verifies that a finished rehearsal is left out of the quiz's past sessions. */
+  /** Verifies that a finished run the host discards is gone from the quiz's past sessions. */
   @Test
-  void aFinishedRehearsalLeavesNoTrace() throws Exception {
+  void aDiscardedRunLeavesNoTrace() throws Exception {
     Auth organiser = organiser();
-    long quizId = createQuiz(organiser, createEvent(organiser, "Rehearse"), "Run-through");
+    long quizId = createQuiz(organiser, createEvent(organiser, "Practice"), "Run-through");
     createSingleSelectQuestion(organiser, quizId, "Only", 0, 30);
 
-    JsonNode rehearsal =
-        postJson("/api/sessions", organiser, Map.of("quizId", quizId, "rehearsal", true), 201)
-            .path("data");
-    long sessionId = rehearsal.path("id").asLong();
-    assertThat(rehearsal.path("rehearsal").asBoolean()).isTrue();
-    assertThat(
-            getJson("/api/sessions/" + sessionId + "/lobby", organiser, 200)
-                .path("data")
-                .path("rehearsal")
-                .asBoolean())
-        .isTrue();
+    long sessionId =
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201)
+            .path("data")
+            .path("id")
+            .asLong();
+    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
+    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
     assertThat(getJson("/api/quizzes/" + quizId + "/sessions", organiser, 200).path("data"))
         .hasSize(1);
 
-    postJson("/api/sessions/" + sessionId + "/start", organiser, Map.of(), 200);
-    postJson("/api/sessions/" + sessionId + "/end", organiser, Map.of(), 200);
+    deleteJson("/api/sessions/" + sessionId, organiser, 200);
 
     assertThat(getJson("/api/quizzes/" + quizId + "/sessions", organiser, 200).path("data"))
         .isEmpty();
+    getJson("/api/sessions/" + sessionId + "/results", organiser, 404);
   }
 
   private static Map<String, Object> block(long questionId) {

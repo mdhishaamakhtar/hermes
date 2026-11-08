@@ -18,7 +18,7 @@ class ResultsAcrossRoundsIntegrationTest extends BaseIntegrationTest {
   /**
    * Verifies that the results list each player with their rank, score, right answers and picks, and
    * that event standings add each round's latest real session per player, matching a player across
-   * rounds by name whatever its case or spacing, and leaving rehearsals out.
+   * rounds by name whatever its case or spacing, and leaving out a run the host discarded.
    */
   @Test
   void resultsCarryEachPlayerAndTheEventAddsUpItsRounds() throws Exception {
@@ -30,10 +30,11 @@ class ResultsAcrossRoundsIntegrationTest extends BaseIntegrationTest {
     JsonNode second = createSingleSelectQuestion(organiser, roundTwo, "Second", 0, 30);
 
     long sessionOne =
-        play(organiser, roundOne, first, Map.of("Ada", 0, "Ben", 1), false).path("id").asLong();
-    play(organiser, roundTwo, second, Map.of(" ada ", 0, "Cy", 0), false);
-    // A rehearsal of round two must not count.
-    play(organiser, roundTwo, second, Map.of("Ben", 0), true);
+        play(organiser, roundOne, first, Map.of("Ada", 0, "Ben", 1)).path("id").asLong();
+    play(organiser, roundTwo, second, Map.of(" ada ", 0, "Cy", 0));
+    // A later run of round two, discarded, must not replace the real one.
+    long practice = play(organiser, roundTwo, second, Map.of("Ben", 0)).path("id").asLong();
+    deleteJson("/api/sessions/" + practice, organiser, 200);
 
     JsonNode results =
         getJson("/api/sessions/" + sessionOne + "/results", organiser, 200).path("data");
@@ -60,12 +61,10 @@ class ResultsAcrossRoundsIntegrationTest extends BaseIntegrationTest {
   }
 
   /** Runs one question to the end with the given players and their picks (option positions). */
-  private JsonNode play(
-      Auth organiser, long quizId, JsonNode question, Map<String, Integer> picks, boolean rehearsal)
+  private JsonNode play(Auth organiser, long quizId, JsonNode question, Map<String, Integer> picks)
       throws Exception {
     JsonNode session =
-        postJson("/api/sessions", organiser, Map.of("quizId", quizId, "rehearsal", rehearsal), 201)
-            .path("data");
+        postJson("/api/sessions", organiser, Map.of("quizId", quizId), 201).path("data");
     long sessionId = session.path("id").asLong();
     Map<String, String> tokens = new LinkedHashMap<>();
     for (String name : picks.keySet()) {

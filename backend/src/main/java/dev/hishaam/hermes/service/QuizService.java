@@ -275,13 +275,10 @@ public class QuizService {
     quizRepository.delete(quiz);
   }
 
-  /** Past and running sessions. A finished rehearsal was only ever the host's, so it's left out. */
+  /** Past and running sessions, newest first. */
   public List<QuizSessionListResponse> listSessions(Long quizId, Long userId) {
     ownershipService.requireQuizOwner(quizId, userId);
-    var sessions =
-        sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId).stream()
-            .filter(s -> !s.isRehearsal() || s.getStatus() != SessionStatus.ENDED)
-            .toList();
+    var sessions = sessionRepository.findByQuizIdOrderByCreatedAtDesc(quizId);
     var sessionIds = sessions.stream().map(QuizSession::getId).toList();
     var counts = participantRepository.countMapBySessionIds(sessionIds);
     return sessions.stream()
@@ -292,8 +289,7 @@ public class QuizService {
                     s.getStatus().name(),
                     s.getStartedAt(),
                     s.getEndedAt(),
-                    counts.getOrDefault(s.getId(), 0L),
-                    s.isRehearsal()))
+                    counts.getOrDefault(s.getId(), 0L)))
         .toList();
   }
 

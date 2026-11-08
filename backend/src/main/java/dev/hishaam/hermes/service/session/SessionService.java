@@ -116,7 +116,6 @@ public class SessionService {
             .joinCode(joinCode)
             .status(SessionStatus.LOBBY)
             .snapshot(snapshotJson)
-            .rehearsal(Boolean.TRUE.equals(request.rehearsal()))
             .build();
     session = sessionRepository.save(session);
 
@@ -235,8 +234,7 @@ public class SessionService {
         participantCount,
         session.getJoinCode(),
         session.getQuiz().getTitle(),
-        players,
-        session.isRehearsal());
+        players);
   }
 
   /**
@@ -301,8 +299,7 @@ public class SessionService {
         active ? leaderboardService.standings(sessionId) : List.of(),
         ctx.timeLeftSeconds(),
         ScoringRules.of(snapshot),
-        active ? stateStore.getScene(sessionId) : StageScene.QUESTION,
-        session.isRehearsal());
+        active ? stateStore.getScene(sessionId) : StageScene.QUESTION);
   }
 
   /**
@@ -380,7 +377,6 @@ public class SessionService {
         session.getStatus().name(),
         session.getStartedAt(),
         session.getEndedAt(),
-        session.getCreatedAt(),
-        session.isRehearsal());
+        session.getCreatedAt());
   }
 }
