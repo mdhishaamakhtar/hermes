@@ -70,29 +70,27 @@ export function SessionList({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon="trash"
+                    onClick={() => onDiscard(session)}
+                    className="hover:text-danger"
+                  >
+                    <span className="max-sm:sr-only">Discard</span>
+                  </Button>
                   {running ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon="trash"
-                        onClick={() => onDiscard(session)}
-                        className="hover:text-danger"
-                      >
-                        <span className="max-sm:sr-only">Discard</span>
-                      </Button>
-                      <ButtonLink
-                        href={`/session/${session.id}/host`}
-                        variant="primary"
-                        size="sm"
-                        trailingIcon="arrow-right"
-                      >
-                        <span className="max-sm:sr-only">Open host view</span>
-                        <span aria-hidden className="sm:hidden">
-                          Open
-                        </span>
-                      </ButtonLink>
-                    </>
+                    <ButtonLink
+                      href={`/session/${session.id}/host`}
+                      variant="primary"
+                      size="sm"
+                      trailingIcon="arrow-right"
+                    >
+                      <span className="max-sm:sr-only">Open host view</span>
+                      <span aria-hidden className="sm:hidden">
+                        Open
+                      </span>
+                    </ButtonLink>
                   ) : (
                     <ButtonLink
                       href={`/session/${session.id}/review`}

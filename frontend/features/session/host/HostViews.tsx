@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { RollingNumber } from "@/components/ui/AnimatedNumber";
-import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
@@ -21,6 +21,7 @@ import { Rundown } from "../components/Rundown";
 import { PassagePanel, SessionTopBar } from "../components/SessionChrome";
 import { WrapUp } from "../components/WrapUp";
 import { RunAgainButton } from "../results/RunAgain";
+import { sessionsApi } from "../session-api";
 import { emptyStats } from "../session-state";
 import type { QuestionStats } from "../session-types";
 import type { StageQuestion } from "./host-state";
@@ -115,41 +116,14 @@ export function HostLobby({ session }: { session: HostSession }) {
       >
         <div className="flex min-w-0 flex-col gap-8">
           <header>
-            {session.rehearsal && (
-              <Badge tone="warning" dot className="mb-5">
-                Rehearsal
-              </Badge>
-            )}
             <h1 className="display display-tight text-[clamp(2.5rem,6vw,4rem)] leading-[0.92] text-balance text-foreground">
               {session.title || "Lobby"}
             </h1>
             <p className="mt-3 max-w-[38rem] text-lg text-muted">
-              {session.rehearsal
-                ? "A run-through on your own. Join on your phone to see what players see, and open the big screen to see what the room sees. Nothing from a rehearsal is kept."
-                : "Players are joining. Put the big screen on the projector, then start when the room is ready."}
+              Players are joining. Put the big screen on the projector, then
+              start when the room is ready.
             </p>
           </header>
-
-          {session.rehearsal && joinCode && (
-            <section
-              aria-labelledby="rehearse-heading"
-              className="flex flex-col gap-5 border border-border bg-surface p-5 sm:flex-row sm:items-center sm:p-6"
-            >
-              <JoinQr url={url.withCode} className="size-32 shrink-0" />
-              <div className="min-w-0">
-                <h2
-                  id="rehearse-heading"
-                  className="font-semibold text-foreground"
-                >
-                  Play along on your phone
-                </h2>
-                <p className="mt-1 text-sm text-muted">
-                  Scan this with your phone&apos;s camera to join as a player,
-                  then run the quiz from here.
-                </p>
-              </div>
-            </section>
-          )}
 
           <section
             aria-labelledby="screen-heading"
@@ -195,33 +169,43 @@ export function HostLobby({ session }: { session: HostSession }) {
 
           <section
             aria-labelledby="join-heading"
-            className="border border-border bg-surface p-5 sm:p-6"
+            className="flex flex-col gap-6 border border-border bg-surface p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6"
           >
-            <h2 id="join-heading" className="font-semibold text-foreground">
-              Players join at{" "}
-              <span className="font-mono text-accent">{url.display}</span>
-            </h2>
-            <div className="mt-5 max-w-md">
-              <JoinCodeDisplay code={joinCode} size="strip" />
+            <div className="min-w-0">
+              <h2 id="join-heading" className="font-semibold text-foreground">
+                Players join at{" "}
+                <span className="font-mono text-accent">{url.display}</span>
+              </h2>
+              <div className="mt-5 max-w-md">
+                <JoinCodeDisplay code={joinCode} size="strip" />
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  icon="copy"
+                  disabled={!joinCode}
+                  onClick={() => void copy(joinCode, "Join code copied")}
+                >
+                  Copy code
+                </Button>
+                <Button
+                  size="sm"
+                  icon="link"
+                  disabled={!joinCode}
+                  onClick={() => void copy(url.withCode, "Join link copied")}
+                >
+                  Copy join link
+                </Button>
+              </div>
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                icon="copy"
-                disabled={!joinCode}
-                onClick={() => void copy(joinCode, "Join code copied")}
-              >
-                Copy code
-              </Button>
-              <Button
-                size="sm"
-                icon="link"
-                disabled={!joinCode}
-                onClick={() => void copy(url.withCode, "Join link copied")}
-              >
-                Copy join link
-              </Button>
-            </div>
+            {joinCode && (
+              <figure className="flex shrink-0 items-center gap-4 sm:w-32 sm:flex-col sm:items-start sm:gap-2">
+                <JoinQr url={url.withCode} className="size-24 sm:size-32" />
+                <figcaption className="text-sm text-muted">
+                  Scan to join. Try it on your own phone first.
+                </figcaption>
+              </figure>
+            )}
           </section>
         </div>
 
@@ -753,6 +737,11 @@ function PlayerList({
 
 export function HostEnded({ session }: { session: HostSession }) {
   const { results, participantCount } = session;
+  const router = useRouter();
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const quizHref = results
+    ? `/events/${results.eventId}/quizzes/${results.quizId}`
+    : "/dashboard";
   return (
     <>
       <SessionTopBar
@@ -769,47 +758,45 @@ export function HostEnded({ session }: { session: HostSession }) {
         <header className="mb-10 flex flex-wrap items-end justify-between gap-6">
           <div>
             <h1 className="display display-tight text-[clamp(2.75rem,6vw,4.5rem)] leading-[0.92] text-foreground">
-              {session.rehearsal ? "Rehearsal over" : "That's a wrap"}
+              That&apos;s a wrap
             </h1>
             <p className="mt-3 text-muted">
-              {session.rehearsal
-                ? "Nothing from it is kept. Change what you need, then run it for real."
-                : [
-                    countLabel(participantCount, "player", "players"),
-                    results &&
-                      countLabel(
-                        results.questionsAsked ?? results.questions.length,
-                        "question",
-                        "questions",
-                      ),
-                    results?.quizTitle,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+              {[
+                countLabel(participantCount, "player", "players"),
+                results &&
+                  countLabel(
+                    results.questionsAsked ?? results.questions.length,
+                    "question",
+                    "questions",
+                  ),
+                results?.quizTitle,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Button
+              variant="ghost"
+              icon="trash"
+              onClick={() => setDiscardOpen(true)}
+              className="hover:text-danger"
+            >
+              Discard this run
+            </Button>
             {results && (
-              <ButtonLink
-                href={`/events/${results.eventId}/quizzes/${results.quizId}`}
-                variant={session.rehearsal ? "primary" : undefined}
-                trailingIcon={session.rehearsal ? "arrow-right" : undefined}
-              >
-                Back to the quiz
-              </ButtonLink>
+              <ButtonLink href={quizHref}>Back to the quiz</ButtonLink>
             )}
-            {!session.rehearsal && results && (
+            {results && (
               <RunAgainButton quizId={results.quizId} variant="secondary" />
             )}
-            {!session.rehearsal && (
-              <ButtonLink
-                href={`/session/${session.sessionId}/review`}
-                variant="primary"
-                trailingIcon="arrow-right"
-              >
-                Full review
-              </ButtonLink>
-            )}
+            <ButtonLink
+              href={`/session/${session.sessionId}/review`}
+              variant="primary"
+              trailingIcon="arrow-right"
+            >
+              Full review
+            </ButtonLink>
           </div>
         </header>
         <WrapUp
@@ -818,6 +805,17 @@ export function HostEnded({ session }: { session: HostSession }) {
           onCorrectScoring={session.correctScoring}
         />
       </main>
+      <ConfirmDialog
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Discard this run?"
+        description="Its players, answers and scores are deleted, and it stops counting towards the event's standings. Use this after a practice run. This can't be undone."
+        confirmLabel="Discard run"
+        onConfirm={async () => {
+          await sessionsApi.abandon(session.sessionId);
+          router.replace(quizHref);
+        }}
+      />
     </>
   );
 }

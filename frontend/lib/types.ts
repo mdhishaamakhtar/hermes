@@ -88,6 +88,4 @@ export interface SessionSummary {
   startedAt: string | null;
   endedAt: string | null;
   participantCount: number;
-  /** The host's own run-through; listed only while it runs. */
-  rehearsal: boolean;
 }

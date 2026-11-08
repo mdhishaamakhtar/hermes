@@ -294,9 +294,9 @@ public class SessionResultsService {
   }
 
   /**
-   * Standings across an event's rounds: for each quiz, its latest finished session that wasn't a
-   * rehearsal, added up per player. Players are matched by the name they joined with, ignoring case
-   * and surrounding space, since nothing else follows a player between sessions.
+   * Standings across an event's rounds: for each quiz, its latest finished session, added up per
+   * player. Players are matched by the name they joined with, ignoring case and surrounding space,
+   * since nothing else follows a player between sessions.
    */
   @Transactional(readOnly = true)
   public EventStandingsResponse eventStandings(Long eventId, Long userId) {
@@ -304,7 +304,7 @@ public class SessionResultsService {
     List<Quiz> quizzes = event.getQuizzes();
     Map<Long, QuizSession> latestByQuiz = new LinkedHashMap<>();
     sessionRepository
-        .findByQuizIdInAndStatusAndRehearsalFalseOrderByEndedAtDesc(
+        .findByQuizIdInAndStatusOrderByEndedAtDesc(
             quizzes.stream().map(Quiz::getId).toList(), SessionStatus.ENDED)
         .forEach(session -> latestByQuiz.putIfAbsent(session.getQuiz().getId(), session));
 

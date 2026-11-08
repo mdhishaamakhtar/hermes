@@ -21,11 +21,8 @@ const NOT_ENDED_YET = [409];
 
 /** Organiser calls authenticate with the JWT; player calls with a rejoin token. */
 export const sessionsApi = {
-  create: (quizId: number, { rehearsal = false } = {}) =>
-    api.post<{ id: number; joinCode: string }>("/api/sessions", {
-      quizId,
-      rehearsal,
-    }),
+  create: (quizId: number) =>
+    api.post<{ id: number; joinCode: string }>("/api/sessions", { quizId }),
   start: (id: Id) => api.post<void>(`/api/sessions/${id}/start`),
   startTimer: (id: Id) => api.post<void>(`/api/sessions/${id}/start-timer`),
   endTimer: (id: Id) => api.post<void>(`/api/sessions/${id}/end-timer`),

@@ -172,12 +172,9 @@ export function useQuizEditor(quizId: string) {
       );
     },
 
-    /**
-     * Opens a lobby and returns its session id. A rehearsal is the host's
-     * own run-through, kept out of the quiz's past sessions.
-     */
-    async launch({ rehearsal = false } = {}) {
-      const session = await sessionsApi.create(Number(quizId), { rehearsal });
+    /** Opens a lobby and returns its session id. */
+    async launch() {
+      const session = await sessionsApi.create(Number(quizId));
       storeJoinCode(session.id, session.joinCode);
       return session.id;
     },

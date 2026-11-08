@@ -76,8 +76,6 @@ export interface HostState {
   /** Everyone in the room, in the order they arrived. */
   players: PlayerInfo[];
   scene: StageScene;
-  /** The host's own run-through, kept out of the quiz's history. */
-  rehearsal: boolean;
 }
 
 export type HostAction =
@@ -125,7 +123,6 @@ export function initialHostState(joinCode: string): HostState {
     scoring: { penalties: false, speedScoring: false },
     players: [],
     scene: "QUESTION",
-    rehearsal: false,
   };
 }
 
@@ -201,7 +198,6 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
           : state.leaderboard,
         scoring: sync.scoring ?? state.scoring,
         scene: sync.scene ?? "QUESTION",
-        rehearsal: sync.rehearsal ?? state.rehearsal,
       };
     }
 
@@ -214,7 +210,6 @@ export function hostReducer(state: HostState, action: HostAction): HostState {
         joinCode: action.lobby.joinCode || state.joinCode,
         title: action.lobby.quizTitle ?? state.title,
         players: action.lobby.players ?? state.players,
-        rehearsal: action.lobby.rehearsal ?? state.rehearsal,
       };
 
     case "STATUS":

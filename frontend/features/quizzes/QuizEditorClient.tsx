@@ -67,9 +67,7 @@ export function QuizEditorClient({
   const [composer, setComposer] = useState<Composer>(null);
   // The running order while a block is being dragged, before it is saved.
   const [dragOrder, setDragOrder] = useState<string[] | null>(null);
-  const [launching, setLaunching] = useState<"session" | "rehearsal" | null>(
-    null,
-  );
+  const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   // Targets are kept apart from the open flags so a dialog's copy does not
   // blank out while it animates closed.
@@ -134,17 +132,15 @@ export function QuizEditorClient({
     },
   };
 
-  const launch = async (kind: "session" | "rehearsal") => {
-    setLaunching(kind);
+  const launch = async () => {
+    setLaunching(true);
     setLaunchError(null);
     try {
-      const sessionId = await editor.launch({
-        rehearsal: kind === "rehearsal",
-      });
+      const sessionId = await editor.launch();
       router.push(`/session/${sessionId}/host`);
     } catch (err) {
       setLaunchError(describeError(err, "Couldn't open a lobby."));
-      setLaunching(null);
+      setLaunching(false);
     }
   };
 
@@ -206,29 +202,17 @@ export function QuizEditorClient({
           </>
         }
         actions={
-          <>
-            <Button
-              size="lg"
-              icon="phone"
-              onClick={() => void launch("rehearsal")}
-              pending={launching === "rehearsal"}
-              disabled={total === 0 || locked || launching !== null}
-              title="Run through it alone, playing along on your phone. Nothing is kept."
-            >
-              {launching === "rehearsal" ? "Opening…" : "Rehearse"}
-            </Button>
-            <Button
-              variant="primary"
-              size="lg"
-              icon="play"
-              onClick={() => void launch("session")}
-              pending={launching === "session"}
-              disabled={total === 0 || locked || launching !== null}
-              title={total === 0 ? "Add a question first" : undefined}
-            >
-              {launching === "session" ? "Opening lobby…" : "Start a session"}
-            </Button>
-          </>
+          <Button
+            variant="primary"
+            size="lg"
+            icon="play"
+            onClick={() => void launch()}
+            pending={launching}
+            disabled={total === 0 || locked || launching}
+            title={total === 0 ? "Add a question first" : undefined}
+          >
+            {launching ? "Opening lobby…" : "Start a session"}
+          </Button>
         }
       />
 
@@ -249,8 +233,7 @@ export function QuizEditorClient({
             </ButtonLink>
           }
         >
-          {runningSession.rehearsal ? "A rehearsal" : "A session"} of this quiz
-          is{" "}
+          A session of this quiz is{" "}
           {runningSession.status === "LOBBY"
             ? "waiting in the lobby"
             : "live right now"}
@@ -449,7 +432,11 @@ export function QuizEditorClient({
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
         title="Discard this session?"
-        description="Everyone in it is disconnected, and its players and answers are deleted. The quiz becomes editable again."
+        description={
+          discardTarget?.status === "ENDED"
+            ? "Its players, answers and scores are deleted, and it stops counting towards the event's standings. This can't be undone."
+            : "Everyone in it is disconnected, and its players and answers are deleted. The quiz becomes editable again."
+        }
         confirmLabel="Discard session"
         onConfirm={() =>
           discardTarget && editor.discardSession(discardTarget.id)
